@@ -1,0 +1,10 @@
+Xema xema-infra-terraform
+Copyright 2026 xema-dev
+
+This product includes software developed at xema-dev.
+
+This repository contains reusable, cloud-agnostic Terraform modules for
+provisioning the cloud SUBSTRATE a Xema deployment runs on (Kubernetes cluster,
+managed databases, DNS, storage class, identity realm). It does NOT contain any
+deployment-specific values, credentials, or Terraform state — those live in the
+operator's private configuration. See README.md.

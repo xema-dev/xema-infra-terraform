@@ -1,0 +1,124 @@
+# GREENFIELD example values for the DigitalOcean substrate root.
+#
+# Copy to terraform.tfvars and replace every REPLACE_ME / placeholder with REAL
+# values. terraform.tfvars is git-ignored — NEVER commit real tokens or ids.
+# Secrets shown here are FAKE placeholders only. Sensitive provider creds are
+# better supplied via TF_VAR_* env vars than written to a file.
+#
+# This file demonstrates GREENFIELD mode — the stack CREATES the cluster, the
+# managed Postgres, the DNS zone, the in-cluster addons, and the realm from
+# nothing. For the alternative (consume an existing cluster/DB/DNS owned by a
+# separate "cloud substrate" Terraform), see consume.tfvars.example.
+
+# --- enable / disable toggles (greenfield = create everything) ---
+# All default to true, so they may be omitted; shown here for clarity.
+enable_cluster             = true
+enable_managed_postgres    = true
+enable_dns                 = true
+enable_rwx_storage         = true
+enable_workload_namespaces = true
+enable_identity_realm      = true
+
+# --- provider credentials (FAKE placeholders) ---
+do_token             = "REPLACE_ME_DO_API_TOKEN"
+do_spaces_access_id  = "REPLACE_ME_SPACES_ACCESS_ID"
+do_spaces_secret_key = "REPLACE_ME_SPACES_SECRET_KEY"
+
+keycloak_url           = "https://id.example.com"
+keycloak_client_id     = "terraform-admin"
+keycloak_client_secret = "REPLACE_ME_KEYCLOAK_CLIENT_SECRET"
+keycloak_admin_realm   = "master"
+
+# --- global placement ---
+region = "fra1"
+tags = {
+  managed-by = "terraform"
+  deployment = "example"
+}
+
+# --- cluster ---
+cluster_name       = "xema-example"
+kubernetes_version = "1.31."
+default_pool_id    = "generic"
+vpc_id             = "" # empty = region default VPC
+
+node_pools = {
+  generic = {
+    size       = "s-4vcpu-8gb"
+    node_count = 3
+    labels     = { workload = "generic" }
+  }
+  workers = {
+    size      = "s-8vcpu-16gb"
+    min_nodes = 1
+    max_nodes = 5
+    labels    = { workload = "opencode" }
+    taints = [
+      { key = "dedicated", value = "workers", effect = "NoSchedule" },
+    ]
+  }
+}
+
+# --- postgres ---
+postgres_name           = "xema-example-pg"
+postgres_engine_version = "16"
+postgres_size           = "db-s-1vcpu-2gb"
+postgres_databases      = ["xema_platform", "xema_biomes"]
+postgres_roles          = ["xema_app"]
+
+# --- dns ---
+dns_domain = "example.com"
+dns_records = {
+  ingress = { name = "@", type = "A", value = "192.0.2.10" }     # RFC-5737 TEST-NET-1
+  api     = { name = "api", type = "A", value = "192.0.2.11" }   # RFC-5737 TEST-NET-1
+}
+
+# --- identity realm ---
+realm_name         = "xema-example"
+realm_display_name = "Xema (example)"
+
+realm_clients = {
+  web = {
+    client_id           = "web-app"
+    access_type         = "PUBLIC"
+    valid_redirect_uris = ["https://app.example.com/*"]
+    web_origins         = ["https://app.example.com"]
+  }
+  admin = {
+    client_id                = "platform-admin"
+    access_type              = "CONFIDENTIAL"
+    standard_flow_enabled    = false
+    service_accounts_enabled = true
+  }
+}
+
+realm_roles = ["platform_admin", "org_owner", "member"]
+
+realm_protocol_mappers = {
+  org_roles = {
+    client         = "web"
+    user_attribute = "org_roles"
+    claim_name     = "org_roles"
+    multivalued    = true
+  }
+}
+
+# --- extension / biome substrate claims ---
+# Only biomes needing DEDICATED out-of-cluster substrate appear here. See
+# docs/extensions.md. Example: one biome claiming a bucket, one claiming a DB.
+extensions = {
+  "acme/legal-review" = {
+    object_buckets = {
+      evidence = { name = "acme-legal-evidence-example", versioning = true }
+    }
+    dns_records = {
+      portal = { name = "legal", type = "CNAME", value = "ingress.example.com." }
+    }
+  }
+
+  "acme/data-warehouse" = {
+    managed_databases = {
+      main = { database = "ext_data_warehouse", owner = "data_warehouse" }
+    }
+  }
+}

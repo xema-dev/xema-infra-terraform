@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: fmt / validate / tflint / leak-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.2"
+
+      - name: terraform fmt (check, recursive)
+        run: terraform fmt -check -recursive
+
+      - name: terraform validate (every module, stack, example)
+        run: |
+          set -euo pipefail
+          # Validate each leaf directory that contains *.tf files, with the
+          # backend disabled and providers from the local mirror — no cloud creds.
+          find modules stacks examples -type f -name '*.tf' -print0 \
+            | xargs -0 -n1 dirname \
+            | sort -u \
+            | while read -r dir; do
+                echo "::group::validate $dir"
+                terraform -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
+                terraform -chdir="$dir" validate -no-color
+                echo "::endgroup::"
+              done
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint (recursive)
+        run: tflint --recursive --no-color
+
+      # Fail the build if any real secret / state / tfvars slipped into the repo.
+      - name: Private-data leak scan
+        run: |
+          set -euo pipefail
+          violations="$(git ls-files \
+            | grep -E '\.tfstate($|\.)|(^|/)terraform\.tfvars$|(^|/)[^/]+\.auto\.tfvars$|(^|/)backend\.hcl$' \
+            | grep -vE '\.example$' || true)"
+          if [ -n "$violations" ]; then
+            echo "Tracked files that must never be committed to this public repo:"
+            echo "$violations"
+            exit 1
+          fi
+          echo "No state/tfvars/backend secrets tracked. OK."

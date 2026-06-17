@@ -1,0 +1,38 @@
+# Terraform working state — NEVER commit
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Override files (local-only overrides)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Real variable values & secrets — this is a PUBLIC repo.
+# Only *.example files are tracked; never commit real tfvars.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+.auto.tfvars
+*.auto.tfvars
+!*.auto.tfvars.example
+# Backend config with real bucket/keys
+backend.hcl
+!backend.hcl.example
+
+# CLI config / plan artifacts
+.terraformrc
+terraform.rc
+*.tfplan
+*.tfplan.*
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

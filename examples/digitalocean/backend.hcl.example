@@ -1,0 +1,19 @@
+# Partial backend config for Terraform remote state in a PRIVATE DigitalOcean
+# Spaces bucket (S3-compatible). Copy to backend.hcl, replace placeholders, then:
+#   terraform init -backend-config=backend.hcl
+#
+# backend.hcl is git-ignored — NEVER commit real bucket names or keys.
+#
+# The Spaces credentials themselves come from AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY env vars (Spaces is S3-compatible), not this file.
+
+bucket   = "REPLACE_ME_STATE_BUCKET"     # private, versioned Spaces bucket
+key      = "xema/digitalocean/substrate/terraform.tfstate"
+region   = "us-east-1"                   # required by the S3 backend; DO ignores it
+endpoint = "https://fra1.digitaloceanspaces.com"
+
+# DigitalOcean Spaces is not real AWS S3 — skip the AWS-specific validations.
+skip_credentials_validation = true
+skip_metadata_api_check     = true
+skip_region_validation      = true
+skip_requesting_account_id  = true
