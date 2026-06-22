@@ -48,6 +48,23 @@ applies against real infrastructure. Apply/import deliberately stay a manual,
 reviewed, local action. (App deploys remain owned by the separate Helm GitOps
 pipeline — see the table below.)
 
+## Who consumes these modules
+
+These are **library modules** consumed by per-deployment roots that live
+elsewhere. Two consumers today, both **cloud** Kubernetes:
+
+| Consumer | Mode | Uses |
+| --- | --- | --- |
+| `xema-deploy` → `terraform/live/xema-prod` | **consume** (cluster/DB/DNS already exist) | reads the cluster by name; manages xema-specific resources (namespaces, RWX storage, realm, biome extension claims) |
+| `xema-control-plane` → `terraform/management-plane` | **greenfield** (creates the management cluster) | `cluster` + `dns` + object storage + `identity-realm` + `cluster-addons/secrets` for the fleet management plane (Rancher Fleet / Headscale / Teleport host) |
+
+**On-prem appliances are NOT a consumer.** The `xema-appliance` fleet edge is a
+single-node **k3s** box brought up by **ansible** + bootstrap scripts and
+reconciled by Rancher Fleet — it does not use this Terraform. In particular the
+`cluster` module is a managed-cloud cluster (not k3s) and `cluster-addons/rwx-storage`
+is a **multi-node** ReadWriteMany NFS class that does not apply to a single-node
+appliance (which uses k3s local-path). This repo is the **cloud** plane only.
+
 ## What this is NOT
 
 This repo is the **substrate plane** only. Three planes, one owner each:

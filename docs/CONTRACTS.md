@@ -156,6 +156,9 @@ every cloud's stack:
   the Helm app bring-up runs.
 - **`identity-realm`** — the full Keycloak realm (realm + clients + roles +
   protocol mappers) via the `keycloak` provider.
+- **`cluster-addons/secrets`** — materializes operator-provided credentials as
+  Kubernetes Secrets (the management-plane "secret backend" Helm values reference
+  via `secretKeyRef`), via the `kubernetes` provider.
 - **extension/biome substrate** — see [extensions.md](extensions.md). Not a
   resource module; a documented claim contract the stack `for_each`-wires to the
   active cloud's `object-bucket` / `managed-postgres` / `dns` primitives.
