@@ -10,8 +10,14 @@ and the cloud-agnostic addons:
 | `module.dns` | the managed DNS zone's records |
 | `module.rwx_storage` | a ReadWriteMany `StorageClass` (NFS provisioner) on the cluster |
 | `module.workload_namespaces` | the namespaces the Helm app bring-up expects |
-| `module.identity_realm` | the Keycloak realm (realm + clients + roles + mappers) |
+| `module.identity_realm` | the Keycloak realm **container** (+ optional base clients/roles/mappers) |
 | `module.extension_bucket` | dedicated object buckets claimed by biomes (see below) |
+
+> **Realm boundary:** when a platform app (e.g. `identity-api`) reconciles the
+> realm's platform clients/roles/scopes/mappers on boot, leave `realm_clients` /
+> `realm_roles` / `realm_protocol_mappers` **empty** and let Terraform manage only
+> the realm container — see the
+> [`identity-realm` README](../../../modules/identity-realm/README.md#ownership-boundary--terraform-vs-identity-api-read-this).
 
 It configures all four providers (`digitalocean`, `kubernetes`, `helm`,
 `keycloak`) in `providers.tf` — reusable modules never declare a `provider {}`

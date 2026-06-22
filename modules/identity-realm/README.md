@@ -8,21 +8,50 @@ provider (`>= 5.0`).
 
 ## This module OWNS the realm declaratively
 
-This module is the **source of truth** for the realm it manages. Everything in
-the realm is described as Terraform inputs, so the desired state is whatever this
-module declares — drift is reconciled on the next `apply`.
+This module manages a realm's **container + identity**, and *optionally* base
+client/role/mapper definitions you pass in. It is **NOT** the sole writer of the
+realm. In a Xema deployment the realm coexists with `identity-api`, which
+**authoritatively reconciles platform-access objects on every boot** (idempotent,
+fail-loud). Do **not** double-manage those — it causes a drift war and changes how
+`identity-api` works.
 
 > **Scoped to ONE realm — never master/other realms.** The canonical Xema
 > deployment runs on an external, **shared** Keycloak that also hosts non-Xema
-> realms. This module manages exactly `var.realm_name` (e.g. `xema-prod`) and its
-> children. It declares no provider block and creates no other realm. The
-> `realm_name` validation refuses `master`.
+> realms. This module manages exactly `var.realm_name` (e.g. `xema-prod`). It
+> declares no provider block and creates no other realm; the `realm_name`
+> validation refuses `master`.
 
-> **Supersedes app-side realm reconciliation.** Because this module owns the realm
-> declaratively, the platform's in-app realm reconciliation (the boot-time
-> realm/client/mapper mutation in `identity-api`) MUST run in **verify/off** mode
-> against any realm managed here — otherwise the two writers fight. Terraform is
-> the writer; the app verifies, it does not mutate.
+**Terraform owns (safe to declare here):**
+- the realm **resource** (existence) + a few identity settings: `display_name`,
+  `enabled`, registration/reset/email/ssl flags;
+- **identity providers** (SAML/OIDC) — `identity-api` never touches these;
+- **base definitions** of clients/roles NOT in identity-api's reconciled set
+  (custom clients, custom realm roles), passed via `clients` / `realm_roles`.
+
+**`identity-api` owns — DO NOT put these in `clients`/`realm_roles`/`protocol_mappers`:**
+- platform realm roles: `platform_admin`, `platform_support`, `micro-service`,
+  `runner*`, the `org_*` taxonomy;
+- the `platform-agent-worker` client (created + secret synced on boot);
+- the `entitlement` and `scoped-service-claims` client scopes + their protocol
+  mappers (`org_roles`, scoped-service claims);
+- realm event listeners (`identity-api-provisioner`), realm attributes
+  (`identityApiUrl`/`identityApiInternalToken`), the user-profile
+  `unmanagedAttributePolicy`, and token lifespans it sets via
+  `POST /realms/{id}/configure`.
+
+`identity-api` documents this split itself — its boot path "deliberately does NOT
+run applyRealmRoles / applyClients … that an environment's realm import owns."
+This module is that realm import for the **container**; leave `identity-api` its
+platform-access reconciliation (do not flip it to verify/off for these objects).
+
+> **Rich operational config is `ignore_changes`d.** Themes, SMTP, password policy,
+> i18n, and signing crypto are NOT managed here (operator/`identity-api` own them)
+> — adopting an existing realm never strips them. See `main.tf`.
+
+**For the canonical `xema-prod` adoption** the realm is imported **shell-only**
+(`clients`/`realm_roles`/`protocol_mappers` empty) precisely because `identity-api`
+owns the platform clients/roles/mappers. Keep them empty unless adding a NEW object
+that `identity-api` does not reconcile.
 
 ## Usage
 
