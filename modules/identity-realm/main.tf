@@ -11,6 +11,26 @@ resource "keycloak_realm" "this" {
   access_token_lifespan    = var.access_token_lifespan != "" ? var.access_token_lifespan : null
   sso_session_idle_timeout = var.sso_session_idle_timeout != "" ? var.sso_session_idle_timeout : null
   sso_session_max_lifespan = var.sso_session_max_lifespan != "" ? var.sso_session_max_lifespan : null
+
+  # This module owns the realm's IDENTITY (existence, display, login flags, token
+  # lifespans) + its clients/roles/mappers — NOT its rich operational config.
+  # Themes, SMTP, password policy, i18n, and signing crypto are owned by the
+  # platform/operator (e.g. identity-api's realm reconciliation). Ignore them so
+  # adopting an existing realm is a clean import and Terraform never strips that
+  # config. To bring any of these under Terraform, remove it from this list and
+  # add an explicit input.
+  lifecycle {
+    ignore_changes = [
+      account_theme,
+      admin_theme,
+      email_theme,
+      login_theme,
+      default_signature_algorithm,
+      password_policy,
+      internationalization,
+      smtp_server,
+    ]
+  }
 }
 
 resource "keycloak_openid_client" "this" {
