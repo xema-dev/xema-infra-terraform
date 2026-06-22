@@ -4,11 +4,11 @@ output "storage_class_name" {
 }
 
 output "release_name" {
-  description = "Helm release name of the NFS provisioner."
-  value       = helm_release.this.name
+  description = "Helm release name of the NFS provisioner; null when manage_provisioner_chart = false (provisioner consumed, not managed)."
+  value       = one(helm_release.this[*].name)
 }
 
 output "namespace" {
-  description = "Namespace the NFS provisioner release is installed into."
-  value       = helm_release.this.namespace
+  description = "Namespace the NFS provisioner release is installed into; null when manage_provisioner_chart = false."
+  value       = one(helm_release.this[*].namespace)
 }

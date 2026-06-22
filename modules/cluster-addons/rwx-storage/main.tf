@@ -1,4 +1,6 @@
 resource "helm_release" "this" {
+  count = var.manage_provisioner_chart ? 1 : 0
+
   name             = var.release_name
   repository       = var.chart_repository
   chart            = var.chart_name

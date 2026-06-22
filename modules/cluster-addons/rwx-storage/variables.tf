@@ -1,3 +1,15 @@
+variable "manage_provisioner_chart" {
+  description = <<-EOT
+    Whether this module installs/manages the NFS provisioner Helm release. Set
+    false to CONSUME a provisioner that already exists in the cluster (e.g.
+    hand-installed) and manage ONLY the StorageClass — avoids adopting a
+    drift-prone Helm release into state. When false, none of the chart_* inputs
+    apply.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "chart_repository" {
   description = "Helm repository URL for the NFS provisioner chart. Swap to e.g. \"https://kubernetes-sigs.github.io/csi-driver-nfs\" to adopt a different provisioner."
   type        = string
