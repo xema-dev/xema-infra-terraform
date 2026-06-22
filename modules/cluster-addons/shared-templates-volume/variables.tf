@@ -52,3 +52,9 @@ variable "labels" {
     "app.kubernetes.io/component"  = "shared-templates-volume"
   }
 }
+
+variable "name_prefix" {
+  description = "Prefix for the two static PV names (`<prefix>-orchestrator`, `<prefix>-workers`). PVs are cluster-scoped, so the prefix must be unique per shared-templates volume on the cluster."
+  type        = string
+  default     = "xema-templates"
+}
