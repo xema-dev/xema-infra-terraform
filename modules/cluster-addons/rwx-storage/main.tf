@@ -33,4 +33,12 @@ resource "kubernetes_storage_class" "this" {
 
   # The provisioner registered by the chart must exist before the class can bind.
   depends_on = [helm_release.this]
+
+  # Adopting a pre-existing StorageClass: ignore label/annotation drift so the
+  # import is clean and Terraform never strips metadata applied by the installer
+  # or other controllers. (is_default_class is applied on create; to flip it on
+  # an already-adopted class, set the annotation out-of-band or recreate.)
+  lifecycle {
+    ignore_changes = [metadata[0].labels, metadata[0].annotations]
+  }
 }
