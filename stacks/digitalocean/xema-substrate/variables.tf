@@ -277,6 +277,24 @@ variable "rwx_is_default_class" {
   default     = false
 }
 
+variable "rwx_manage_provisioner_chart" {
+  description = "Install/manage the NFS provisioner Helm release. Set false to consume a pre-installed provisioner and manage only the StorageClass (clean StorageClass-only import)."
+  type        = bool
+  default     = true
+}
+
+variable "rwx_storage_provisioner" {
+  description = "The provisioner field on the RWX StorageClass (must match the installed provisioner)."
+  type        = string
+  default     = "openebs.io/nfsrwx"
+}
+
+variable "rwx_allow_volume_expansion" {
+  description = "Whether PVCs bound to the RWX StorageClass may be expanded (match the live class when importing)."
+  type        = bool
+  default     = true
+}
+
 # ---------------------------------------------------------------------------
 # Workload namespaces (modules/cluster-addons/workload-namespaces)
 # ---------------------------------------------------------------------------

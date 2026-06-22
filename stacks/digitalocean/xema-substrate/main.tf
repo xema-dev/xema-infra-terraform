@@ -65,9 +65,12 @@ module "rwx_storage" {
   source = "../../../modules/cluster-addons/rwx-storage"
   count  = var.enable_rwx_storage ? 1 : 0
 
-  storage_class_name = var.rwx_storage_class_name
-  chart_version      = var.rwx_chart_version
-  is_default_class   = var.rwx_is_default_class
+  storage_class_name        = var.rwx_storage_class_name
+  storage_class_provisioner = var.rwx_storage_provisioner
+  chart_version             = var.rwx_chart_version
+  is_default_class          = var.rwx_is_default_class
+  manage_provisioner_chart  = var.rwx_manage_provisioner_chart
+  allow_volume_expansion    = var.rwx_allow_volume_expansion
 }
 
 module "workload_namespaces" {
