@@ -3,10 +3,11 @@ output "websockets_enabled" {
   value       = var.websockets_enabled
 }
 
-output "argo_smart_routing_enabled" {
+output "argo_smart_routing_managed" {
   description = <<-EOT
-    Effective Argo Smart Routing state. Expected false — Cloudflare documents
-    Argo as incompatible with WebSockets.
+    Whether Terraform manages Argo Smart Routing on this zone. False on a plan
+    without the Argo add-on, where the setting does not exist — and therefore
+    cannot be switched on to break WebSockets.
   EOT
-  value       = var.argo_smart_routing_enabled
+  value       = var.manage_argo_smart_routing
 }

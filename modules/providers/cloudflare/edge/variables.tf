@@ -21,6 +21,23 @@ variable "websockets_enabled" {
   default     = true
 }
 
+variable "manage_argo_smart_routing" {
+  description = <<-EOT
+    Whether Terraform manages the Argo Smart Routing setting at all.
+
+    Default false: Argo is a paid add-on, and on a plan without it the setting
+    does not exist — the API answers 1015 "not authorized to access this
+    setting (smart_routing)". Declaring the resource anyway would make
+    `terraform apply` fail rather than protect anything. `xema.dev` is on the
+    Free plan, so Argo cannot be enabled there and cannot break WebSockets.
+
+    Flip to true if the zone is upgraded to a plan that includes Argo — that is
+    when pinning it off begins to matter.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "argo_smart_routing_enabled" {
   description = <<-EOT
     Whether Argo Smart Routing is enabled.
@@ -29,8 +46,8 @@ variable "argo_smart_routing_enabled" {
     (see https://developers.cloudflare.com/network/websockets/ "Compatibility
     notes"), so enabling it would break every WebSocket session on the zone.
 
-    Declared here — rather than simply left alone — so that turning it on is a
-    visible, reviewed diff instead of a dashboard click nobody can see.
+    Only takes effect when `manage_argo_smart_routing` is true; see that
+    variable for why managing it is opt-in.
   EOT
   type        = bool
   default     = false
