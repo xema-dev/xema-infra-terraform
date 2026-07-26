@@ -45,7 +45,8 @@ SSE endpoints (`agent-session-api` session events, `canopy-api` turns,
   [incompatible with WebSockets](https://developers.cloudflare.com/network/websockets/),
   so enabling it for latency would break every WebSocket session on the zone.
   On the current Free plan Argo is not available at all — the setting answers
-  `1015 ... Cause(s): smart_routing` and `/zones/:id/argo` has no route — so it
+  `1003 "Undefined zone setting"` (and `/zones/:id/argo/smart_routing` answers
+  `1015 … Cause(s): smart_routing`) — so it
   cannot be switched on, and Terraform leaves it unmanaged by default
   (`manage_argo_smart_routing = false`). Managing it unconditionally would make
   `apply` fail on that 1015 rather than protect anything.

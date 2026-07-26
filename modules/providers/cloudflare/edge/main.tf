@@ -47,6 +47,8 @@ resource "cloudflare_zone_setting" "websockets" {
 # Not managed by default, because Argo is a PAID ADD-ON and the setting does not
 # exist on a plan without it. Verified against `xema.dev` (Free):
 #   GET /zones/:id/settings/argo_smart_routing
+#     → 1003 "Undefined zone setting: argo_smart_routing"
+#   GET /zones/:id/argo/smart_routing
 #     → 1015 "The request is not authorized to access this setting.
 #             Cause(s): smart_routing"
 #   GET /zones/:id/argo → 7000 "No route for that URI"

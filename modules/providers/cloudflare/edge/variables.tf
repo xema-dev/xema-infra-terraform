@@ -26,8 +26,9 @@ variable "manage_argo_smart_routing" {
     Whether Terraform manages the Argo Smart Routing setting at all.
 
     Default false: Argo is a paid add-on, and on a plan without it the setting
-    does not exist — the API answers 1015 "not authorized to access this
-    setting (smart_routing)". Declaring the resource anyway would make
+    does not exist — the settings API answers 1003 "Undefined zone setting"
+    (and the dedicated Argo endpoint 1015 "not authorized … smart_routing").
+    Declaring the resource anyway would make
     `terraform apply` fail rather than protect anything. `xema.dev` is on the
     Free plan, so Argo cannot be enabled there and cannot break WebSockets.
 
