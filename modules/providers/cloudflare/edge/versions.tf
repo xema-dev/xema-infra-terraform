@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 1.6"
   required_providers {
     cloudflare = {
       # >= 5.0 is REQUIRED, not conservative: `cloudflare_zone_setting` (one
