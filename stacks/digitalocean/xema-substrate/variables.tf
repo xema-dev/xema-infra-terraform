@@ -341,6 +341,18 @@ variable "realm_display_name" {
   default     = ""
 }
 
+variable "realm_access_token_lifespan" {
+  description = <<-EOT
+    Access-token lifespan for the managed realm, as a Go duration string (e.g.
+    "5m"). Empty string keeps the Keycloak default — which is itself 5m, so
+    leaving this empty means the value is INHERITED rather than decided. Set it
+    explicitly in a deployment's tfvars so the lifespan is intent, and a change
+    to it shows up in a plan.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "realm_clients" {
   description = <<-EOT
     OpenID clients to create in the realm, keyed by a stable id. Each client:
