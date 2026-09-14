@@ -61,10 +61,11 @@ node_pools = {
     labels     = { workload = "generic" }
   }
   workers = {
-    size      = "Standard_D8s_v5"
-    min_nodes = 1
-    max_nodes = 5
-    labels    = { workload = "opencode" }
+    size       = "Standard_D8s_v5"
+    node_count = 1 # required by the type; ignored once min_nodes/max_nodes enable autoscaling
+    min_nodes  = 1
+    max_nodes  = 5
+    labels     = { workload = "opencode" }
     taints = [
       { key = "dedicated", value = "workers", effect = "NoSchedule" },
     ]
