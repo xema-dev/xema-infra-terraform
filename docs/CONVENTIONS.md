@@ -49,8 +49,10 @@ be empty):
 ## Adding a new cloud
 
 1. Add `modules/providers/<cloud>/{cluster,managed-postgres,dns,object-bucket,state-bucket}`,
-   each satisfying [CONTRACTS.md](CONTRACTS.md).
-2. Copy `stacks/digitalocean/xema-substrate` to `stacks/<cloud>/xema-substrate` and
+   each satisfying [CONTRACTS.md](CONTRACTS.md) — plus `secrets-backend` and
+   `cache` when the cloud offers a managed equivalent (both optional primitives).
+2. Copy a `stacks/<cloud>/xema-substrate` (DigitalOcean is the minimal shape,
+   Azure the one with every optional primitive and the `ingress-tls` addon) and
    point each `module` block at the new `providers/<cloud>/*` sources. The
    cloud-agnostic modules and the extension wiring are copied verbatim.
 3. Add an `examples/<cloud>/` with placeholder `terraform.tfvars.example` +

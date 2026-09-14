@@ -51,12 +51,16 @@ pipeline — see the table below.)
 ## Who consumes these modules
 
 These are **library modules** consumed by per-deployment roots that live
-elsewhere. Two consumers today, both **cloud** Kubernetes:
+elsewhere. Every consumer is a **private root** (its own backend, tfvars and
+state) that references these modules by a pinned `?ref=`; the shape of such a
+root is what `examples/<cloud>/` shows. Consumers today, all **cloud**
+Kubernetes:
 
 | Consumer | Mode | Uses |
 | --- | --- | --- |
 | `xema-deploy` → `terraform/live/xema-prod` | **consume** (cluster/DB/DNS already exist) | reads the cluster by name; manages xema-specific resources (namespaces, RWX storage, realm, biome extension claims) |
 | `xema-control-plane` → `terraform/management-plane` | **greenfield** (creates the management cluster) | `cluster` + `dns` + object storage + `identity-realm` + `cluster-addons/secrets` for the fleet management plane (Rancher Fleet / Headscale / Teleport host) |
+| a per-deployment private root on **Azure** (one per customer deployment, kept in that deployment's own private repository) | **greenfield** or **consume** | `stacks/azure/xema-substrate` — everything derived from one `deployment_name` (see [The Azure stack](#the-azure-stack)) |
 
 **On-prem appliances are NOT a consumer.** The `xema-appliance` fleet edge is a
 single-node **k3s** box brought up by **ansible** + bootstrap scripts and
@@ -64,6 +68,35 @@ reconciled by Rancher Fleet — it does not use this Terraform. In particular th
 `cluster` module is a managed-cloud cluster (not k3s) and `cluster-addons/rwx-storage`
 is a **multi-node** ReadWriteMany NFS class that does not apply to a single-node
 appliance (which uses k3s local-path). This repo is the **cloud** plane only.
+
+## The Azure stack
+
+[`stacks/azure/xema-substrate`](stacks/azure/xema-substrate/README.md) is the
+second full implementation of the substrate, and it adds three optional
+primitives the DigitalOcean stack does not have — a **secrets backend**
+(Key Vault + External Secrets), an optional **managed cache**, and the
+cloud-agnostic **`ingress-tls`** addon (ingress-nginx, cert-manager +
+`ClusterIssuer`, External Secrets + `ClusterSecretStore`). Three properties
+decide its shape:
+
+- **One input names everything.** `deployment_name` (validated, 3-20 chars)
+  derives the cluster, server, storage account, vault, namespaces
+  (`<dep>`, `<dep>-shared`, `<dep>-infra`, …), the thirteen platform databases
+  (`<dep>_identity_api`, …), the app and provisioner roles, the blob container
+  prefix and the realm. `environment` (`dev | prod`) decides the irreversible
+  knobs. The only rewrite is hyphen → underscore for Postgres identifiers.
+- **Workload identity, no stored cloud credentials.** AKS runs with the OIDC
+  issuer on; cert-manager's DNS-01 solver and External Secrets each get a
+  user-assigned identity federated to their service account, scoped to the one
+  zone / vault they touch.
+- **A `substrate` output map** carries the non-secret facts the Helm layer
+  consumes (hosts, ports, names, endpoints, the ingress hint, the realm);
+  credentials stay in separate sensitive outputs.
+
+Read the stack README's
+[apply-order section](stacks/azure/xema-substrate/README.md#apply-order-on-a-greenfield-cluster-read-this)
+before a greenfield apply: three providers connect to things the stack
+creates, and the Postgres roles need the operator to reach a private server.
 
 ## What this is NOT
 
@@ -91,8 +124,10 @@ infrastructure** the platform itself runs on. They compose but never overlap.
 ```
 modules/
   cluster-addons/
-    rwx-storage/          # ReadWriteMany StorageClass + NFS provisioner (any cluster)
+    rwx-storage/          # ReadWriteMany StorageClass (+ optional NFS provisioner) (any cluster)
     workload-namespaces/  # cluster-prerequisite namespaces (any cluster)
+    secrets/              # operator-provided credentials as Kubernetes Secrets (any cluster)
+    ingress-tls/          # ingress-nginx + cert-manager/ClusterIssuer + External Secrets/ClusterSecretStore (any cluster)
   identity-realm/         # full Keycloak realm config (any Keycloak)
   providers/
     digitalocean/         # DigitalOcean implementations of the substrate contracts
@@ -101,11 +136,22 @@ modules/
       dns/                #   DO DNS domain + records
       object-bucket/      #   DO Spaces bucket (app/biome use)
       state-bucket/       #   DO Spaces bucket for Terraform state (bootstrap)
+    azure/                # Azure implementations of the substrate contracts
+      cluster/            #   AKS + node pools + VNet (delegated Postgres subnet), workload identity
+      managed-postgres/   #   PostgreSQL Flexible Server + logical DBs/roles + grants
+      dns/                #   Azure DNS zone + records (+ DNS-01 workload identity)
+      object-bucket/      #   storage account (+ containers) for app/biome blobs
+      state-bucket/       #   storage account + container for Terraform state (bootstrap)
+      secrets-backend/    #   RBAC Key Vault + External Secrets reader identity
+      cache/              #   Azure Cache for Redis (optional)
 stacks/
   digitalocean/
-    xema-substrate/       # composes the above into one deployable substrate
+    xema-substrate/       # composes the DO primitives into one deployable substrate
+  azure/
+    xema-substrate/       # composes the Azure primitives; every name derived from deployment_name
 examples/
   digitalocean/           # runnable example with placeholder values
+  azure/                  # runnable example with placeholder values
 docs/
   CONTRACTS.md            # the cloud-agnostic interface every provider must satisfy
   CONVENTIONS.md          # module authoring conventions
@@ -119,11 +165,13 @@ docs/
    substrate primitive must satisfy.
 2. To run on **DigitalOcean**, copy [`examples/digitalocean`](examples/digitalocean)
    and fill in `terraform.tfvars` + `backend.hcl` from the `.example` files.
-3. To run on **another cloud**, add `modules/providers/<cloud>/{cluster,managed-postgres,dns,object-bucket}`
-   satisfying the contracts, then copy `stacks/digitalocean/xema-substrate` to
-   `stacks/<cloud>/xema-substrate` and swap the module sources. Nothing else changes —
-   the cloud-agnostic modules (`cluster-addons/*`, `identity-realm`) and the stack
-   shape are reused as-is.
+3. To run on **Azure**, copy [`examples/azure`](examples/azure) — one
+   `deployment_name` derives everything; see [The Azure stack](#the-azure-stack).
+4. To run on **another cloud**, add `modules/providers/<cloud>/{cluster,managed-postgres,dns,object-bucket,state-bucket}`
+   satisfying the contracts (plus `secrets-backend` / `cache` if that cloud offers
+   them), then copy a `stacks/<cloud>/xema-substrate` and swap the module sources.
+   Nothing else changes — the cloud-agnostic modules (`cluster-addons/*`,
+   `identity-realm`) and the stack shape are reused as-is.
 
 ## Adopting already-running infrastructure
 

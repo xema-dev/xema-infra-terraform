@@ -159,8 +159,12 @@ Manages a DNS zone's records.
 - Record `type` is the closed set `A | AAAA | CNAME | TXT` (Azure DNS uses one
   resource type per record type; only those four are implemented). Wildcards
   (`"*"`, `"*.sub"`) and the apex (`"@"`) are supported.
+- The zone is global, but a created resource group and the DNS-01 identity
+  need a location, so the implementation adds an optional `region` that is
+  required (by precondition, naming the input) exactly when one of those is
+  created.
 - Extra outputs: `name_servers` (delegate the apex to these at the registrar),
-  `zone_id`, `resource_group_name`, and — when the optional
+  `zone_id`, `resource_group_name`, `subscription_id`, and — when the optional
   `dns01_workload_identity` input is enabled — `dns01_client_id`, the
   user-assigned identity cert-manager's ACME DNS-01 solver uses through workload
   identity (see the `ingress-tls` addon).
