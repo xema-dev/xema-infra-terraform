@@ -26,10 +26,6 @@ resource "terraform_data" "input_guards" {
       condition     = !var.enable_identity_realm || var.keycloak_url != ""
       error_message = "enable_identity_realm = true requires keycloak_url."
     }
-    precondition {
-      condition     = var.enable_cluster || !local.needs_cluster_facts || local.cluster_name != ""
-      error_message = "Consuming an existing cluster requires cluster_name (and cluster_resource_group_name)."
-    }
   }
 }
 
@@ -88,10 +84,11 @@ module "postgres" {
   delegated_subnet_id   = local.delegated_subnet_id
   public_firewall_rules = var.postgres_public_firewall_rules
 
-  private_dns_zone_name  = local.postgres_private_dns_zone_name
-  administrator_login    = local.pg_admin_login
-  administrator_password = local.pg_admin_password
-  backup_retention_days  = local.postgres_backup_retention
+  private_dns_zone_name           = local.postgres_private_dns_zone_name
+  administrator_login             = local.pg_admin_login
+  generate_administrator_password = false # minted by the stack (random_password.postgres_admin) or supplied
+  administrator_password          = local.pg_admin_password
+  backup_retention_days           = local.postgres_backup_retention
 
   databases    = local.postgres_databases
   roles        = local.postgres_roles
@@ -112,7 +109,7 @@ module "dns" {
   # The cert-manager DNS-01 identity, only when that solver is in use.
   dns01_workload_identity = {
     enabled         = var.enable_ingress_tls && local.dns01
-    oidc_issuer_url = coalesce(local.oidc_issuer_url, "")
+    oidc_issuer_url = local.oidc_issuer_url
   }
 
   tags = local.tags
@@ -143,7 +140,7 @@ module "secrets_backend" {
 
   workload_identity = {
     enabled         = true
-    oidc_issuer_url = coalesce(local.oidc_issuer_url, "")
+    oidc_issuer_url = local.oidc_issuer_url
   }
 
   purge_protection_enabled = local.key_vault_purge_protection

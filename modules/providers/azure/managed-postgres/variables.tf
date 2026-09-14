@@ -123,8 +123,14 @@ variable "administrator_login" {
   default     = "pgadmin"
 }
 
+variable "generate_administrator_password" {
+  description = "Generate the administrator password with random_password (exposed as the sensitive administrator_password output and inside uri). Set false to supply administrator_password yourself. A boolean rather than \"empty means generate\" so a caller may pass a password that is itself unknown until apply."
+  type        = bool
+  default     = true
+}
+
 variable "administrator_password" {
-  description = "Server administrator password. Empty generates a random one (exposed as the sensitive administrator_password output and inside uri). Supply via TF_VAR_*, never committed."
+  description = "Server administrator password, used when generate_administrator_password = false. Supply via TF_VAR_*, never committed."
   type        = string
   default     = ""
   sensitive   = true

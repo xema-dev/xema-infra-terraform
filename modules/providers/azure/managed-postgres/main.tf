@@ -5,7 +5,7 @@ locals {
   private               = var.network_access == "private"
   private_dns_zone_name = var.private_dns_zone_name != "" ? var.private_dns_zone_name : "${var.name}.private.postgres.database.azure.com"
 
-  administrator_password = var.administrator_password != "" ? var.administrator_password : random_password.administrator[0].result
+  administrator_password = var.generate_administrator_password ? random_password.administrator[0].result : var.administrator_password
 
   # Every (role, database) pair gets CONNECT.
   connect_grants = {
@@ -23,7 +23,7 @@ resource "azurerm_resource_group" "this" {
 }
 
 resource "random_password" "administrator" {
-  count = var.administrator_password == "" ? 1 : 0
+  count = var.generate_administrator_password ? 1 : 0
 
   length  = 32
   special = false
@@ -85,6 +85,11 @@ resource "azurerm_postgresql_flexible_server" "this" {
     # Azure picks a zone when none is requested and reports it back; that must
     # not read as drift. The HA standby zone likewise.
     ignore_changes = [zone, high_availability[0].standby_availability_zone]
+
+    precondition {
+      condition     = var.generate_administrator_password || var.administrator_password != ""
+      error_message = "generate_administrator_password = false requires administrator_password."
+    }
 
     precondition {
       condition     = !local.private || (var.delegated_subnet_id != "" && var.vpc_id != "")

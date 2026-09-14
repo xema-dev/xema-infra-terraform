@@ -23,7 +23,7 @@ output "vpc_id" {
 }
 
 output "oidc_issuer_url" {
-  description = "OIDC issuer URL of the created or consumed cluster (for federated credentials); null when no cluster facts were needed."
+  description = "OIDC issuer URL of the created or consumed cluster (for federated credentials); \"\" when no cluster facts were needed."
   value       = local.oidc_issuer_url
 }
 

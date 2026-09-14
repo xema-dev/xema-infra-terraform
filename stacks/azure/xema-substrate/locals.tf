@@ -105,7 +105,11 @@ locals {
     ? one(module.cluster[*].cluster_ca_certificate)
   : try(one(data.azurerm_kubernetes_cluster.existing[*].kube_config[0].cluster_ca_certificate), null))
 
-  oidc_issuer_url = var.enable_cluster ? one(module.cluster[*].oidc_issuer_url) : try(one(data.azurerm_kubernetes_cluster.existing[*].oidc_issuer_url), "")
+  # Never null: "" when no cluster facts are needed, so the modules that take it
+  # can be given it unconditionally (coalesce(null, "") is an error, not "").
+  oidc_issuer_url = (var.enable_cluster
+    ? one(module.cluster[*].oidc_issuer_url)
+  : (local.needs_cluster_facts ? data.azurerm_kubernetes_cluster.existing[0].oidc_issuer_url : ""))
 
   vpc_id              = var.enable_cluster ? one(module.cluster[*].vpc_id) : var.existing_vnet_id
   delegated_subnet_id = var.enable_cluster ? one(module.cluster[*].delegated_subnet_id) : var.existing_delegated_subnet_id
