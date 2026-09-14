@@ -13,8 +13,11 @@ mechanism are then reused unchanged.
 
 Each substrate area is independently toggleable via an `enable_*` stack input
 (`enable_cluster`, `enable_managed_postgres`, `enable_dns`, `enable_rwx_storage`,
-`enable_workload_namespaces`, `enable_identity_realm`; all default `true`). This
-splits the **cloud-infra** plane from the **xema-specific** plane:
+`enable_workload_namespaces`, `enable_identity_realm`; all default `true`). A
+stack that implements the optional primitives below adds a toggle per primitive
+with the same shape (`enable_object_storage`, `enable_secrets_backend`,
+`enable_cache`, `enable_ingress_tls`). This splits the **cloud-infra** plane from
+the **xema-specific** plane:
 
 - **Greenfield (default):** everything enabled → the stack CREATES the cluster,
   managed DB, DNS, in-cluster addons, and realm from nothing.
@@ -61,6 +64,22 @@ Provisions the managed Kubernetes cluster and its node pools.
 | `token` | `string` (sensitive) | Short-lived auth token, if the cloud issues one (else `""`). |
 | `vpc_id` | `string` | Network the cluster lives in (`""` if N/A). |
 
+**Azure specifics** (`providers/azure/cluster`)
+
+- `region` is the Azure *location* (e.g. `"westeurope"`).
+- `token` is always `""`: AKS issues **client-certificate** credentials, not a
+  bearer token. The implementation exposes the extra sensitive outputs
+  `client_certificate` and `client_key`, which the stack feeds to the
+  `kubernetes` / `helm` providers instead of `token`.
+- `vpc_id` is the **virtual network** id. The module always creates its own VNet
+  with two subnets — one for AKS, one **delegated** to
+  `Microsoft.DBforPostgreSQL/flexibleServers` — and exposes the extras
+  `delegated_subnet_id`, `resource_group_name`, `oidc_issuer_url`
+  (workload identity is always ON) and `kubelet_identity_id`.
+- `node_pools` keys are also the AKS **agent pool names**, so they must match
+  `^[a-z][a-z0-9]{0,11}$`. The default pool cannot carry taints (an AKS rule);
+  put tainted pools in additional pools.
+
 ---
 
 ## `managed-postgres`
@@ -91,6 +110,30 @@ Provisions a managed Postgres instance/cluster plus logical databases and roles.
 | `uri` | `string` (sensitive) | Admin connection URI. |
 | `ca_certificate` | `string` (sensitive) | CA bundle for `verify-full`, `""` if N/A. |
 
+**Azure specifics** (`providers/azure/managed-postgres`)
+
+- `size` is the Flexible Server **SKU name** (e.g. `"B_Standard_B2s"`,
+  `"GP_Standard_D2ds_v5"`).
+- `node_count` accepts only `1` (single zone) or `2` (zone-redundant high
+  availability, one standby). Azure has no N-replica flexible server.
+- `vpc_id` is the virtual network to **link the private DNS zone** to; private
+  access additionally needs the extra `delegated_subnet_id` (the cluster
+  module's `delegated_subnet_id` output). Access mode is the closed set
+  `network_access = private | public` — never inferred.
+- `ca_certificate` is always `""`, and that is **not** a gap the way it is on
+  DigitalOcean: Azure Database for PostgreSQL Flexible Server presents a
+  certificate chain anchored on **public root CAs** (DigiCert Global Root G2 /
+  Microsoft RSA Root CA 2017), which every OS trust store already carries.
+  `sslmode=verify-full` therefore works with the system bundle and there is no
+  per-server CA to export.
+- Roles are created **inside** the server with the `cyrilgdn/postgresql`
+  provider (Azure's API has no logical-role resource), so the **stack** must
+  configure that provider against the server's admin credentials and must be
+  able to **reach** the server (a private server is reachable only from inside
+  the VNet or over VPN/bastion). Every role gets `CONNECT` on every database and
+  `CONNECT` is revoked from `PUBLIC`. Per-role `create_database` /
+  `connection_limit` come from the optional `role_options` map.
+
 ---
 
 ## `dns`
@@ -110,6 +153,17 @@ Manages a DNS zone's records.
 | --- | --- | --- |
 | `domain` | `string` | The managed zone. |
 | `record_ids` | `map(string)` | Provider record ids keyed by the input key. |
+
+**Azure specifics** (`providers/azure/dns`)
+
+- Record `type` is the closed set `A | AAAA | CNAME | TXT` (Azure DNS uses one
+  resource type per record type; only those four are implemented). Wildcards
+  (`"*"`, `"*.sub"`) and the apex (`"@"`) are supported.
+- Extra outputs: `name_servers` (delegate the apex to these at the registrar),
+  `zone_id`, `resource_group_name`, and — when the optional
+  `dns01_workload_identity` input is enabled — `dns01_client_id`, the
+  user-assigned identity cert-manager's ACME DNS-01 solver uses through workload
+  identity (see the `ingress-tls` addon).
 
 ---
 
@@ -133,6 +187,18 @@ A single object-storage bucket (for application/biome use, not Terraform state).
 | `bucket` | `string` | Bucket name. |
 | `endpoint` | `string` | S3-compatible endpoint URL. |
 
+**Azure specifics** (`providers/azure/object-bucket`)
+
+- The "bucket" is a **storage account** (`name` must match `^[a-z0-9]{3,24}$`
+  and be globally unique); `endpoint` is its primary **Blob** endpoint, not an
+  S3 endpoint — the platform's `@xemahq/blob-storage` Azure adapter targets it.
+- Blob **containers** are optional (`containers = set(string)`): the platform
+  ensures its own `${prefix}-${logical}` containers at boot, so pre-creating
+  them here is only needed when the runtime identity may not create containers.
+- `acl = "public-read"` maps to `container_access_type = "blob"` on each
+  container and `allow_nested_items_to_be_public = true` on the account.
+- Replication is the closed set `LRS | ZRS | GRS | GZRS`.
+
 ---
 
 ## `state-bucket` (bootstrap-only)
@@ -142,6 +208,74 @@ during bootstrap, typically with local state, then the backend points at it. Kep
 separate from `object-bucket` because its lifecycle and access policy differ (it
 holds state, must be private + versioned + locked). See
 [CONVENTIONS.md § State & secrets](CONVENTIONS.md).
+
+**Azure specifics** (`providers/azure/state-bucket`): a storage account plus one
+private, versioned **container** (default `tfstate`); `backend_config_hint`
+emits a `backend "azurerm" {}` block. Locking is native (blob leases), so no
+extra lock table is needed.
+
+---
+
+## `secrets-backend` (optional)
+
+A cloud secret store the cluster reads at runtime through the
+[External Secrets Operator](https://external-secrets.io) — the source that the
+`ingress-tls` addon's `ClusterSecretStore` points at. Optional: a deployment may
+instead materialize secrets with `cluster-addons/secrets`. Not every cloud has
+an implementation; today only Azure (Key Vault).
+
+**Required inputs**
+
+| Name | Type | Meaning |
+| --- | --- | --- |
+| `name` | `string` | Vault name (cloud naming rules apply; globally unique where the cloud requires it). |
+| `region` | `string` | Cloud region. |
+| `secret_names` | `optional(set(string), [])` | Secrets to **seed** at provisioning time, by name. |
+| `secret_values` | `map(string)` (sensitive, **no default**) | Values for every name in `secret_names`. A name with no value fails fast. Never committed — supply via `TF_VAR_*` / a decrypted tfvars. |
+| `workload_identity` | `object({ enabled = bool, oidc_issuer_url = string, service_account_namespace = optional(string), service_account_name = optional(string) })` | Federate the cluster's OIDC issuer to an identity that may **read** secrets, for the in-cluster operator's service account. |
+| `tags` | `optional(map(string), {})` | Resource tags. |
+
+**Required outputs**
+
+| Name | Type | Meaning |
+| --- | --- | --- |
+| `vault_uri` | `string` | The vault's base URI the operator targets. |
+| `client_id` | `string` | Client id of the reader identity (`""` when `workload_identity.enabled = false`). |
+| `tenant_id` | `string` | Identity tenant the reader identity lives in (`""` if the cloud has no such notion). |
+
+**Azure specifics** (`providers/azure/secrets-backend`): an `azurerm_key_vault`
+with **RBAC authorization** (no access policies), one `azurerm_key_vault_secret`
+per seeded name, and a user-assigned identity + federated credential
+(`api://AzureADTokenExchange`) holding **Key Vault Secrets User**. The principal
+running Terraform is granted **Key Vault Secrets Officer** on the vault so the
+seeded secrets can be written; role propagation is waited on explicitly rather
+than retried by hand.
+
+---
+
+## `cache` (optional)
+
+A managed Redis-protocol cache. Optional: the platform's default topology runs
+valkey **in-cluster** via Helm; use this only when a deployment wants the cloud's
+managed offering instead. Today only Azure (Azure Cache for Redis).
+
+**Required inputs**
+
+| Name | Type | Meaning |
+| --- | --- | --- |
+| `name` | `string` | Cache name. |
+| `region` | `string` | Cloud region. |
+| `sku` | `string` | Closed set, per implementation (Azure: `Basic \| Standard \| Premium`). |
+| `capacity` | `optional(number, 1)` | Size step within the SKU. |
+| `tags` | `optional(map(string), {})` | Resource tags. |
+
+**Required outputs**
+
+| Name | Type | Meaning |
+| --- | --- | --- |
+| `host` | `string` | Hostname. |
+| `port` | `number` | **TLS** port (Azure: 6380; the non-TLS port is disabled). |
+| `primary_key` | `string` (sensitive) | Access key (`""` if the cloud uses identity auth only). |
 
 ---
 
@@ -159,6 +293,15 @@ every cloud's stack:
 - **`cluster-addons/secrets`** — materializes operator-provided credentials as
   Kubernetes Secrets (the management-plane "secret backend" Helm values reference
   via `secretKeyRef`), via the `kubernetes` provider.
+- **`cluster-addons/ingress-tls`** — the ingress edge every Xema hostname sits
+  behind: `ingress-nginx` (a cloud `LoadBalancer`, annotations passed through),
+  `cert-manager` plus one ACME `ClusterIssuer` (closed-set solver:
+  `http01 | dns01-azure`), and the External Secrets Operator plus one
+  `ClusterSecretStore` (closed-set backend: `azure-key-vault`). Chart versions are
+  pinned inputs with defaults. Cloud-specific facts (a DNS zone, a vault URI, the
+  identities that may touch them) arrive as plain string inputs from the
+  provider primitives, so the addon itself installs against any conformant
+  cluster via the `helm` provider.
 - **extension/biome substrate** — see [extensions.md](extensions.md). Not a
   resource module; a documented claim contract the stack `for_each`-wires to the
   active cloud's `object-bucket` / `managed-postgres` / `dns` primitives.
