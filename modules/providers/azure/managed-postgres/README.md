@@ -1,0 +1,73 @@
+# `providers/azure/managed-postgres`
+
+Azure implementation of the [`managed-postgres` contract](../../../../docs/CONTRACTS.md#managed-postgres).
+Provisions an Azure Database for PostgreSQL **Flexible Server** plus any number
+of logical databases and login roles, with `CONNECT` granted to every role on
+every database and revoked from `PUBLIC`.
+
+## Usage
+
+```hcl
+module "postgres" {
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/managed-postgres?ref=v0.1.0"
+
+  name           = "acme-dev-pg"
+  region         = "westeurope"
+  engine_version = "16"
+  size           = "B_Standard_B2s"
+  node_count     = 1
+
+  network_access      = "private"
+  vpc_id              = module.cluster.vpc_id
+  delegated_subnet_id = module.cluster.delegated_subnet_id
+
+  databases = ["acme_dev_identity_api", "acme_dev_biomes"]
+  roles     = ["acme_dev", "acme_dev_provisioner"]
+  role_options = {
+    acme_dev_provisioner = { create_database = true }
+  }
+
+  tags = { deployment = "acme-dev" }
+}
+```
+
+## Notes
+
+- **Roles need the `postgresql` provider, configured by the stack.** Azure's
+  control plane has no logical-role resource, so roles and grants are applied
+  *inside* the server through `cyrilgdn/postgresql`. The root configures that
+  provider from this module's `host` / `administrator_login` /
+  `administrator_password` outputs, with `superuser = false` (the Azure admin is
+  not a superuser) and `sslmode = "require"`.
+- **Reachability.** A `private` server answers only inside the linked VNet, so
+  the machine running `terraform apply` must reach it (VPN, bastion, or a runner
+  in the VNet). `network_access = "public"` with explicit `public_firewall_rules`
+  is the alternative — a closed-set choice, never inferred.
+- **CA certificate.** `ca_certificate` is always `""`, and unlike DigitalOcean
+  that is not a gap: the server chain is anchored on public roots (DigiCert
+  Global Root G2 / Microsoft RSA Root CA 2017) already in every OS trust store,
+  so `sslmode=verify-full` needs nothing exported.
+- `node_count` is `1` or `2` only — `2` enables zone-redundant HA with one
+  standby. `zone` (and the standby zone) are `ignore_changes`d so Azure's
+  placement never reads as drift.
+- Passwords (admin when not supplied, and every role) are generated with
+  `random_password` and exposed as sensitive outputs; they live in state, as any
+  managed-database credential does. Supply `administrator_password` via
+  `TF_VAR_*` to own it instead.
+- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
+  here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+
+| Input | Required | Description |
+| --- | --- | --- |
+| `name`, `region`, `engine_version`, `size` | yes | server identity + version + SKU |
+| `node_count` | no | `1` single zone (default) or `2` zone-redundant HA |
+| `network_access`, `delegated_subnet_id`, `vpc_id`, `private_dns_zone_name`, `public_firewall_rules` | no | private (default) or public reachability |
+| `storage_mb`, `auto_grow_enabled`, `backup_retention_days`, `geo_redundant_backup_enabled`, `zone` | no | storage, backups, placement |
+| `administrator_login`, `administrator_password` | no | admin credentials (password generated when empty) |
+| `databases`, `roles`, `role_options` | no | logical databases / roles / per-role CREATEDB + connection limit |
+| `resource_group_name`, `tags` | no | use an existing resource group (else `"<name>-rg"`), tagging |
+
+Outputs: `cluster_id`, `host`, `port`, `uri` (sensitive), `ca_certificate`
+(sensitive, always `""` — see note), `administrator_login`,
+`administrator_password` (sensitive), `role_passwords` (sensitive),
+`database_ids`, `resource_group_name`, `private_dns_zone_id`.
