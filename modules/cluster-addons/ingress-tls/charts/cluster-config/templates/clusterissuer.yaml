@@ -1,0 +1,27 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.clusterIssuer.name | quote }}
+spec:
+  acme:
+    email: {{ required "clusterIssuer.email is required" .Values.clusterIssuer.email | quote }}
+    server: {{ .Values.clusterIssuer.server | quote }}
+    privateKeySecretRef:
+      name: {{ printf "%s-account-key" .Values.clusterIssuer.name | quote }}
+    solvers:
+{{- if eq .Values.clusterIssuer.solver "http01" }}
+      - http01:
+          ingress:
+            ingressClassName: {{ .Values.clusterIssuer.ingressClassName | quote }}
+{{- else if eq .Values.clusterIssuer.solver "dns01-azure" }}
+      - dns01:
+          azureDNS:
+            subscriptionID: {{ required "clusterIssuer.dns01Azure.subscriptionID is required" .Values.clusterIssuer.dns01Azure.subscriptionID | quote }}
+            resourceGroupName: {{ required "clusterIssuer.dns01Azure.resourceGroupName is required" .Values.clusterIssuer.dns01Azure.resourceGroupName | quote }}
+            hostedZoneName: {{ required "clusterIssuer.dns01Azure.hostedZoneName is required" .Values.clusterIssuer.dns01Azure.hostedZoneName | quote }}
+            environment: {{ .Values.clusterIssuer.dns01Azure.environment | default "AzurePublicCloud" | quote }}
+            managedIdentity:
+              clientID: {{ required "clusterIssuer.dns01Azure.clientID is required" .Values.clusterIssuer.dns01Azure.clientID | quote }}
+{{- else }}
+{{- fail (printf "unsupported clusterIssuer.solver %q (http01 | dns01-azure)" .Values.clusterIssuer.solver) }}
+{{- end }}
