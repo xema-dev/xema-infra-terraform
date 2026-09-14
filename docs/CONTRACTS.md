@@ -121,7 +121,7 @@ Provisions a managed Postgres instance/cluster plus logical databases and roles.
   module's `delegated_subnet_id` output). Access mode is the closed set
   `network_access = private | public` — never inferred.
 - `ca_certificate` is always `""`, and that is **not** a gap the way it is on
-  DigitalOcean: Azure Database for PostgreSQL Flexible Server presents a
+  DigitalOcean: Azure Database for PostgreSQL Flexible Server serves a
   certificate chain anchored on **public root CAs** (DigiCert Global Root G2 /
   Microsoft RSA Root CA 2017), which every OS trust store already carries.
   `sslmode=verify-full` therefore works with the system bundle and there is no
