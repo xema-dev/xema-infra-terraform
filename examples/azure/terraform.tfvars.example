@@ -1,0 +1,140 @@
+# GREENFIELD example values for the Azure substrate root.
+#
+# Copy to terraform.tfvars and replace every REPLACE_ME / placeholder with REAL
+# values. terraform.tfvars is git-ignored — NEVER commit real ids or secrets.
+# Secrets shown here are FAKE placeholders only; sensitive values are better
+# supplied via TF_VAR_* env vars than written to a file. Azure authentication
+# is NOT an input: run `az login` or set ARM_* before terraform.
+#
+# This file demonstrates GREENFIELD mode — the stack CREATES the cluster, the
+# Flexible Server, the DNS zone, the blob account, the Key Vault, the in-cluster
+# addons and the realm from nothing. For the alternative (consume an existing
+# cluster/server/zone owned by a separate "cloud substrate" Terraform), see
+# consume.tfvars.example.
+
+# --- identity: every resource, namespace, database and role derives from these ---
+deployment_name = "acme-dev"    # -> acme-dev-aks, acme-dev-pg, acmedevblob, acme_dev_identity_api, ...
+environment     = "dev"         # dev | prod
+region          = "westeurope"
+apex_domain     = "example.com" # the zone this stack manages (enable_dns)
+tags = {
+  cost-centre = "platform"
+}
+
+# --- enable / disable toggles (greenfield = create everything) ---
+# All but enable_cache default to true, so they may be omitted; shown for clarity.
+enable_cluster             = true
+enable_managed_postgres    = true
+enable_dns                 = true
+enable_object_storage      = true
+enable_secrets_backend     = true
+enable_cache               = false # valkey runs in-cluster by default
+enable_rwx_storage         = true
+enable_workload_namespaces = true
+enable_ingress_tls         = true
+enable_identity_realm      = false # flip to true once Keycloak answers at keycloak_url (phase 3)
+
+# --- provider credentials (FAKE placeholders) ---
+azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+keycloak_url           = "https://id.example.com"
+keycloak_client_id     = "terraform-admin"
+keycloak_client_secret = "REPLACE_ME_KEYCLOAK_CLIENT_SECRET"
+keycloak_admin_realm   = "master"
+
+# --- sizing + cluster ---
+azure_sizing = {
+  aks_sku_tier        = "Free"
+  postgres_sku_name   = "B_Standard_B2s"
+  postgres_storage_mb = 32768
+  postgres_ha         = false
+  blob_replication    = "LRS"
+}
+
+kubernetes_version = "1.31"
+default_pool_id    = "generic"
+
+node_pools = {
+  generic = {
+    size       = "Standard_D4s_v5"
+    node_count = 3
+    labels     = { workload = "generic" }
+  }
+  workers = {
+    size      = "Standard_D8s_v5"
+    min_nodes = 1
+    max_nodes = 5
+    labels    = { workload = "opencode" }
+    taints = [
+      { key = "dedicated", value = "workers", effect = "NoSchedule" },
+    ]
+  }
+}
+
+# --- postgres ---
+# "private" answers only inside the VNet: apply from a VPN/bastion/runner there,
+# or use "public" with explicit firewall rules for the operator's address.
+postgres_network_access = "private"
+enable_billing_database = false
+
+# --- dns ---
+dns_records = {
+  ingress  = { name = "@", type = "A", value = "192.0.2.10" } # RFC-5737 TEST-NET-1: the ingress LB address, once known
+  wildcard = { name = "*", type = "A", value = "192.0.2.10" }
+}
+
+# --- secrets backend ---
+# Seed nothing from a file. Supply real secrets via the environment, e.g.:
+#   export TF_VAR_key_vault_secrets='{"postgres-app-password":"..."}'
+key_vault_secrets = {}
+
+# --- ingress + tls ---
+acme_email = "ops@example.com"
+acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory" # staging while testing; switch to production after
+tls_solver  = "dns01-azure"                                             # wildcard certificates need DNS-01
+ingress_service_annotations = {
+  "service.beta.kubernetes.io/azure-dns-label-name" = "acme-dev-ingress"
+}
+
+# --- identity realm (managed only when enable_identity_realm) ---
+realm_display_name = "Xema (acme-dev)"
+
+realm_clients = {
+  web = {
+    client_id           = "web-app"
+    access_type         = "PUBLIC"
+    valid_redirect_uris = ["https://app.example.com/*"]
+    web_origins         = ["https://app.example.com"]
+  }
+}
+
+realm_roles = ["platform_admin", "org_owner", "member"]
+
+realm_protocol_mappers = {
+  org_roles = {
+    client         = "web"
+    user_attribute = "org_roles"
+    claim_name     = "org_roles"
+    multivalued    = true
+  }
+}
+
+# --- extension / biome substrate claims ---
+# Only biomes needing DEDICATED out-of-cluster substrate appear here. See
+# docs/extensions.md. Bucket names are storage-account names (3-24 alphanumerics).
+extensions = {
+  "acme/legal-review" = {
+    object_buckets = {
+      evidence = { name = "acmedevlegalevidence", versioning = true }
+    }
+    dns_records = {
+      portal = { name = "legal", type = "CNAME", value = "ingress.example.com" }
+    }
+  }
+
+  "acme/data-warehouse" = {
+    managed_databases = {
+      main = { database = "ext_data_warehouse", owner = "data_warehouse" }
+    }
+  }
+}

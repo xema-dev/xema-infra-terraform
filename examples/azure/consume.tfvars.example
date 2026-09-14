@@ -1,0 +1,86 @@
+# CONSUME-mode example values for the Azure substrate root.
+#
+# Copy to terraform.tfvars (or a separate *.tfvars passed via -var-file) and
+# replace every REPLACE_ME / placeholder with REAL values. NEVER commit real
+# ids or secrets — values shown here are FAKE placeholders only.
+#
+# This file demonstrates CONSUME (xema-specific) mode: a SEPARATE "cloud
+# substrate" Terraform (owned by another team/agent) already owns the cluster,
+# the Flexible Server and the DNS zone. This root then manages ONLY the
+# xema-specific resources — RWX storage, workload namespaces, the ingress edge,
+# the Key Vault, the Keycloak realm, and extension/biome claims — and CONSUMES
+# the existing cluster by name.
+#
+# What changes vs greenfield:
+#   - enable_cluster / enable_managed_postgres / enable_dns are FALSE.
+#   - cluster_name + cluster_resource_group_name name the EXISTING cluster.
+#   - existing_postgres_* describe the EXISTING server (extension databases and
+#     their owner roles land there).
+#   - tls_solver is http01, because dns01-azure needs this stack to own the zone.
+
+# --- identity ---
+deployment_name = "acme-dev"
+environment     = "dev"
+region          = "westeurope"
+
+# --- scope toggles: consume cloud infra, manage only xema-specific resources ---
+enable_cluster             = false
+enable_managed_postgres    = false
+enable_dns                 = false
+enable_object_storage      = true
+enable_secrets_backend     = true
+enable_cache               = false
+enable_rwx_storage         = true
+enable_workload_namespaces = true
+enable_ingress_tls         = true
+enable_identity_realm      = true
+
+# --- provider credentials (FAKE placeholders) ---
+azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+keycloak_url           = "https://id.example.com"
+keycloak_client_id     = "terraform-admin"
+keycloak_client_secret = "REPLACE_ME_KEYCLOAK_CLIENT_SECRET"
+keycloak_admin_realm   = "master"
+
+# --- consume the existing cluster (read by name; NOT created) ---
+cluster_name                = "existing-shared-aks"
+cluster_resource_group_name = "existing-shared-rg"
+
+# --- consume the existing Flexible Server (hosts extension databases) ---
+existing_postgres_server_id      = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/existing-shared-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/existing-shared-pg"
+existing_postgres_host           = "existing-shared-pg.postgres.database.azure.com"
+existing_postgres_admin_login    = "pgadmin"
+existing_postgres_admin_password = "REPLACE_ME_EXISTING_PG_ADMIN_PASSWORD"
+
+# --- ingress + tls (xema-specific, applied to the consumed cluster) ---
+acme_email = "ops@example.com"
+tls_solver = "http01" # dns01-azure needs enable_dns
+
+# --- secrets backend ---
+key_vault_secrets = {} # seed via TF_VAR_key_vault_secrets
+
+# --- identity realm (xema-specific) ---
+realm_display_name = "Xema (acme-dev)"
+
+realm_clients = {
+  web = {
+    client_id           = "web-app"
+    access_type         = "PUBLIC"
+    valid_redirect_uris = ["https://app.example.com/*"]
+    web_origins         = ["https://app.example.com"]
+  }
+}
+
+realm_roles = ["platform_admin", "org_owner", "member"]
+
+# --- extension / biome substrate claims ---
+# managed_databases land on existing_postgres_server_id (the consumed server).
+# dns_records are NOT allowed here while enable_dns = false (the stack fails fast).
+extensions = {
+  "acme/data-warehouse" = {
+    managed_databases = {
+      main = { database = "ext_data_warehouse", owner = "data_warehouse" }
+    }
+  }
+}

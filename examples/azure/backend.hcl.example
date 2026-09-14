@@ -1,0 +1,16 @@
+# Partial backend config for Terraform remote state in a PRIVATE Azure Storage
+# container. Copy to backend.hcl, replace placeholders, then:
+#   terraform init -backend-config=backend.hcl
+#
+# backend.hcl is git-ignored — NEVER commit real account names or keys.
+#
+# Bootstrap the account once with modules/providers/azure/state-bucket; its
+# backend_config_hint output emits exactly this block. Authenticate with Entra
+# ID (use_azuread_auth) — the running principal needs Storage Blob Data
+# Contributor on the container. No account key anywhere.
+
+resource_group_name  = "REPLACE_ME_STATE_RG"      # e.g. "acmedevtfstate-rg"
+storage_account_name = "REPLACE_ME_STATE_ACCOUNT" # e.g. "acmedevtfstate"
+container_name       = "tfstate"
+key                  = "xema/azure/substrate/terraform.tfstate"
+use_azuread_auth     = true
