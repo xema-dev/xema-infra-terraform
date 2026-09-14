@@ -191,6 +191,8 @@ module "ingress_tls" {
   acme_email                  = var.acme_email
   acme_server                 = var.acme_server
   tls_solver                  = var.tls_solver
+  cluster_issuer_name         = var.cluster_issuer_name
+  cluster_secret_store_name   = var.cluster_secret_store_name
   ingress_service_annotations = var.ingress_service_annotations
   ingress_load_balancer_ip    = var.ingress_load_balancer_ip
 

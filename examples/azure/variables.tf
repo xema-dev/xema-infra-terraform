@@ -36,6 +36,32 @@ variable "tags" {
   default     = {}
 }
 
+# --- overrides for the GLOBALLY-unique derived names (validated by the stack) ---
+
+variable "key_vault_name" {
+  description = "Key Vault name. Empty derives \"<deployment_name>-kv\"; set it when the derived name collides with a vault another tenant owns."
+  type        = string
+  default     = ""
+}
+
+variable "storage_account_name" {
+  description = "Blob storage account name. Empty derives \"<deployment_name without hyphens>blob\"."
+  type        = string
+  default     = ""
+}
+
+variable "postgres_server_name" {
+  description = "Flexible Server name (created server only). Empty derives \"<deployment_name>-pg\"."
+  type        = string
+  default     = ""
+}
+
+variable "redis_cache_name" {
+  description = "Azure Cache for Redis name (enable_cache only). Empty derives \"<deployment_name>-redis\"."
+  type        = string
+  default     = ""
+}
+
 # --- enable / disable toggles (defaults = greenfield) ---
 
 variable "enable_cluster" {
@@ -300,6 +326,18 @@ variable "ingress_service_annotations" {
   description = "Annotations on the ingress LoadBalancer Service."
   type        = map(string)
   default     = {}
+}
+
+variable "cluster_issuer_name" {
+  description = "ACME ClusterIssuer name (cert-manager.io/cluster-issuer). Read it back from the stack output rather than restating it in manifests."
+  type        = string
+  default     = "letsencrypt"
+}
+
+variable "cluster_secret_store_name" {
+  description = "ClusterSecretStore name (ExternalSecret secretStoreRef.name). Read it back from the stack output rather than restating it in manifests."
+  type        = string
+  default     = "platform"
 }
 
 # --- identity realm ---

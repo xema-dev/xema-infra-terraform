@@ -19,6 +19,12 @@ module "substrate" {
   apex_domain     = var.apex_domain
   tags            = var.tags
 
+  # --- overrides for the four GLOBALLY-unique derived names (empty = derive) ---
+  key_vault_name       = var.key_vault_name
+  storage_account_name = var.storage_account_name
+  postgres_server_name = var.postgres_server_name
+  redis_cache_name     = var.redis_cache_name
+
   # --- enable / disable toggles ---
   # Greenfield (default): everything true → create cluster + DB + DNS + blob +
   # vault + addons + realm. Consume mode: set enable_cluster /
@@ -75,6 +81,8 @@ module "substrate" {
   acme_email                  = var.acme_email
   acme_server                 = var.acme_server
   tls_solver                  = var.tls_solver
+  cluster_issuer_name         = var.cluster_issuer_name
+  cluster_secret_store_name   = var.cluster_secret_store_name
   ingress_service_annotations = var.ingress_service_annotations
 
   # --- identity realm ---
@@ -107,6 +115,19 @@ output "postgres_role_passwords" {
   description = "Generated passwords for the derived Postgres roles."
   value       = module.substrate.postgres_role_passwords
   sensitive   = true
+}
+
+# The two in-cluster names the consumer's own manifests reference — read from
+# the stack (also in substrate.ingress.cluster_issuer_name /
+# substrate.cluster_secret_store_name), never restated.
+output "cluster_issuer_name" {
+  description = "The ACME ClusterIssuer name for cert-manager.io/cluster-issuer; null when ingress is disabled."
+  value       = module.substrate.cluster_issuer_name
+}
+
+output "cluster_secret_store_name" {
+  description = "The ClusterSecretStore name for ExternalSecret secretStoreRef.name; null when ingress or the secrets backend is disabled."
+  value       = module.substrate.cluster_secret_store_name
 }
 
 output "dns_name_servers" {

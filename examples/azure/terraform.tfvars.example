@@ -21,6 +21,16 @@ tags = {
   cost-centre = "platform"
 }
 
+# --- overrides for the four GLOBALLY-unique derived names ---
+# Each is a public DNS label unique across EVERY Azure tenant, so the derived
+# name (acme-dev-kv, acmedevblob, acme-dev-pg, acme-dev-redis) can be taken by
+# someone else. Leave them out (or empty) to keep the derived name; set one
+# only when Azure reports the derived name as already in use.
+# key_vault_name       = "acme-dev-kv-7f3a"   # 3-24 letters/digits/single hyphens, starts with a letter
+# storage_account_name = "acmedevblob7f3a"    # 3-24 lowercase letters/digits
+# postgres_server_name = "acme-dev-pg-7f3a"   # 3-63 lowercase letters/digits/hyphens
+# redis_cache_name     = "acme-dev-redis-7f3a"
+
 # --- enable / disable toggles (greenfield = create everything) ---
 # All but enable_cache default to true, so they may be omitted; shown for clarity.
 enable_cluster             = true
@@ -96,6 +106,11 @@ tls_solver  = "dns01-azure"                                             # wildca
 ingress_service_annotations = {
   "service.beta.kubernetes.io/azure-dns-label-name" = "acme-dev-ingress"
 }
+# The two in-cluster names your Ingress / ExternalSecret manifests reference.
+# Defaults shown; whatever you set, READ them back from the stack outputs
+# (cluster_issuer_name, cluster_secret_store_name) instead of restating them.
+cluster_issuer_name       = "letsencrypt"
+cluster_secret_store_name = "platform"
 
 # --- identity realm (managed only when enable_identity_realm) ---
 realm_display_name = "Xema (acme-dev)"

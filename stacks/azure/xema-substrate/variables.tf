@@ -8,7 +8,9 @@ variable "deployment_name" {
     (e.g. "acme-dev"). 3-20 chars: lowercase letters, digits, single hyphens,
     starting with a letter and ending alphanumeric. The bound is what keeps
     every derived Azure name inside its limit (storage account "<compact>blob"
-    <= 24, Key Vault "<name>-kv" <= 24). The ONE deterministic rewrite applied
+    <= 24, Key Vault "<name>-kv" <= 24). The four globally-unique derived
+    names each take an optional override (key_vault_name, storage_account_name,
+    postgres_server_name, redis_cache_name). The ONE deterministic rewrite applied
     downstream is documented in locals.tf: Postgres identifiers replace "-"
     with "_" because an unquoted identifier cannot hold a hyphen.
   EOT
@@ -50,6 +52,66 @@ variable "tags" {
   description = "Extra tags applied to every created cloud resource, merged over the derived { deployment, environment, managed-by } set."
   type        = map(string)
   default     = {}
+}
+
+# ---------------------------------------------------------------------------
+# Overrides for the GLOBALLY-UNIQUE derived names.
+#
+# Four Azure names are unique across every tenant, not just this one, because
+# each is a public DNS label: the Key Vault (<name>.vault.azure.net), the
+# storage account (<name>.blob.core.windows.net), the Flexible Server
+# (<name>.postgres.database.azure.com) and the cache
+# (<name>.redis.cache.windows.net). A name derived from deployment_name can
+# therefore collide with a vault or account SOMEBODY ELSE owns — and Azure
+# refuses the create, after the plan looked fine. Each has an optional override
+# that defaults to the derived name; the rule validated here is the SAME rule
+# the provider module validates, so a bad override is refused at the stack
+# boundary rather than one module deeper. Resource-group-scoped names (the AKS
+# cluster) need no override for this reason and already have one for another.
+# ---------------------------------------------------------------------------
+
+variable "key_vault_name" {
+  description = "Key Vault name. Empty derives \"<deployment_name>-kv\". Globally unique across Azure (3-24 letters, digits and single hyphens, starting with a letter, ending alphanumeric). The vault's dedicated resource group is \"<key_vault_name>-rg\"."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.key_vault_name == "" || (can(regex("^[a-zA-Z](?:[a-zA-Z0-9-]{1,22})[a-zA-Z0-9]$", var.key_vault_name)) && !can(regex("--", var.key_vault_name)))
+    error_message = "key_vault_name must be empty (derive it) or 3-24 letters, digits or hyphens, start with a letter, end alphanumeric, and contain no consecutive hyphens."
+  }
+}
+
+variable "storage_account_name" {
+  description = "Storage account name the platform's blob adapter targets. Empty derives \"<deployment_name without hyphens>blob\". Globally unique across Azure (3-24 lowercase letters or digits)."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.storage_account_name == "" || can(regex("^[a-z0-9]{3,24}$", var.storage_account_name))
+    error_message = "storage_account_name must be empty (derive it) or 3-24 lowercase letters or digits (an Azure storage account name)."
+  }
+}
+
+variable "postgres_server_name" {
+  description = "PostgreSQL Flexible Server name (created server only). Empty derives \"<deployment_name>-pg\". Globally unique across Azure as <name>.postgres.database.azure.com (3-63 lowercase letters, digits and hyphens, starting with a letter, ending alphanumeric). The private DNS zone and the derived host follow it."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.postgres_server_name == "" || can(regex("^[a-z][a-z0-9-]{1,61}[a-z0-9]$", var.postgres_server_name))
+    error_message = "postgres_server_name must be empty (derive it) or 3-63 chars of lowercase letters, digits and hyphens, starting with a letter and ending alphanumeric."
+  }
+}
+
+variable "redis_cache_name" {
+  description = "Azure Cache for Redis name (enable_cache only). Empty derives \"<deployment_name>-redis\". Globally unique across Azure as <name>.redis.cache.windows.net (1-63 letters, digits and hyphens, starting and ending alphanumeric)."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.redis_cache_name == "" || can(regex("^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$", var.redis_cache_name))
+    error_message = "redis_cache_name must be empty (derive it) or 1-63 letters, digits or hyphens, starting and ending alphanumeric."
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -459,6 +521,33 @@ variable "ingress_load_balancer_ip" {
   description = "Pin the ingress LoadBalancer to a pre-allocated static IP. Empty lets Azure assign one."
   type        = string
   default     = ""
+}
+
+# The two in-cluster resource NAMES a consumer's manifests reference — the
+# cert-manager.io/cluster-issuer annotation and every ExternalSecret's
+# secretStoreRef. Exposed as stack outputs (and in the substrate map) so a
+# consumer reads them from the stack instead of restating today's defaults.
+
+variable "cluster_issuer_name" {
+  description = "Name of the ACME ClusterIssuer the addon creates (what Ingress resources reference in cert-manager.io/cluster-issuer). A DNS-1123 subdomain name."
+  type        = string
+  default     = "letsencrypt"
+
+  validation {
+    condition     = length(var.cluster_issuer_name) <= 253 && can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$", var.cluster_issuer_name))
+    error_message = "cluster_issuer_name must be a DNS-1123 subdomain name: lowercase letters, digits, hyphens and dots, starting and ending alphanumeric, at most 253 chars."
+  }
+}
+
+variable "cluster_secret_store_name" {
+  description = "Name of the ClusterSecretStore the addon creates (what ExternalSecret resources reference in secretStoreRef). A DNS-1123 subdomain name. Only created when enable_secrets_backend."
+  type        = string
+  default     = "platform"
+
+  validation {
+    condition     = length(var.cluster_secret_store_name) <= 253 && can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$", var.cluster_secret_store_name))
+    error_message = "cluster_secret_store_name must be a DNS-1123 subdomain name: lowercase letters, digits, hyphens and dots, starting and ending alphanumeric, at most 253 chars."
+  }
 }
 
 # ---------------------------------------------------------------------------

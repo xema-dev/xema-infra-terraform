@@ -90,6 +90,11 @@ output "blob_primary_access_key" {
   sensitive   = true
 }
 
+output "key_vault_name" {
+  description = "Key Vault name (derived or overridden via var.key_vault_name); null when disabled."
+  value       = var.enable_secrets_backend ? local.key_vault_name : null
+}
+
 output "key_vault_uri" {
   description = "Key Vault URI; null when disabled."
   value       = one(module.secrets_backend[*].vault_uri)
@@ -114,6 +119,20 @@ output "redis_primary_key" {
 output "storage_class_name" {
   description = "Name of the ReadWriteMany StorageClass; null when disabled."
   value       = one(module.rwx_storage[*].storage_class_name)
+}
+
+# The two in-cluster resource names a consumer's manifests reference. Read from
+# the addon's outputs — never from the input — so they are null exactly when
+# the resource does not exist (ingress disabled; or, for the store, the secrets
+# backend disabled).
+output "cluster_issuer_name" {
+  description = "Name of the ACME ClusterIssuer (the cert-manager.io/cluster-issuer annotation value); null when enable_ingress_tls = false."
+  value       = one(module.ingress_tls[*].cluster_issuer_name)
+}
+
+output "cluster_secret_store_name" {
+  description = "Name of the ClusterSecretStore (every ExternalSecret's secretStoreRef.name); null when enable_ingress_tls = false or enable_secrets_backend = false."
+  value       = one(module.ingress_tls[*].cluster_secret_store_name)
 }
 
 output "workload_namespaces" {
@@ -174,6 +193,7 @@ output "substrate" {
     blob_endpoint         = one(module.blob[*].endpoint)
     blob_container_prefix = local.blob_container_prefix
 
+    key_vault_name             = var.enable_secrets_backend ? local.key_vault_name : null
     key_vault_uri              = one(module.secrets_backend[*].vault_uri)
     external_secrets_client_id = one(module.secrets_backend[*].client_id)
     cluster_secret_store_name  = one(module.ingress_tls[*].cluster_secret_store_name)

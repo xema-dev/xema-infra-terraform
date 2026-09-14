@@ -90,9 +90,14 @@ variable "cert_manager_values" {
 }
 
 variable "cluster_issuer_name" {
-  description = "Name of the ACME ClusterIssuer (what Ingress resources reference in cert-manager.io/cluster-issuer)."
+  description = "Name of the ACME ClusterIssuer (what Ingress resources reference in cert-manager.io/cluster-issuer). A DNS-1123 subdomain name, as Kubernetes requires of the object."
   type        = string
   default     = "letsencrypt"
+
+  validation {
+    condition     = length(var.cluster_issuer_name) <= 253 && can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$", var.cluster_issuer_name))
+    error_message = "cluster_issuer_name must be a DNS-1123 subdomain name: lowercase letters, digits, hyphens and dots, starting and ending alphanumeric, at most 253 chars."
+  }
 }
 
 variable "acme_email" {
@@ -178,9 +183,14 @@ variable "external_secrets_values" {
 }
 
 variable "cluster_secret_store_name" {
-  description = "Name of the ClusterSecretStore ExternalSecret resources reference."
+  description = "Name of the ClusterSecretStore ExternalSecret resources reference (secretStoreRef.name). A DNS-1123 subdomain name, as Kubernetes requires of the object."
   type        = string
   default     = "platform"
+
+  validation {
+    condition     = length(var.cluster_secret_store_name) <= 253 && can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$", var.cluster_secret_store_name))
+    error_message = "cluster_secret_store_name must be a DNS-1123 subdomain name: lowercase letters, digits, hyphens and dots, starting and ending alphanumeric, at most 253 chars."
+  }
 }
 
 variable "secret_store_backend" {

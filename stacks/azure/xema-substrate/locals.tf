@@ -18,13 +18,14 @@ locals {
 
   cluster_name                = var.cluster_name != "" ? var.cluster_name : "${local.dep}-aks"
   cluster_resource_group_name = var.cluster_resource_group_name != "" ? var.cluster_resource_group_name : "${local.dep}-rg"
-  postgres_name               = "${local.dep}-pg"
-  key_vault_name              = "${local.dep}-kv"
-  blob_account_name           = "${local.compact}blob"
-  redis_name                  = "${local.dep}-redis"
-  realm_name                  = local.dep
-  realm_display_name          = var.realm_display_name != "" ? var.realm_display_name : "Xema (${local.dep})"
-  blob_container_prefix       = var.blob_container_prefix != "" ? var.blob_container_prefix : local.dep
+  # The four GLOBALLY-unique names: derived unless overridden (variables.tf).
+  postgres_name         = var.postgres_server_name != "" ? var.postgres_server_name : "${local.dep}-pg"
+  key_vault_name        = var.key_vault_name != "" ? var.key_vault_name : "${local.dep}-kv"
+  blob_account_name     = var.storage_account_name != "" ? var.storage_account_name : "${local.compact}blob"
+  redis_name            = var.redis_cache_name != "" ? var.redis_cache_name : "${local.dep}-redis"
+  realm_name            = local.dep
+  realm_display_name    = var.realm_display_name != "" ? var.realm_display_name : "Xema (${local.dep})"
+  blob_container_prefix = var.blob_container_prefix != "" ? var.blob_container_prefix : local.dep
 
   tags = merge(
     {

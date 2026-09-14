@@ -11,6 +11,17 @@ vault `acme-dev-kv`, namespaces `acme-dev`, `acme-dev-shared`, …, databases
 `acme_dev_identity_api`, …, roles `acme_dev` / `acme_dev_provisioner`. See the
 [stack README](../../stacks/azure/xema-substrate/README.md#derived-names).
 
+Four of those names are unique across **every** Azure tenant (the vault, the
+storage account, the Flexible Server, the cache), so each has an optional
+override — `key_vault_name`, `storage_account_name`, `postgres_server_name`,
+`redis_cache_name` — for when the derived name is already taken; see
+[Overriding the globally-unique names](../../stacks/azure/xema-substrate/README.md#overriding-the-globally-unique-names).
+The two in-cluster names your own manifests reference, the ClusterIssuer
+(`cluster_issuer_name`, default `letsencrypt`) and the ClusterSecretStore
+(`cluster_secret_store_name`, default `platform`), are inputs here and come
+back as outputs of the same name — read them from `terraform output` rather
+than restating them.
+
 ## Two modes
 
 1. **Greenfield (default).** Enable everything — the stack CREATES the cluster,

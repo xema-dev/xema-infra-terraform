@@ -196,6 +196,12 @@ A single object-storage bucket (for application/biome use, not Terraform state).
 - The "bucket" is a **storage account** (`name` must match `^[a-z0-9]{3,24}$`
   and be globally unique); `endpoint` is its primary **Blob** endpoint, not an
   S3 endpoint — the platform's `@xemahq/blob-storage` Azure adapter targets it.
+- **Global uniqueness is across every Azure tenant**, because the name is a
+  public DNS label (`<name>.blob.core.windows.net`). A stack that DERIVES the
+  name must therefore also let it be overridden: the Azure stack derives
+  `<deployment_name without hyphens>blob` and takes `storage_account_name` to
+  replace it, validated against the same rule. Extension-claimed buckets carry
+  their own explicit `name` and need no override.
 - Blob **containers** are optional (`containers = set(string)`): the platform
   ensures its own `${prefix}-${logical}` containers at boot, so pre-creating
   them here is only needed when the runtime identity may not create containers.
@@ -216,7 +222,9 @@ holds state, must be private + versioned + locked). See
 **Azure specifics** (`providers/azure/state-bucket`): a storage account plus one
 private, versioned **container** (default `tfstate`); `backend_config_hint`
 emits a `backend "azurerm" {}` block. Locking is native (blob leases), so no
-extra lock table is needed.
+extra lock table is needed. The account `name` is a globally-unique storage
+account name (`^[a-z0-9]{3,24}$`) that the bootstrap caller supplies explicitly
+— the stack never derives it, since the backend is the consuming root's.
 
 ---
 
@@ -232,7 +240,7 @@ an implementation; today only Azure (Key Vault).
 
 | Name | Type | Meaning |
 | --- | --- | --- |
-| `name` | `string` | Vault name (cloud naming rules apply; globally unique where the cloud requires it). |
+| `name` | `string` | Vault name (cloud naming rules apply; globally unique where the cloud requires it — see the Azure specifics: a stack that derives it must also accept an override). |
 | `region` | `string` | Cloud region. |
 | `secret_names` | `optional(set(string), [])` | Secrets to **seed** at provisioning time, by name. |
 | `secret_values` | `map(string)` (sensitive, **no default**) | Values for every name in `secret_names`. A name with no value fails fast. Never committed — supply via `TF_VAR_*` / a decrypted tfvars. |
@@ -254,6 +262,15 @@ per seeded name, and a user-assigned identity + federated credential
 running Terraform is granted **Key Vault Secrets Officer** on the vault so the
 seeded secrets can be written; role propagation is waited on explicitly rather
 than retried by hand.
+
+The vault `name` is **globally unique across every Azure tenant** (it is the
+DNS label of `<name>.vault.azure.net`; 3-24 letters, digits and single hyphens,
+starting with a letter). A derived name can collide with a vault somebody else
+owns, and Azure refuses the create only at apply time — so the Azure stack
+derives `<deployment_name>-kv` AND takes `key_vault_name` to replace it,
+validated against the module's own rule. The dedicated resource group follows
+the vault name (`<name>-rg`). The same holds for the other two globally-unique
+derived names the stack owns — `postgres_server_name` and `redis_cache_name`.
 
 ---
 
@@ -305,7 +322,13 @@ every cloud's stack:
   pinned inputs with defaults. Cloud-specific facts (a DNS zone, a vault URI, the
   identities that may touch them) arrive as plain string inputs from the
   provider primitives, so the addon itself installs against any conformant
-  cluster via the `helm` provider.
+  cluster via the `helm` provider. The two object names a consumer's manifests
+  reference — `cluster_issuer_name` (default `letsencrypt`, the
+  `cert-manager.io/cluster-issuer` annotation) and `cluster_secret_store_name`
+  (default `platform`, every `ExternalSecret`'s `secretStoreRef.name`) — are
+  validated DNS-1123 inputs echoed as outputs; a stack exposes both as its own
+  inputs and outputs (and in its `substrate` map) so a consumer reads the names
+  from the stack rather than restating them.
 - **extension/biome substrate** — see [extensions.md](extensions.md). Not a
   resource module; a documented claim contract the stack `for_each`-wires to the
   active cloud's `object-bucket` / `managed-postgres` / `dns` primitives.

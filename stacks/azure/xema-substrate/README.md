@@ -49,12 +49,43 @@ is the one rewrite, and it is injective on that alphabet. `environment`
 (`dev | prod`) decides the irreversible knobs: Key Vault purge protection and
 the backup retention window are `prod`-only.
 
+### Overriding the globally-unique names
+
+Four of the derived names are unique across **every** Azure tenant, not just
+this one, because each is a public DNS label — so a derived name can collide
+with a resource somebody else owns, and Azure refuses the create at apply time.
+Each takes an optional override, validated against the same rule the provider
+module enforces; empty (the default) keeps the derived name:
+
+| Input | Derived default | Rule | Public name |
+| --- | --- | --- | --- |
+| `key_vault_name` | `acme-dev-kv` | 3-24 letters/digits/single hyphens, starts with a letter | `<name>.vault.azure.net` (resource group `<name>-rg`) |
+| `storage_account_name` | `acmedevblob` | `^[a-z0-9]{3,24}$` | `<name>.blob.core.windows.net` |
+| `postgres_server_name` | `acme-dev-pg` | 3-63 lowercase letters/digits/hyphens, starts with a letter | `<name>.postgres.database.azure.com` (the private DNS zone and derived host follow it) |
+| `redis_cache_name` | `acme-dev-redis` | 1-63 letters/digits/hyphens | `<name>.redis.cache.windows.net` |
+
+The AKS cluster name is resource-group-scoped, not global; its override
+(`cluster_name`) exists for consume mode, not for collisions. Extension-claimed
+storage accounts carry their own explicit `name`.
+
+### The in-cluster names a consumer's manifests reference
+
+`cluster_issuer_name` (default `letsencrypt`) and `cluster_secret_store_name`
+(default `platform`) are threaded to the `ingress-tls` addon, validated as
+DNS-1123 subdomain names, and **read back** as the stack outputs of the same
+name (and in the `substrate` map: `substrate.ingress.cluster_issuer_name`,
+`substrate.cluster_secret_store_name`). A consumer's `Ingress`
+(`cert-manager.io/cluster-issuer`) and `ExternalSecret` (`secretStoreRef.name`)
+manifests should read them from the stack, never restate the defaults. Both
+outputs are `null` exactly when the object does not exist — `enable_ingress_tls
+= false`, or for the store also `enable_secrets_backend = false`.
+
 ## The `substrate` output
 
 One non-secret map the Helm layer consumes: `postgres_host` / `postgres_port` /
 the role and database names, `blob_account` / `blob_endpoint` /
-`blob_container_prefix`, `key_vault_uri` + the External Secrets client id and
-`cluster_secret_store_name`, `redis_host` / `redis_port`, `dns_zone` +
+`blob_container_prefix`, `key_vault_name` / `key_vault_uri` + the External
+Secrets client id and `cluster_secret_store_name`, `redis_host` / `redis_port`, `dns_zone` +
 `dns_name_servers`, an `ingress` hint (service name, namespace, class, issuer),
 `keycloak_url` + `realm_name`, `oidc_issuer_url`, `storage_class_name`, the
 namespaces. Credentials are the separate **sensitive** outputs

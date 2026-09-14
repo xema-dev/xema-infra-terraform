@@ -69,6 +69,12 @@ A missing companion input fails at plan with a precondition naming it.
   records at it (the stack's `dns_records` input, or an Azure DNS label
   annotation).
 - Chart versions are inputs with pinned defaults; bump them deliberately.
+- `cluster_issuer_name` (default `letsencrypt`) and `cluster_secret_store_name`
+  (default `platform`) are the two object names a consumer's manifests
+  reference — the `cert-manager.io/cluster-issuer` annotation and every
+  `ExternalSecret`'s `secretStoreRef.name`. Both are validated as DNS-1123
+  subdomain names and echoed as outputs, so a caller reads them back rather
+  than restating the defaults.
 - Extra values for each chart are lists of YAML documents merged AFTER the
   module's own, so a caller can override anything without forking.
 - Providers (`helm`) are configured by the **root/stack**, not here (see
