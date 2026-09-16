@@ -34,6 +34,116 @@ Two consequences decide the shape of every stack input:
 The examples under `examples/<cloud>/` pass explicit rosters. They are
 EXAMPLES of one deployment's answer, labelled as such, never a default.
 
+## The capability matrix — EXISTING, MANAGED, or NOT REQUIRED
+
+Every capability a deployment needs is in exactly one of three states, and the
+state is a DECLARATION the consumer makes, never something inferred:
+
+- **EXISTING** — the consumer binds to a capability somebody already runs
+  (its own DBA's Postgres, a corporate DNS, a shared Keycloak). This module set
+  creates nothing for it; the stack's `enable_<area> = false` consumes it, and
+  the deployment root declares `provider: external` for it.
+- **MANAGED by this module set** — a stack module creates it in the cloud and
+  the [binding contract](#binding-contract) publishes its facts.
+- **MANAGED in-cluster** — the capability is a Helm recipe the DEPLOYMENT ROOT
+  installs (`provider: self-hosted` in its `infra.yaml`), not Terraform. This
+  repository stops at the substrate and deploys nothing into the cluster but
+  the addons below; a backing service that runs IN the cluster is the
+  deployment root's to install, and that root's `infra.yaml` — one
+  `<component>.provider` per capability — IS the capability-shaped
+  declaration layer.
+- **NOT REQUIRED** — the deployment does not use it. Only the capabilities the
+  deployment root's `infra.yaml` admits `provider: disabled` for can be in this
+  state; the rest are required by every service that boots.
+
+| capability | EXISTING (bind to yours) | MANAGED by this module set | MANAGED in-cluster (deployment root's `infra.yaml`) | NOT REQUIRED |
+| --- | --- | --- | --- | --- |
+| kubernetes | `enable_cluster = false`, `cluster_name` reads it | `providers/<cloud>/cluster` (DOKS, AKS) | — (it is the cluster) | never |
+| postgres | `enable_managed_postgres = false` (+ `existing_database_cluster_id` for extension claims); `infra.yaml#postgres.provider: external` | `providers/<cloud>/managed-postgres`, databases from the REQUIRED `platform_databases` roster | `postgres.provider: self-hosted` chart | never |
+| redis | `infra.yaml#redis.provider: external` | `providers/azure/cache` (Azure only; DigitalOcean: no module — bind or self-host) | `redis.provider: self-hosted` (valkey chart) | never |
+| object-store | `infra.yaml#minio.provider: external` | `providers/<cloud>/object-bucket` — per EXTENSION claim on DigitalOcean, the platform account + extension claims on Azure | `minio.provider: self-hosted` chart | never |
+| etcd | `infra.yaml#etcd.provider: external` (scoped by an etcd namespace per deployment) | **no module** — no cloud here offers it managed | `etcd.provider: self-hosted` chart — the normal answer | never |
+| temporal | `infra.yaml#temporal.provider: external` | **no module** | `temporal.provider: self-hosted` chart | `temporal.provider: disabled` — every workflow service fails fast |
+| dns / ingress | `enable_dns = false` (DNS at your registrar or another zone owner); ingress edge already present in the cluster | `providers/<cloud>/dns` for the zone; `cluster-addons/ingress-tls` for the edge (ingress-nginx + cert-manager + External Secrets; wired by the Azure stack today) | — | never |
+| secret-authority | the deployment root's own generator + an operator-held externals file (the DigitalOcean shape today) | `providers/azure/secrets-backend` (Key Vault + External Secrets reader identity) with `ingress-tls`'s `ClusterSecretStore`; `cluster-addons/secrets` for operator-provided values as plain Secrets | — | never |
+| identity-realm | `enable_identity_realm = false`; `infra.yaml#keycloak.provider: external` | `identity-realm` — the REALM inside a Keycloak the consumer already runs (`keycloak_url`); this module set does not install Keycloak | `keycloak.provider: self-hosted` chart installs the server | never |
+
+Two things the table says that are easy to read past:
+
+- **Redis, etcd and temporal MANAGED is the in-cluster recipe.** There is no
+  Terraform for them (Azure's cache module is the one exception, and it is
+  optional). "MANAGED" for those three is a Helm chart the deployment root
+  installs, and the declaration lives in that root's `infra.yaml`, not in any
+  stack input. A stack input for them would be this repository learning an
+  application's runtime roster, which is the boundary above.
+- **`identity-realm` manages a realm, never a server.** `keycloak_url` names a
+  Keycloak that already answers; whether that server is EXISTING or a
+  self-hosted chart is the deployment root's `keycloak.provider`.
+
+## Three ownership modes, one stack
+
+Who owns and who operates the substrate are two axes, and they produce three
+OPERATING MODES of one model. The stack is parameter-identical across all
+three: what changes is who runs `terraform apply`, where the state backend
+lives, and who holds the credentials. No `.tf` differs between modes.
+
+| | 1 — customer-owned, customer-operated | 2 — customer-owned, vendor-operated | 3 — vendor-hosted |
+| --- | --- | --- | --- |
+| runs `terraform apply` | the customer's operator, locally (this repo's CI never applies) | the vendor's operator, locally, against the customer's cloud | the vendor's operator |
+| consumer root (`main.tf` + `backend.hcl` + tfvars) | the customer's private repository, pinning `?ref=vX.Y.Z` | the customer's private repository; the vendor holds a clone | the vendor's private repository |
+| state backend (`backend.hcl`) | the customer's bucket (`providers/<cloud>/state-bucket`, bootstrapped once) | the customer's bucket | the vendor's bucket |
+| state-backend credential (`AWS_*` / `ARM_*` env for `init`) | the customer's | the customer's, issued to the vendor | the vendor's |
+| provider credentials (`TF_VAR_do_token`, `TF_VAR_keycloak_client_secret`, Azure `ARM_*`) | the customer's cloud account | the customer's cloud account, a scoped token issued to the vendor | the vendor's cloud account |
+| kubeconfig (`kubeconfig_raw`) | the customer | read by the vendor at apply time; never stored by the vendor | the vendor |
+| DNS authority (`dns_domain` zone) | the customer's registrar delegates to the created zone | same — the zone is in the customer's cloud | the vendor's zone |
+| registry pull credential (the deployment root's `ghcr-dockerconfigjson` external) | issued to the customer | held by the vendor | held by the vendor |
+| SCM credential (the private consumer root) | the customer's | the customer's, with the vendor as a collaborator | the vendor's |
+
+What every mode has in common decides the design: the stack reads its inputs
+from tfvars and the environment, keeps facts in one state, and publishes one
+[binding contract](#binding-contract). Nothing in it knows which mode it is in.
+
+### Mode 2 → 3 handoff (and back): a change of BINDINGS, never a replatform
+
+Moving a deployment from vendor-operated to vendor-hosted — or the reverse,
+the customer taking operation back — is the ordered transfer of the bindings
+in the table, and nothing else. In order:
+
+1. **State backend + its credential.** Copy the state to the receiving
+   party's bucket (`terraform state pull` / `push`, or a backend migration
+   `terraform init -migrate-state` against the new `backend.hcl`), then
+   revoke the old backend credential. The state is the deployment's identity;
+   until it has moved nothing else may.
+2. **Provider token(s).** The receiving party's cloud credential replaces the
+   issuing party's in `TF_VAR_*` / `ARM_*`. `terraform plan` must report
+   **0 to add, 0 to change, 0 to destroy** — the same resources, seen by a
+   different principal.
+3. **kubeconfig.** Re-read from `terraform output -raw kubeconfig_raw` by the
+   receiving party; the issuing party deletes its copy.
+4. **DNS authority.** The zone stays where it is in a cloud-account transfer;
+   in a cloud-account CHANGE, re-create the zone (`dns_domain`) and
+   re-delegate at the registrar (`dns_name_servers` on Azure).
+5. **Registry pull credential.** Re-issued to the receiving party and
+   re-supplied through the deployment root's externals file; the old one is
+   revoked.
+6. **SCM credential.** Ownership of the private consumer root moves (a
+   repository transfer, or a fork the receiving party now owns), and the
+   issuing party's access is removed.
+
+The assertion that makes this a handoff and not a migration: **no `.tf` file
+changes**. `backend.hcl` and the ownership of the tfvars/credentials change;
+the stack's parameters do not, so `terraform plan` after step 2 is the proof —
+a plan that wants to create, replace or destroy anything means a parameter
+moved, and that is a defect to fix before the handoff proceeds. A tool that
+can only run the deployment while its operator is available is not a handoff
+target; that is why every credential above is a value the receiving party can
+hold, never a service of the issuing party.
+
+What this does NOT cover, stated so nobody reads the table as complete: the
+deployment root (Helm GitOps) has its own bindings — its cluster credential,
+its image registry, its secret generator's externals — and they move under
+that root's own procedure. This section is the substrate's half only.
+
 ## Enable / disable toggles — greenfield vs consume
 
 Each substrate area is independently toggleable via an `enable_*` stack input
