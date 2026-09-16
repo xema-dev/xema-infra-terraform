@@ -8,17 +8,27 @@ CREDENTIALS from an operator file kept OUTSIDE every repository and passed
 to its secret generator as `--externals <file>`. Getting the outputs into
 those two files was a manual step. `bind-outputs.mjs` is that step.
 
-Node ≥ 20, ESM, zero dependencies. Two commands:
+Node ≥ 20, ESM, zero dependencies. **It consumes bindings and never drives
+the engine.** Its only input is the JSON that `output -json` prints, and that
+document is byte-identical from OpenTofu and from HashiCorp Terraform — so the
+script neither knows nor cares which engine produced the state, runs no
+`init`/`plan`/`apply`, and is not a wrapper, a DSL or a state layer of any
+kind. Two commands, in either spelling:
 
 ```sh
-# from the consumer root, after apply
+# from the consumer root, after apply — OpenTofu (the default engine) …
+tofu output -json \
+  | node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs \
+      --secret-inputs ./secret-inputs.fragment.yaml \
+      --externals    "$HOME/.config/acme/externals.json"
+# … or HashiCorp Terraform, when the customer mandates it: same script, same flags
 terraform output -json \
   | node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs \
       --secret-inputs ./secret-inputs.fragment.yaml \
       --externals    "$HOME/.config/acme/externals.json"
 
 # or from a saved document
-terraform output -json > /somewhere/outside/outputs.json
+tofu output -json > /somewhere/outside/outputs.json        # or: terraform output -json
 node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs --from /somewhere/outside/outputs.json \
      --secret-inputs ./secret-inputs.fragment.yaml --externals "$HOME/.config/acme/externals.json"
 ```

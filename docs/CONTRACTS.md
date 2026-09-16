@@ -80,64 +80,150 @@ Two things the table says that are easy to read past:
   Keycloak that already answers; whether that server is EXISTING or a
   self-hosted chart is the deployment root's `keycloak.provider`.
 
+## Engine and authoring profile — the engine is not the definition
+
+**OpenTofu is the default execution engine. HashiCorp Terraform is supported
+when the customer mandates it.** The infrastructure definition is standard
+HCL; the engine is the binary an operator runs (`cd <root> && tofu init/plan/
+apply`, or `terraform …`). There is one module set, never a tofu fork and a
+terraform fork, and NO wrapper of any kind — no DSL, no translation layer, no
+state layer, no module registry. `cd <root> && tofu|terraform init/plan/apply`
+must work with nothing of Xema's installed, or the boundary is wrong. Xema
+consumes OUTPUTS (the [binding contract](#binding-contract) and the sensitive
+outputs, through `tooling/bind`), and must never care which engine produced
+them.
+
+Every module and stack has an **engine profile**, and the profile is a closed
+set of two:
+
+| profile | means | how it is recorded |
+| --- | --- | --- |
+| `terraform-portable` | standard `terraform {}` / providers / modules / variables / outputs; no OpenTofu-only language or state feature; a backend both engines read (Azure Blob, S3-compatible, GCS — backend/provider-native encryption with the customer's KMS; HCP never mandatory); provider versions pinned and resolvable from both ecosystems | **the zero-configuration DEFAULT — recorded NOWHERE.** A module that says nothing is portable, and the customer template only ever uses this |
+| `opentofu-native` | uses an OpenTofu-only construct on purpose (client-side state encryption, provider iteration, …); does not advertise portability | **the EXCEPTION, declared** in the module's `versions.tf` beside its `required_version`: `locals { xema_engine_profile = "opentofu-native" }` — no manifest, no header, no registry |
+
+What makes the default data rather than a hope is one check in this
+repository's CI, `tooling/check-engine-profile.mjs` (node --test'd): per
+module, an OpenTofu-only construct present WITHOUT that local fails, naming
+the construct, the file, the line and the module — `encryption {`,
+`removed {`, `terraform.applying`, `provider::…(` calls, provider `for_each`,
+an engine-naming `required_version`, a `.tofu` file. A module WITH the local
+is opentofu-native and is validated on the OpenTofu leg only.
+
+Measured on `origin/develop` `63a9dfd` (2026-09-16): every module is
+terraform-portable — zero `encryption {}`, zero `removed {}`, zero
+`terraform.applying`, zero `provider::` functions (control: 384 variable
+declarations), one `azurerm` backend, `required_version = ">= 1.6"`
+throughout. Portability is proven once per module release by CI running
+`fmt` + `validate` on BOTH engines for every portable leaf; the
+representative-plan half of that proof is unrun in CI because CI holds no
+cloud credential and no credential-free plan fixture exists (recorded in
+`ci.yml`, not faked). The first two-engine run found one real defect the
+Terraform leg alone had never seen: `providers/azure/cluster`'s `endpoint`
+output derived from the sensitive `kube_config` block, which OpenTofu's
+`validate` refuses and Terraform would have refused at plan — fixed with
+`nonsensitive()`, which both engines accept.
+
 ## Three ownership modes, one stack
 
 Who owns and who operates the substrate are two axes, and they produce three
 OPERATING MODES of one model. The stack is parameter-identical across all
-three: what changes is who runs `terraform apply`, where the state backend
+three: what changes is who runs `apply`, with which engine, where the state
 lives, and who holds the credentials. No `.tf` differs between modes.
 
-| | 1 — customer-owned, customer-operated | 2 — customer-owned, vendor-operated | 3 — vendor-hosted |
+| | 1 — customer-owned, customer-operated | 2 — customer-owned, NeuralChowder-operated | 3 — NeuralChowder-owned, NeuralChowder-operated (vendor-hosted) |
 | --- | --- | --- | --- |
-| runs `terraform apply` | the customer's operator, locally (this repo's CI never applies) | the vendor's operator, locally, against the customer's cloud | the vendor's operator |
-| consumer root (`main.tf` + `backend.hcl` + tfvars) | the customer's private repository, pinning `?ref=vX.Y.Z` | the customer's private repository; the vendor holds a clone | the vendor's private repository |
-| state backend (`backend.hcl`) | the customer's bucket (`providers/<cloud>/state-bucket`, bootstrapped once) | the customer's bucket | the vendor's bucket |
-| state-backend credential (`AWS_*` / `ARM_*` env for `init`) | the customer's | the customer's, issued to the vendor | the vendor's |
-| provider credentials (`TF_VAR_do_token`, `TF_VAR_keycloak_client_secret`, Azure `ARM_*`) | the customer's cloud account | the customer's cloud account, a scoped token issued to the vendor | the vendor's cloud account |
-| kubeconfig (`kubeconfig_raw`) | the customer | read by the vendor at apply time; never stored by the vendor | the vendor |
-| DNS authority (`dns_domain` zone) | the customer's registrar delegates to the created zone | same — the zone is in the customer's cloud | the vendor's zone |
-| registry pull credential (the deployment root's `ghcr-dockerconfigjson` external) | issued to the customer | held by the vendor | held by the vendor |
-| SCM credential (the private consumer root) | the customer's | the customer's, with the vendor as a collaborator | the vendor's |
+| engine | **their choice**; Terraform (and HCP/TFE) fully supported | **OpenTofu**, unless the customer mandates Terraform/HCP | **OpenTofu** |
+| runs `apply` | the customer's operator, locally (this repo's CI never applies) | NeuralChowder's operator, locally, under DELEGATED IAM in the customer's account | NeuralChowder's operator |
+| consumer root (`main.tf` + `backend.hcl` + tfvars) | the customer's private repository, pinning `?ref=vX.Y.Z` | the customer's private repository; NeuralChowder has access to it | NeuralChowder's private repository |
+| cloud account | the customer's | **the customer's, from day one** | NeuralChowder's |
+| state backend (`backend.hcl`) + KMS / key authority | the customer's bucket and keys (`providers/<cloud>/state-bucket`, bootstrapped once) | **the customer's bucket and keys, from day one** — never the only authoritative copy in a NeuralChowder-only system | NeuralChowder's |
+| state-backend credential (`AWS_*` / `ARM_*` for `init`) | the customer's | the customer's, delegated to NeuralChowder | NeuralChowder's |
+| provider credentials (`TF_VAR_do_token`, `TF_VAR_keycloak_client_secret`, Azure `ARM_*`) | the customer's cloud account | the customer's, as a scoped delegated identity | NeuralChowder's |
+| kubeconfig (`kubeconfig_raw`) | the customer | read by NeuralChowder at apply time, never stored | NeuralChowder |
+| DNS authority (`dns_domain` zone) | the customer's registrar delegates to the created zone | same — the zone is in the customer's cloud | NeuralChowder's zone |
+| registry pull credential (the deployment root's `ghcr-dockerconfigjson` external) | issued to the customer | held by NeuralChowder | held by NeuralChowder |
+| SCM credential (the private consumer root) | the customer's | the customer's, with NeuralChowder as a collaborator | NeuralChowder's |
 
 What every mode has in common decides the design: the stack reads its inputs
 from tfvars and the environment, keeps facts in one state, and publishes one
 [binding contract](#binding-contract). Nothing in it knows which mode it is in.
 
-### Mode 2 → 3 handoff (and back): a change of BINDINGS, never a replatform
+### Onboarding asks TWO lines
 
-Moving a deployment from vendor-operated to vendor-hosted — or the reverse,
-the customer taking operation back — is the ordered transfer of the bindings
-in the table, and nothing else. In order:
+1. **"Does the customer mandate Terraform / HCP?"** — yes → the engine is
+   `terraform`; no → `tofu`.
+2. **"Is future Terraform portability required?"** — default **yes** for
+   customer-owned infrastructure; it pins the profile to `terraform-portable`,
+   which is the only profile the customer template uses anyway.
 
-1. **State backend + its credential.** Copy the state to the receiving
-   party's bucket (`terraform state pull` / `push`, or a backend migration
-   `terraform init -migrate-state` against the new `backend.hcl`), then
-   revoke the old backend credential. The state is the deployment's identity;
-   until it has moved nothing else may.
-2. **Provider token(s).** The receiving party's cloud credential replaces the
-   issuing party's in `TF_VAR_*` / `ARM_*`. `terraform plan` must report
-   **0 to add, 0 to change, 0 to destroy** — the same resources, seen by a
-   different principal.
-3. **kubeconfig.** Re-read from `terraform output -raw kubeconfig_raw` by the
-   receiving party; the issuing party deletes its copy.
-4. **DNS authority.** The zone stays where it is in a cloud-account transfer;
-   in a cloud-account CHANGE, re-create the zone (`dns_domain`) and
-   re-delegate at the registrar (`dns_name_servers` on Azure).
-5. **Registry pull credential.** Re-issued to the receiving party and
-   re-supplied through the deployment root's externals file; the old one is
+No further ceremony. `examples/customer/README.md` carries both lines.
+
+### Mode 2 → 1 handoff: revoke access + hand over the runbook, NEVER a state migration
+
+Because in mode 2 the cloud account, the state backend and the keys are the
+customer's from day one, handing operation to the customer is the REMOVAL of
+NeuralChowder's delegated access plus the runbook — the state does not move,
+because it was never anywhere else. Acceptance, all four:
+
+- the customer holds the IaC source (the consumer root: module version,
+  tfvars, `backend.hcl`);
+- the customer holds the state backend and its keys, and the cloud
+  credentials;
+- the customer can run the declared engine independently — a clean
+  `tofu plan` (or `terraform plan`) from their own workstation, with
+  NeuralChowder's access already revoked;
+- for the `terraform-portable` profile, switching control to Terraform
+  proposes NO destructive recreation (the procedure below).
+
+### Switching the engine to Terraform (portable profile): a controlled operation
+
+Never casually alternate both CLIs on one live state. When the customer takes
+operation on Terraform, in order:
+
+1. **Freeze** — no `apply` from anyone until the switch completes.
+2. **Back up the state** (`tofu state pull > backup.tfstate`, kept by the
+   customer).
+3. **Clean OpenTofu plan** — `tofu plan` reports `0 to add, 0 to change, 0 to
+   destroy`; a dirty plan is fixed before, never during.
+4. **Verify no OpenTofu-only feature or state dependency** —
+   `node tooling/check-profile.mjs` says `terraform-portable` for every leaf
+   the root consumes; no `encryption {}`, no provider iteration.
+5. **Init the customer's Terraform tooling and backend** — `terraform init
+   -backend-config=backend.hcl` against the SAME backend (`backend.hcl`
+   unchanged; the state does not move).
+6. **`terraform plan` — require NO unexpected recreation.** Provider version
+   pins resolve identically from both ecosystems; anything that wants to
+   create, replace or destroy is a stop, not a note.
+7. **Transfer / revoke access** — the customer's operator is now the one who
+   applies; NeuralChowder's delegated identity is revoked.
+
+### Mode 2 → 3 (and 3 → 2): a change of BINDINGS, never a replatform
+
+Moving between NeuralChowder-operated-in-the-customer's-account and
+vendor-hosted is a different operation from the handoff above, because here
+the cloud ACCOUNT changes. It is the ordered transfer of the bindings in the
+table, and nothing else:
+
+1. **State backend + its credential** — copy the state into the receiving
+   account's bucket (`state pull` / `push`, or `init -migrate-state` against
+   the new `backend.hcl`), then revoke the old backend credential.
+2. **Provider token(s)** — the receiving account's cloud credential replaces
+   the issuing one in `TF_VAR_*` / `ARM_*`; `plan` must report **0 to add, 0
+   to change, 0 to destroy**.
+3. **kubeconfig** — re-read from `output -raw kubeconfig_raw` by the receiving
+   party; the issuing party deletes its copy.
+4. **DNS authority** — re-create the zone (`dns_domain`) in the receiving
+   account and re-delegate at the registrar (`dns_name_servers` on Azure).
+5. **Registry pull credential** — re-issued to the receiving party and
+   re-supplied through the deployment root's externals file; the old one
    revoked.
-6. **SCM credential.** Ownership of the private consumer root moves (a
-   repository transfer, or a fork the receiving party now owns), and the
-   issuing party's access is removed.
+6. **SCM credential** — ownership of the private consumer root moves.
 
-The assertion that makes this a handoff and not a migration: **no `.tf` file
-changes**. `backend.hcl` and the ownership of the tfvars/credentials change;
-the stack's parameters do not, so `terraform plan` after step 2 is the proof —
-a plan that wants to create, replace or destroy anything means a parameter
-moved, and that is a defect to fix before the handoff proceeds. A tool that
-can only run the deployment while its operator is available is not a handoff
-target; that is why every credential above is a value the receiving party can
-hold, never a service of the issuing party.
+The assertion that makes either operation a handoff and not a migration: **no
+`.tf` file changes**. Only `backend.hcl` and the ownership of tfvars and
+credentials change, so `plan` after the credential moves is the proof — a plan
+that wants to create, replace or destroy anything means a parameter moved,
+and that is a defect to fix before proceeding.
 
 What this does NOT cover, stated so nobody reads the table as complete: the
 deployment root (Helm GitOps) has its own bindings — its cluster credential,

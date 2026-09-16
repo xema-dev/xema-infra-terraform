@@ -38,7 +38,18 @@ is the consumer's fact, derived from what it deploys.
 - **`realm_access_token_lifespan`** (both stacks, `identity-realm`) —
   optional, default `""` (inherits Keycloak's 5m). Set it so the lifespan is
   intent.
-- **`tooling/bind/bind-outputs.mjs`** — BIND made mechanical: `terraform
+- **Engine policy as data.** OpenTofu is the default execution engine and
+  HashiCorp Terraform is supported on customer mandate; the modules are one
+  standard-HCL set for both. `terraform-portable` is every module's unrecorded
+  default; the exception is `locals { xema_engine_profile = "opentofu-native" }`
+  in a module's `versions.tf`. `tooling/check-engine-profile.mjs` fails an
+  undeclared module that uses an OpenTofu-only construct, naming it; CI
+  validates every module on both engines (`docs/CONTRACTS.md § Engine and
+  authoring profile`). The first two-engine run fixed
+  `providers/azure/cluster`'s `endpoint` output (derived from the sensitive
+  `kube_config`; now `nonsensitive()`, which both engines accept).
+- **`tooling/bind/bind-outputs.mjs`** — BIND made mechanical: `tofu output
+  -json` or `terraform
   output -json` → the deployment root's `secret-inputs.yaml` fragment
   (endpoints) and its operator externals file (credentials, 0600, refused
   inside any git work tree). One explicit table; an unknown output is
