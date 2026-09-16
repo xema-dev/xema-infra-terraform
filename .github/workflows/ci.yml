@@ -80,3 +80,8 @@ jobs:
 
       - name: Every tracked source file is readable by search
         run: node tooling/boundaries/lib/source-readability.mjs
+
+      # BIND: the outputs → secret-inputs/externals mapping runs its own suite
+      # over one fixture document per stack (tooling/bind/README.md).
+      - name: bind-outputs (node --test)
+        run: node --test 'tooling/bind/*.test.mjs'
