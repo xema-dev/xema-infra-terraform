@@ -16,40 +16,108 @@ permissions:
   contents: read
 
 jobs:
+  # PORTABILITY, PROVEN ON BOTH ENGINES. `terraform-portable` is every
+  # module's zero-configuration default, recorded nowhere; the exception is a
+  # module declaring `locals { xema_engine_profile = "opentofu-native" }` in
+  # its versions.tf (tooling/check-engine-profile.mjs grades both). The default
+  # is only worth something if both engines accept the HCL, so fmt + validate
+  # run twice: under OpenTofu — the default execution engine — and under
+  # HashiCorp Terraform, which SKIPS the opentofu-native leaves (today: 21
+  # portable / 0 native, so both legs validate everything). Running Terraform
+  # here is INTERNAL USE inside its BSL; it is a validation step and never the
+  # default engine anywhere else.
+  #
+  # NOT RUN: a representative `plan` per engine. A plan needs cloud
+  # credentials, and this repository's CI holds none by design (apply and
+  # plan are a reviewed, local, operator action — README § How it runs). No
+  # credential-free plan fixture exists yet, so the plan half of the
+  # portability proof is unrun, and this comment is where that is recorded
+  # rather than a green step that planned nothing.
   validate:
-    name: fmt / validate / tflint / leak-scan
+    name: ${{ matrix.engine }} — fmt / validate
     runs-on: [self-hosted, linux]
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: opentofu
+            bin: tofu
+          - engine: terraform
+            bin: terraform
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up OpenTofu
+        if: matrix.engine == 'opentofu'
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.12.6"
+          tofu_wrapper: false
+
       - name: Set up Terraform
+        if: matrix.engine == 'terraform'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.6.2"
+          terraform_wrapper: false
 
-      - name: terraform fmt (check, recursive)
-        run: terraform fmt -check -recursive
+      - name: fmt (check, recursive)
+        run: ${{ matrix.bin }} fmt -check -recursive
 
-      - name: terraform validate (every module, stack, example)
+      - name: Setup Node.js (for the profile list)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        timeout-minutes: 5
+        with:
+          node-version-file: .node-version
+
+      - name: validate (every module, stack, example)
         run: |
           set -euo pipefail
           # examples/customer pins the stack by git ref, which init cannot
           # fetch offline; the CI-only override resolves it from this checkout
           # (examples/customer/README.md § Validating this example offline).
           cp examples/customer/ci/source_override.tf.ci examples/customer/source_override.tf
+          # The terraform leg skips leaves declared opentofu-native; the tofu
+          # leg validates everything.
+          native="$(node tooling/check-engine-profile.mjs --list native)"
           # Validate each leaf directory that contains *.tf files, with the
           # backend disabled and providers from the local mirror — no cloud creds.
           find modules stacks examples -type f -name '*.tf' -print0 \
             | xargs -0 -n1 dirname \
             | sort -u \
             | while read -r dir; do
+                if [ "${{ matrix.engine }}" = "terraform" ] && printf '%s\n' "$native" | grep -qx "$dir"; then
+                  echo "skip $dir (opentofu-native; validated on the OpenTofu leg only)"
+                  continue
+                fi
                 echo "::group::validate $dir"
-                terraform -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
-                terraform -chdir="$dir" validate -no-color
+                ${{ matrix.bin }} -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
+                ${{ matrix.bin }} -chdir="$dir" validate -no-color
                 echo "::endgroup::"
               done
+
+  checks:
+    name: profile / tflint / leak-scan / readability / bind tests
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Self-contained (node builtins only): no install, nothing to lock.
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        timeout-minutes: 5  # setup-node stalls indefinitely on this fleet; fail loudly instead of masking later steps
+        with:
+          node-version-file: .node-version
+
+      # terraform-portable is the unrecorded default; a leaf using an
+      # OpenTofu-only construct without declaring opentofu-native fails, naming
+      # the construct and the module.
+      - name: Engine profile honoured
+        run: node --test tooling/check-engine-profile.test.mjs && node tooling/check-engine-profile.mjs
 
       - name: Set up TFLint
         uses: terraform-linters/setup-tflint@v4
@@ -75,13 +143,6 @@ jobs:
       # tracked source file carrying a raw NUL is classified BINARY by ripgrep,
       # ugrep and `grep -I` — they skip the whole file and report zero matches,
       # so it is invisible to all of them.
-      # Self-contained (node builtins only): no install, nothing to lock.
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        timeout-minutes: 5  # setup-node stalls indefinitely on this fleet; fail loudly instead of masking later steps
-        with:
-          node-version-file: .node-version
-
       - name: Every tracked source file is readable by search
         run: node tooling/boundaries/lib/source-readability.mjs
 

@@ -5,7 +5,15 @@ output "cluster_id" {
 
 output "endpoint" {
   description = "Kubernetes API server URL."
-  value       = azurerm_kubernetes_cluster.this.kube_config[0].host
+  # `kube_config` is a sensitive block in azurerm, so everything read from it is
+  # sensitive-derived — including the host, which the cluster contract
+  # (docs/CONTRACTS.md) declares NON-secret: it is the public API address the
+  # kubeconfig itself names. OpenTofu's `validate` refuses a root output that
+  # derives from a sensitive value without `sensitive = true`; HashiCorp
+  # Terraform raises the same error, one step later, at plan. `nonsensitive`
+  # is the explicit, both-engine statement that this one field is not the
+  # credential its container is. Found by the OpenTofu validate leg in CI.
+  value = nonsensitive(azurerm_kubernetes_cluster.this.kube_config[0].host)
 }
 
 output "kubeconfig_raw" {
