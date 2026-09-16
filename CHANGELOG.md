@@ -4,7 +4,7 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
-## v0.6.1 — UNRELEASED (tagged by the coordinator after promotion)
+## v0.6.1 — 2026-09-16 (tag `v0.6.1` = `7735dac`, cut from `develop` like `v0.6.0`; promotion to `main` is PR #1)
 
 **`tooling/bind/bind-outputs.mjs --secret-inputs` MERGES.** Aimed at the
 committed `deployments/<d>/secret-inputs.yaml` — the file every procedure
