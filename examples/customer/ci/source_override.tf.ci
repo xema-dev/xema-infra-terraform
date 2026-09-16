@@ -1,0 +1,10 @@
+# CI ONLY. main.tf pins the stack by `git::…?ref=v0.6.0`, which `terraform init`
+# must fetch over the network — and this repository's CI validates every root
+# offline, with the backend disabled. CI copies this file to
+# examples/customer/source_override.tf (git-ignored via *_override.tf) before
+# `terraform init -backend=false`, so validate resolves the stack from the
+# checkout under test instead of from a release that may not exist yet.
+# A customer root never carries this file.
+module "substrate" {
+  source = "../../stacks/digitalocean/xema-substrate"
+}

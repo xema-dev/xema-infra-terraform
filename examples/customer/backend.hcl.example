@@ -1,0 +1,14 @@
+# Copy to backend.hcl (git-ignored). The customer's PRIVATE, versioned state
+# bucket — bootstrapped once with modules/providers/digitalocean/state-bucket.
+# Credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (Spaces is
+# S3-compatible), never from this file. In a mode-2→3 handoff THIS file and
+# that credential are the first binding that moves (docs/CONTRACTS.md).
+bucket   = "acme-tfstate"
+key      = "acme-prod/substrate/terraform.tfstate"
+region   = "us-east-1" # required by the S3 backend; DigitalOcean ignores it
+endpoint = "https://fra1.digitaloceanspaces.com"
+
+skip_credentials_validation = true
+skip_metadata_api_check     = true
+skip_region_validation      = true
+skip_requesting_account_id  = true

@@ -1,0 +1,48 @@
+# Copy to terraform.tfvars (git-ignored) and replace every value. NEUTRAL
+# placeholders only — nothing here names a live deployment. Credentials
+# (do_token, keycloak_client_secret) go in TF_VAR_* env vars, not here.
+
+region = "fra1"
+tags   = { managed-by = "terraform", deployment = "acme-prod" }
+
+# --- cluster ---
+cluster_name    = "acme-prod"
+default_pool_id = "generic"
+node_pools = {
+  generic = { size = "s-4vcpu-8gb", node_count = 3 }
+}
+
+# --- postgres ---
+postgres_name = "acme-prod-pg"
+postgres_size = "db-s-2vcpu-4gb"
+# REQUIRED rosters — yours. The deployment root's bootstrap/postgres-databases.sql
+# and deployment.yaml are where these come from; the placeholders are a shape.
+platform_databases  = ["acme_prod_platform", "acme_prod_openfga"]
+workload_namespaces = ["acme-prod", "acme-prod-infra"]
+
+# --- dns ---
+dns_domain = "acme.example"
+dns_records = {
+  apex = { name = "@", type = "A", value = "192.0.2.10" } # RFC 5737 TEST-NET-1
+}
+
+# --- identity realm (the Keycloak SERVER is yours; this manages the realm in it) ---
+keycloak_url       = "https://id.acme.example"
+keycloak_client_id = "terraform-admin"
+realm_name         = "acme-prod"
+realm_display_name = "Acme"
+realm_clients = {
+  identity-api = {
+    client_id                = "identity-api"
+    access_type              = "CONFIDENTIAL"
+    standard_flow_enabled    = false
+    service_accounts_enabled = true
+  }
+  web = {
+    client_id           = "web-app"
+    access_type         = "PUBLIC"
+    valid_redirect_uris = ["https://app.acme.example/*"]
+    web_origins         = ["https://app.acme.example"]
+  }
+}
+realm_roles = ["platform_admin", "member"]

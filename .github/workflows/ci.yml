@@ -35,6 +35,10 @@ jobs:
       - name: terraform validate (every module, stack, example)
         run: |
           set -euo pipefail
+          # examples/customer pins the stack by git ref, which init cannot
+          # fetch offline; the CI-only override resolves it from this checkout
+          # (examples/customer/README.md § Validating this example offline).
+          cp examples/customer/ci/source_override.tf.ci examples/customer/source_override.tf
           # Validate each leaf directory that contains *.tf files, with the
           # backend disabled and providers from the local mirror — no cloud creds.
           find modules stacks examples -type f -name '*.tf' -print0 \
