@@ -65,11 +65,12 @@ tofu apply                                                  # phase 2
 ```
 
 Then BIND — the outputs into the deployment root's two input files, with no
-credential typed by hand:
+credential typed by hand. `--secret-inputs` MERGES into the committed file
+(every key you declared is kept; a disagreement with the stack is reported):
 
 ```sh
 tofu output -json | node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs \
-  --secret-inputs ./secret-inputs.fragment.yaml --externals "$HOME/.config/acme/externals.json"
+  --secret-inputs <deployment root>/deployments/acme-prod/secret-inputs.yaml --externals "$HOME/.config/acme/externals.json"
 ```
 
 See [`tooling/bind/README.md`](../../tooling/bind/README.md) for the mapping,

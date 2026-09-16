@@ -4,6 +4,22 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.6.1 — UNRELEASED (tagged by the coordinator after promotion)
+
+**`tooling/bind/bind-outputs.mjs --secret-inputs` MERGES.** Aimed at the
+committed `deployments/<d>/secret-inputs.yaml` — the file every procedure
+names — v0.6.0 REPLACED it with the derived fragment: measured on the first
+customer, 55 hand-written lines became 12. It now adds the derived keys the
+file lacks (at the end of their section; a missing section is appended),
+preserves every byte the owner wrote, and KEEPS a key the owner declared with
+a different value than the stack's, reporting the disagreement (`merged: KEPT
+— …`) instead of absorbing it. A prior fragment of its own (first line = the
+generated banner) or an absent file is still written whole; a file whose
+shape the merge cannot read (a nested mapping or list inside a section the
+stack writes) is refused by line and left untouched. Nothing a consumer root's
+`main.tf` or tfvars say changes. Pinned by three new cases in
+`tooling/bind/bind-outputs.test.mjs`.
+
 ## v0.6.0 — UNRELEASED (tagged by the coordinator after promotion)
 
 **Breaking: the stacks stop knowing the application.** Two inputs that used to

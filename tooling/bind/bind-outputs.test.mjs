@@ -14,7 +14,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { BindError, DISPOSITIONS, Disposition, assertOutsideWorkTree, bind } from './bind-outputs.mjs';
+import { BindError, DISPOSITIONS, Disposition, assertOutsideWorkTree, bind, mergeIntoSecretInputs } from './bind-outputs.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(HERE, 'bind-outputs.mjs');
@@ -182,4 +182,98 @@ test('CLI: writes the fragment as YAML and the externals at 0600, and exits 1 on
 
 test('the test file itself sits in a work tree (positive control for the refusal)', () => {
   assert.equal(execFileSync('git', ['-C', HERE, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8' }).trim(), 'true');
+});
+
+// ── THE BINDER TRAP (v0.6.1) ────────────────────────────────────────────────
+// Aimed at the committed deployments/<d>/secret-inputs.yaml — the file every
+// procedure names — --secret-inputs REPLACED it with the derived fragment (a
+// 55-line hand file became 12 lines on the first customer). It MERGES now.
+
+/** The shape a committed secret-inputs.yaml has: comments, blank lines, owner keys, sections the stack knows nothing about. */
+const COMMITTED = `# secret-inputs for acme-prod — hand-authored; endpoints only, never a credential.
+postgres:
+  # the role the platform's databases are created for
+  role: acme_prod_app
+  directHost: pg.acme.internal      # the operator's alias; the stack disagrees
+  directParams: sslmode=require
+
+keycloak:
+  issuer: "https://id.acme.example/realms/acme-prod"
+
+llm:
+  openaiBaseUrl: https://llm.acme.example/v1
+  embeddingModel: Qwen/Qwen3-Embedding-8B
+biomeFetcher:
+  trustedOidcIssuer: https://token.actions.githubusercontent.com
+  trustedPublishers: ''
+`;
+
+test('merge: every existing byte survives; missing derived keys are added in their section; a differing owner key is KEPT and reported; an equal one is `same`', () => {
+  const { fragment } = bind(fixture('azure'));
+  const { text, report } = mergeIntoSecretInputs(COMMITTED, fragment);
+  // Nothing the owner wrote is lost — every original line is still there, in order.
+  const original = COMMITTED.split('\n').filter((l) => l !== '');
+  let cursor = 0;
+  for (const line of text.split('\n')) if (line === original[cursor]) cursor += 1;
+  assert.equal(cursor, original.length, `an original line was lost or reordered:\n${text}`);
+  // Added: the keys the file lacked, appended at the END of their sections.
+  assert.match(text, /^  directParams: sslmode=require\n  directPort: "5432"\n/m, 'directPort was not appended at the end of postgres:');
+  assert.match(text, /^\nredis:\n  host: "acme-prod-redis\.redis\.cache\.windows\.net"\n  port: "6380"\n$/m, 'the redis section was not appended at the end of the file');
+  assert.deepEqual(report.added.sort(), ['postgres.directPort', 'redis.host', 'redis.port']);
+  // Kept: the owner's directHost differs from the stack's — the explicit key wins, loudly.
+  assert.equal(report.kept.length, 1);
+  assert.match(report.kept[0], /^postgres\.directHost: the file declares "pg\.acme\.internal", the stack says "acme-prod-pg\.postgres\.database\.azure\.com" — the explicit key wins/);
+  assert.match(text, /^  directHost: pg\.acme\.internal      # the operator's alias; the stack disagrees$/m);
+  // Same: role and issuer are already declared with the stack's value (quoted or not).
+  assert.deepEqual(report.same.sort(), ['keycloak.issuer', 'postgres.role']);
+  // Idempotent: merging the result again changes nothing.
+  const again = mergeIntoSecretInputs(text, fragment);
+  assert.equal(again.text, text);
+  assert.deepEqual(again.report.added, []);
+});
+
+test('merge: a target section this merge cannot read (a nested mapping) is REFUSED by line, and the file is not touched', () => {
+  const { fragment } = bind(fixture('azure'));
+  const nested = 'postgres:\n  role: r\n  pooler:\n    host: x\n';
+  assert.throws(() => mergeIntoSecretInputs(nested, fragment), /cannot merge into section 'postgres'.*line\(s\) 3, 4 are not/);
+  assert.throws(() => mergeIntoSecretInputs('just a scalar\n', fragment), /not a section header/);
+  // A section the fragment does NOT write into may hold anything.
+  const elsewhere = 'llm:\n  models:\n    - a\n    - b\npostgres:\n  role: acme_prod_app\n';
+  const { text } = mergeIntoSecretInputs(elsewhere, fragment);
+  assert.match(text, /^llm:\n  models:\n    - a\n    - b\n/m);
+});
+
+test('CLI: aimed at a committed secret-inputs.yaml, --secret-inputs MERGES (55 lines stay 55+); a prior fragment of its own is rewritten whole', () => {
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'bind-merge-'));
+  try {
+    const committed = path.join(outside, 'secret-inputs.yaml');
+    fs.writeFileSync(committed, COMMITTED);
+    const before = COMMITTED.split('\n').length;
+    const run = spawnSync(process.execPath, [SCRIPT, '--from', path.join(HERE, 'fixtures', 'azure.output.json'), '--secret-inputs', committed], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    const after = fs.readFileSync(committed, 'utf8');
+    assert.ok(after.split('\n').length > before, `the file shrank: ${before} → ${after.split('\n').length}`);
+    assert.ok(after.startsWith('# secret-inputs for acme-prod'), 'the owner\'s header was replaced');
+    assert.match(run.stderr, /merged into .*secret-inputs\.yaml: 3 key\(s\) added, 2 already equal, 1 kept as declared/);
+    assert.match(run.stderr, /KEPT — the file declares a different value/);
+
+    // A prior fragment of the script's own is regenerated whole, as before.
+    const fragmentPath = path.join(outside, 'fragment.yaml');
+    spawnSync(process.execPath, [SCRIPT, '--from', path.join(HERE, 'fixtures', 'digitalocean.output.json'), '--secret-inputs', fragmentPath], { encoding: 'utf8' });
+    const rerun = spawnSync(process.execPath, [SCRIPT, '--from', path.join(HERE, 'fixtures', 'azure.output.json'), '--secret-inputs', fragmentPath], { encoding: 'utf8' });
+    assert.equal(rerun.status, 0, rerun.stderr);
+    assert.match(rerun.stderr, /^wrote /m);
+    assert.match(fs.readFileSync(fragmentPath, 'utf8'), /directPort: "5432"/);
+    assert.doesNotMatch(fs.readFileSync(fragmentPath, 'utf8'), /25060/);
+
+    // An unreadable target is refused and left byte-identical.
+    const opaque = path.join(outside, 'opaque.yaml');
+    fs.writeFileSync(opaque, 'postgres:\n  role: r\n  pooler:\n    host: x\n');
+    const refused = spawnSync(process.execPath, [SCRIPT, '--from', path.join(HERE, 'fixtures', 'azure.output.json'), '--secret-inputs', opaque], { encoding: 'utf8' });
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /cannot merge into section 'postgres'/);
+    assert.equal(fs.readFileSync(opaque, 'utf8'), 'postgres:\n  role: r\n  pooler:\n    host: x\n');
+  } finally {
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
 });

@@ -19,24 +19,35 @@ kind. Two commands, in either spelling:
 # from the consumer root, after apply — OpenTofu (the default engine) …
 tofu output -json \
   | node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs \
-      --secret-inputs ./secret-inputs.fragment.yaml \
+      --secret-inputs <deployment root>/deployments/<d>/secret-inputs.yaml \
       --externals    "$HOME/.config/acme/externals.json"
 # … or HashiCorp Terraform, when the customer mandates it: same script, same flags
 terraform output -json \
   | node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs \
-      --secret-inputs ./secret-inputs.fragment.yaml \
+      --secret-inputs <deployment root>/deployments/<d>/secret-inputs.yaml \
       --externals    "$HOME/.config/acme/externals.json"
 
 # or from a saved document
 tofu output -json > /somewhere/outside/outputs.json        # or: terraform output -json
 node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs --from /somewhere/outside/outputs.json \
-     --secret-inputs ./secret-inputs.fragment.yaml --externals "$HOME/.config/acme/externals.json"
+     --secret-inputs <deployment root>/deployments/<d>/secret-inputs.yaml --externals "$HOME/.config/acme/externals.json"
 ```
 
-Then merge the fragment into `deployments/<d>/secret-inputs.yaml` (an explicit
-key there wins over a derived one — the generator reports each disagreement)
-and run the deployment root's generator with `--externals` pointing at the
-externals file.
+**`--secret-inputs` MERGES into the committed `secret-inputs.yaml`** (v0.6.1):
+a derived key the file lacks is added at the end of its section (a missing
+section is appended), every byte the owner wrote — keys, comments, order —
+is preserved, and a key the owner declared with a DIFFERENT value than the
+stack's is KEPT and reported (`merged: KEPT — …`): an explicit key wins over
+a derived one, and the disagreement is printed rather than absorbed. Until
+v0.6.1 the script wrote a FRAGMENT and REPLACED whatever file the path named
+— aimed at the committed file, 55 hand-written lines became 12 — so the only
+safe target was a separate `secret-inputs.fragment.yaml` merged by hand.
+That still works: a file that is a prior fragment of the script's own (its
+first line is the generated banner), or absent, is written whole. A file
+whose shape the merge cannot read — a nested mapping or a list inside a
+section the stack writes into — is refused naming the line and left
+untouched; add those keys by hand. Then run the deployment root's generator
+with `--externals` pointing at the externals file.
 
 Options: `--identity-client <realm_clients key>` names which realm client is
 the identity-api client (default `identity-api`); `--consumed <output>[,…]`
