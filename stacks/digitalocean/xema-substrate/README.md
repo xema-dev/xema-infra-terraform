@@ -1,20 +1,25 @@
 # `xema-substrate` stack — DigitalOcean
 
-Composes the full Xema substrate on DigitalOcean from the per-cloud primitives
-and the cloud-agnostic addons:
+Composes the full substrate on DigitalOcean from the per-cloud primitives and
+the cloud-agnostic addons. Nothing in this stack names a service or an
+application: the two rosters the substrate cannot know — which databases and
+which namespaces exist — are **required inputs with no default**,
+`platform_databases` and `workload_namespaces`, derived by the consumer from
+what it deploys (see
+[the boundary](../../../docs/CONTRACTS.md#the-boundary-capabilities-never-applications)).
 
 | Module | What it provisions |
 | --- | --- |
 | `module.cluster` | DOKS managed Kubernetes cluster + node pools |
-| `module.postgres` | DO managed Postgres + logical databases/roles |
+| `module.postgres` | DO managed Postgres + the `platform_databases` roster and `postgres_roles` |
 | `module.dns` | the managed DNS zone's records |
 | `module.rwx_storage` | a ReadWriteMany `StorageClass` (NFS provisioner) on the cluster |
-| `module.workload_namespaces` | the namespaces the Helm app bring-up expects |
+| `module.workload_namespaces` | the `workload_namespaces` roster the consumer supplies |
 | `module.identity_realm` | the Keycloak realm **container** (+ optional base clients/roles/mappers) |
-| `module.extension_bucket` | dedicated object buckets claimed by biomes (see below) |
+| `module.extension_bucket` | dedicated object buckets claimed by extensions (see below) |
 
-> **Realm boundary:** when a platform app (e.g. `identity-api`) reconciles the
-> realm's platform clients/roles/scopes/mappers on boot, leave `realm_clients` /
+> **Realm boundary:** when the consumer's own identity service reconciles the
+> realm's clients/roles/scopes/mappers on boot, leave `realm_clients` /
 > `realm_roles` / `realm_protocol_mappers` **empty** and let Terraform manage only
 > the realm container — see the
 > [`identity-realm` README](../../../modules/identity-realm/README.md#ownership-boundary--terraform-vs-identity-api-read-this).
@@ -33,12 +38,12 @@ input (all default to `true`). This lets the same stack run in two modes:
    **creates** the cluster, the managed Postgres, the DNS zone records, the
    in-cluster addons, and the Keycloak realm — the complete substrate from
    nothing.
-2. **Xema-specific / consume.** Set `enable_cluster = false`,
-   `enable_managed_postgres = false`, and `enable_dns = false` when a **separate
-   "cloud substrate" Terraform** (owned by another team/agent) already owns the
-   cluster, managed database, and DNS zone. In this mode the stack manages **only
-   the xema-specific resources** — RWX storage, workload namespaces, the Keycloak
-   realm, and extension/biome claims — and **consumes** the existing cluster: when
+2. **Consume.** Set `enable_cluster = false`, `enable_managed_postgres = false`,
+   and `enable_dns = false` when a **separate "cloud substrate" Terraform**
+   (owned by another team/agent) already owns the cluster, managed database,
+   and DNS zone. In this mode the stack manages **only the in-cluster and
+   identity resources** — RWX storage, workload namespaces, the Keycloak realm,
+   and extension claims — and **consumes** the existing cluster: when
    `enable_cluster = false` it reads the cluster by name (`var.cluster_name`) via
    `data.digitalocean_kubernetes_cluster.existing` to configure the
    `kubernetes`/`helm` providers, and extension `managed_databases` claims target
@@ -62,12 +67,35 @@ In consume mode, `cluster_name` (to read the existing cluster) and
 `existing_database_cluster_id` (to host extension databases on the shared cluster)
 are the two extra inputs that replace the create-time cluster/DB inputs.
 
-## Extension / biome claims
+### The two rosters — required, never defaulted
 
-`var.extensions` is a map keyed by biome id; each value may carry any subset of a
-**closed set** of three claim kinds — `object_buckets`, `managed_databases`,
-`dns_records`. `extensions.tf` flattens each kind into a `"<biome>/<claim>"`-keyed
-map and wires it to the cloud primitive:
+| Input | What it is | Rule |
+| --- | --- | --- |
+| `platform_databases` | the logical databases to ensure on the CREATED cluster, by name, verbatim | `[]` when consuming a shared cluster — managing a subset there would plan to drop the rest |
+| `workload_namespaces` | the namespaces to ensure exist, by full name | DNS-1123 labels; ignored when `enable_workload_namespaces = false` |
+
+Both have **no default**: which databases and namespaces a deployment needs is
+a fact about what it deploys, derived by the consumer from its own
+distribution, and a stack invoked without them refuses to plan.
+
+## The `substrate` output — the binding contract
+
+One non-secret map a consumer binds to, with the key shape every cloud's stack
+shares — documented once in
+[`docs/CONTRACTS.md` § Binding contract](../../../docs/CONTRACTS.md#binding-contract).
+On DigitalOcean the keys this stack does not model (a derived
+`deployment_name`, `environment`, the secrets backend, the cache, platform
+object storage, the ingress addon, `dns_name_servers`) are always `null`; a
+consumer branches on `null`, never on the cloud. Credentials are the separate
+**sensitive** outputs (`postgres_uri`, `realm_client_secrets`,
+`kubeconfig_raw`), on purpose.
+
+## Extension claims
+
+`var.extensions` is a map keyed by a consumer-chosen extension id; each value
+may carry any subset of a **closed set** of three claim kinds — `object_buckets`,
+`managed_databases`, `dns_records`. `extensions.tf` flattens each kind into a
+`"<extension>/<claim>"`-keyed map and wires it to the cloud primitive:
 
 - `object_buckets` → `module.extension_bucket` (`for_each`).
 - `managed_databases` → a `digitalocean_database_db` (+ optional
@@ -77,9 +105,9 @@ map and wires it to the cloud primitive:
 - `dns_records` → merged into `module.dns.records` (requires `enable_dns`; fails
   fast otherwise).
 
-This is an **escape hatch** for biomes that need DEDICATED, out-of-cluster
-substrate only. Shared-schema biomes need no entry here — they are provisioned at
-runtime by the platform's biome installer. Full contract:
+This is an **escape hatch** for extensions that need DEDICATED, out-of-cluster
+substrate only. What a consumer provisions for itself at runtime (schemas on a
+shared database, in-cluster objects) needs no entry here. Full contract:
 [`../../../docs/extensions.md`](../../../docs/extensions.md).
 
 ## CRITICAL — two-phase apply on a greenfield cluster (greenfield mode ONLY)
@@ -113,9 +141,9 @@ and document it in the operator's private root.
 cluster is **read** via `data.digitalocean_kubernetes_cluster.existing` (by
 `var.cluster_name`), so its endpoint/token/CA are known before the
 `kubernetes`/`helm` providers configure — there is no not-yet-known ordering
-problem and the full apply runs in a single pass. This is the verified
-xema-specific operating mode: with the cloud modules disabled the stack read the
-live DOKS cluster and adopted the `xema-prod` namespace on a zero-change plan.
+problem and the full apply runs in a single pass. This is the verified consume
+operating mode: with the cloud modules disabled the stack read a live DOKS
+cluster and adopted an existing namespace on a zero-change plan.
 
 **The IMPORT path also does not hit this caveat.** When the whole substrate
 already exists (greenfield resources adopted rather than created) every resource —

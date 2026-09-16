@@ -10,7 +10,7 @@ provision the **cloud substrate** a [Xema](https://xema.dev) deployment runs on 
 - the ReadWriteMany **StorageClass + NFS provisioner**,
 - the cluster-prerequisite **namespaces**,
 - the **Keycloak identity realm** (realm + clients + roles + mappers),
-- and a generic **extension/biome substrate** mechanism for biomes that need
+- and a generic **extension substrate** mechanism for consumers that need
   their own dedicated cloud resources.
 
 It is **Apache-2.0** and carries **no deployment-specific values, secrets, or
@@ -25,17 +25,17 @@ default to `true`), so the stack runs in either of two modes:
 
 - **Greenfield (default):** enable everything → the stack CREATES the cluster,
   managed Postgres, DNS, in-cluster addons, and realm from nothing.
-- **Xema-specific / consume:** set `enable_cluster = false`,
-  `enable_managed_postgres = false`, `enable_dns = false` when a SEPARATE "cloud
-  substrate" Terraform (owned by another team) already provides the cluster /
-  DB / DNS. The stack then manages ONLY the xema-specific resources (namespaces,
-  RWX storage, realm, extension claims) and **consumes** the existing cluster by
-  name — no two-phase apply needed, because the cluster is read via a data source
-  rather than created in the same pass. Extension databases land on
+- **Consume:** set `enable_cluster = false`, `enable_managed_postgres = false`,
+  `enable_dns = false` when a SEPARATE "cloud substrate" Terraform (owned by
+  another team) already provides the cluster / DB / DNS. The stack then manages
+  ONLY the in-cluster and identity resources (namespaces, RWX storage, realm,
+  extension claims) and **consumes** the existing cluster by name — no two-phase
+  apply needed, because the cluster is read via a data source rather than
+  created in the same pass. Extension databases land on
   `existing_database_cluster_id`.
 
-This is the **xema-specific vs cloud-infra split**: the same modules either own
-the whole substrate or just the parts a Xema deployment adds on top of someone
+This is the **in-cluster vs cloud-infra split**: the same modules either own
+the whole substrate or just the parts a deployment adds on top of someone
 else's cloud. See the
 [stack README](stacks/digitalocean/xema-substrate/README.md#two-modes--greenfield-vs-consume).
 
@@ -58,7 +58,7 @@ Kubernetes:
 
 | Consumer | Mode | Uses |
 | --- | --- | --- |
-| `xema-deploy` → `terraform/live/xema-prod` | **consume** (cluster/DB/DNS already exist) | reads the cluster by name; manages xema-specific resources (namespaces, RWX storage, realm, biome extension claims) |
+| `xema-deploy` → `terraform/live/xema-prod` | **consume** (cluster/DB/DNS already exist) | reads the cluster by name; manages the in-cluster and identity resources (namespaces, RWX storage, realm, extension claims) |
 | `xema-control-plane` → `terraform/management-plane` | **greenfield** (creates the management cluster) | `cluster` + `dns` + object storage + `identity-realm` + `cluster-addons/secrets` for the fleet management plane (Rancher Fleet / Headscale / Teleport host) |
 | a per-deployment private root on **Azure** (one per customer deployment, kept in that deployment's own private repository) | **greenfield** or **consume** | `stacks/azure/xema-substrate` — everything derived from one `deployment_name` (see [The Azure stack](#the-azure-stack)) |
 
@@ -69,7 +69,23 @@ reconciled by Rancher Fleet — it does not use this Terraform. In particular th
 is a **multi-node** ReadWriteMany NFS class that does not apply to a single-node
 appliance (which uses k3s local-path). This repo is the **cloud** plane only.
 
-## The Azure stack
+## The stacks — capabilities, not applications
+
+**The infrastructure layer must be usable without the platform running at
+all.** It deals in capabilities — Kubernetes, PostgreSQL, Redis, object
+storage, DNS/ingress, secret authority — and must not know application
+concepts: no service, no biome, no roster of who runs where. The consumer
+binds to a substrate through the stable
+[binding contract](docs/CONTRACTS.md#binding-contract) (the `substrate`
+output, same key shape on every cloud); it does not own the infrastructure's
+architecture. That is why the two rosters the substrate cannot know — which
+databases exist (`platform_databases`) and which namespaces exist
+(`workload_namespaces`) — are **required inputs with no default** on every
+stack: the consumer derives them from its own distribution, and a stack
+invoked without them refuses to plan. The `examples/` pass explicit rosters,
+labelled as one deployment's example and never a default.
+
+### The Azure stack
 
 [`stacks/azure/xema-substrate`](stacks/azure/xema-substrate/README.md) is the
 second full implementation of the substrate, and it adds three optional
@@ -79,19 +95,21 @@ cloud-agnostic **`ingress-tls`** addon (ingress-nginx, cert-manager +
 `ClusterIssuer`, External Secrets + `ClusterSecretStore`). Three properties
 decide its shape:
 
-- **One input names everything.** `deployment_name` (validated, 3-20 chars)
-  derives the cluster, server, storage account, vault, namespaces
-  (`<dep>`, `<dep>-shared`, `<dep>-infra`, …), the thirteen platform databases
-  (`<dep>_identity_api`, …), the app and provisioner roles, the blob container
-  prefix and the realm. `environment` (`dev | prod`) decides the irreversible
+- **One input names everything the substrate owns.** `deployment_name`
+  (validated, 3-20 chars) derives the cluster, server, storage account, vault,
+  the app and provisioner roles, the blob container prefix, the realm, and the
+  prefix of every database (`<dep>_<name>` for each name in
+  `platform_databases`). `environment` (`dev | prod`) decides the irreversible
   knobs. The only rewrite is hyphen → underscore for Postgres identifiers.
+  Namespaces are NOT derived: `workload_namespaces` is passed by full name.
 - **Workload identity, no stored cloud credentials.** AKS runs with the OIDC
   issuer on; cert-manager's DNS-01 solver and External Secrets each get a
   user-assigned identity federated to their service account, scoped to the one
   zone / vault they touch.
-- **A `substrate` output map** carries the non-secret facts the Helm layer
-  consumes (hosts, ports, names, endpoints, the ingress hint, the realm);
-  credentials stay in separate sensitive outputs.
+- **The `substrate` output map** carries the non-secret facts a consumer binds
+  to (hosts, ports, names, endpoints, the ingress hint, the realm);
+  credentials stay in separate sensitive outputs. The DigitalOcean stack
+  exposes the same map with the same keys.
 
 Read the stack README's
 [apply-order section](stacks/azure/xema-substrate/README.md#apply-order-on-a-greenfield-cluster-read-this)
@@ -125,7 +143,8 @@ infrastructure** the platform itself runs on. They compose but never overlap.
 modules/
   cluster-addons/
     rwx-storage/          # ReadWriteMany StorageClass (+ optional NFS provisioner) (any cluster)
-    workload-namespaces/  # cluster-prerequisite namespaces (any cluster)
+    workload-namespaces/  # a roster of prerequisite namespaces (any cluster)
+    shared-templates-volume/ # one RWX NFS export shared across N namespaces (any cluster)
     secrets/              # operator-provided credentials as Kubernetes Secrets (any cluster)
     ingress-tls/          # ingress-nginx + cert-manager/ClusterIssuer + External Secrets/ClusterSecretStore (any cluster)
   identity-realm/         # full Keycloak realm config (any Keycloak)
@@ -134,16 +153,18 @@ modules/
       cluster/            #   DOKS + node pools + VPC
       managed-postgres/   #   DO managed Postgres + logical DBs/roles
       dns/                #   DO DNS domain + records
-      object-bucket/      #   DO Spaces bucket (app/biome use)
+      object-bucket/      #   DO Spaces bucket (application/extension use)
       state-bucket/       #   DO Spaces bucket for Terraform state (bootstrap)
     azure/                # Azure implementations of the substrate contracts
       cluster/            #   AKS + node pools + VNet (delegated Postgres subnet), workload identity
       managed-postgres/   #   PostgreSQL Flexible Server + logical DBs/roles + grants
       dns/                #   Azure DNS zone + records (+ DNS-01 workload identity)
-      object-bucket/      #   storage account (+ containers) for app/biome blobs
+      object-bucket/      #   storage account (+ containers) for application/extension blobs
       state-bucket/       #   storage account + container for Terraform state (bootstrap)
       secrets-backend/    #   RBAC Key Vault + External Secrets reader identity
       cache/              #   Azure Cache for Redis (optional)
+    cloudflare/           # Cloudflare edge settings long-lived connections depend on
+      edge/               #   WebSocket proxying held on for the consumer's declared paths; Argo pinned off
 stacks/
   digitalocean/
     xema-substrate/       # composes the DO primitives into one deployable substrate
@@ -155,7 +176,7 @@ examples/
 docs/
   CONTRACTS.md            # the cloud-agnostic interface every provider must satisfy
   CONVENTIONS.md          # module authoring conventions
-  extensions.md           # the generic biome/extension substrate mechanism
+  extensions.md           # the generic extension substrate mechanism
   import-runbook.md       # adopting already-running infra with zero-change plans
 ```
 
@@ -190,6 +211,38 @@ state — lives **outside** this repo, in a private root that references these
 modules by a pinned version. State lives in remote object storage (e.g. a private
 DigitalOcean Spaces / S3 / GCS / Azure Blob bucket) with locking, **never** in any
 git repository. See [`docs/CONVENTIONS.md` § State & secrets](docs/CONVENTIONS.md).
+
+## Version notes
+
+### Unreleased — next MAJOR (breaking: the stacks' variable contract)
+
+The boundary above became law in the code. Both stacks and three modules now
+refuse to plan without inputs that used to be defaulted or derived to one
+deployment's roster:
+
+| Where | New REQUIRED input (no default) | Replaces |
+| --- | --- | --- |
+| `stacks/azure/xema-substrate` | `platform_databases` — `set(string)`, unprefixed logical names, each prefixed `<deployment_name as _>_` | the thirteen derived databases, `enable_billing_database` and `postgres_extra_databases` (all deleted) |
+| `stacks/azure/xema-substrate` | `workload_namespaces` — `set(string)`, full names, DNS-1123 | the five derived namespaces and `extra_workload_namespaces` (deleted) |
+| `stacks/digitalocean/xema-substrate` | `platform_databases` — `set(string)`, verbatim (`[]` when consuming) | `postgres_databases` (renamed; had a default) |
+| `stacks/digitalocean/xema-substrate` | `workload_namespaces` — `set(string)`, full names, DNS-1123 | its seven-namespace default (deleted) |
+| `modules/cluster-addons/workload-namespaces` | `namespaces` | its seven-namespace default (deleted) |
+| `modules/cluster-addons/shared-templates-volume` | `owner_namespace`, `owner_pvc_name`, `consumer_mounts` (`map(namespace => claim)`), `name_prefix` | `orchestrator_namespace`, `workers_namespace`, `orchestrator_pvc_name`, `workers_pvc_name` and their defaults; resources are now `owner` + `consumer[<ns>]` (state addresses change); the `shared_templates_pool_slug` output is deleted |
+| `modules/providers/cloudflare/edge` | `websocket_paths` — `set(string)`, each starting with `/` (`[]` declares none) | prose that named the paths; a plan turning `websockets_enabled` off while paths are declared is now REFUSED |
+
+Also in this change: the DigitalOcean stack gains the `substrate` output with
+the same key shape as Azure's (the [binding contract](docs/CONTRACTS.md#binding-contract)),
+and a `postgres_databases` output; the Azure `substrate.namespaces` entry is
+the ensured roster (`set(string)`) instead of a role-keyed map, and
+`postgres_app_role` / `postgres_provisioner_role` / `postgres_databases` /
+`blob_container_prefix` in that map — and the top-level `postgres_databases` /
+`postgres_roles` outputs — are `null` when their area is disabled, as the map's
+description always said; the Azure `realm_display_name` default is
+`deployment_name` verbatim. `extensions` keeps its name — its docs now say
+"extension id" rather than "biome id". To adopt: pass the rosters you already
+deploy (the `examples/*.tfvars.example` files show one deployment's), and
+`terraform plan` must report **0 to add, 0 to change, 0 to destroy** on an
+existing deployment before you apply.
 
 ## License
 

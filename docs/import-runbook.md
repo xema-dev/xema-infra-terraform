@@ -18,13 +18,13 @@ module addresses are **`count`-indexed**: a created cluster is at
 `module.dns[0]…`, and so on. Write `import {}` block `to =` addresses with the
 `[0]` index whenever the owning module is enabled.
 
-In **xema-specific / consume** mode (`enable_cluster = false`,
+In **consume** mode (`enable_cluster = false`,
 `enable_managed_postgres = false`, `enable_dns = false`) the cluster, managed
 database, and DNS zone are **consumed, not imported** — they are owned by a
 separate "cloud substrate" Terraform. The cluster is read via
 `data.digitalocean_kubernetes_cluster.existing` (by `var.cluster_name`), not a
 managed resource, so there is **nothing to import** for it. You only import the
-xema-specific resources that this deployment owns: the RWX `StorageClass` /
+in-cluster and identity resources that this deployment owns: the RWX `StorageClass` /
 `helm_release`, the workload namespaces, the realm (+ clients/roles/mappers), and
 any extension databases/buckets already created on the shared cluster.
 

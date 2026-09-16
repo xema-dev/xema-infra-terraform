@@ -9,6 +9,31 @@ Adopting a new cloud means writing one implementation per primitive that honours
 these contracts — the stack, the cloud-agnostic modules, and the extension
 mechanism are then reused unchanged.
 
+## The boundary: capabilities, never applications
+
+Everything in this repository must be usable **without the platform running at
+all**. It deals in CAPABILITIES — Kubernetes, PostgreSQL, Redis, object
+storage, DNS/ingress, secret authority — and knows no application concept: no
+service name, no biome, no roster of who runs where. A consumer binds to the
+substrate through the [binding contract](#binding-contract) below; it does not
+own the infrastructure's architecture, and the infrastructure does not know the
+consumer's.
+
+Two consequences decide the shape of every stack input:
+
+- **The database roster and the namespace roster are REQUIRED inputs with no
+  default** (`platform_databases`, `workload_namespaces`). Which databases and
+  namespaces exist is a fact the consumer derives from what it deploys — from
+  its own distribution — so a stack invoked without them refuses to plan. There
+  is no per-service switch of any kind: a database exists because the consumer
+  listed it, and for no other reason.
+- **An extension is a consumer-chosen id.** `extensions` is keyed by a stable
+  id the consumer picks; the mechanism (a consumer claims a database, a bucket,
+  a DNS record) is generic and the substrate never learns what the id means.
+
+The examples under `examples/<cloud>/` pass explicit rosters. They are
+EXAMPLES of one deployment's answer, labelled as such, never a default.
+
 ## Enable / disable toggles — greenfield vs consume
 
 Each substrate area is independently toggleable via an `enable_*` stack input
@@ -17,17 +42,17 @@ Each substrate area is independently toggleable via an `enable_*` stack input
 stack that implements the optional primitives below adds a toggle per primitive
 with the same shape (`enable_object_storage`, `enable_secrets_backend`,
 `enable_cache`, `enable_ingress_tls`). This splits the **cloud-infra** plane from
-the **xema-specific** plane:
+the **in-cluster + identity** plane:
 
 - **Greenfield (default):** everything enabled → the stack CREATES the cluster,
   managed DB, DNS, in-cluster addons, and realm from nothing.
-- **Xema-specific / consume:** set `enable_cluster = false`,
-  `enable_managed_postgres = false`, `enable_dns = false` when a SEPARATE "cloud
-  substrate" Terraform owns the cluster / DB / DNS. The stack then manages ONLY
-  the xema-specific resources (namespaces, RWX storage, realm, extension claims)
-  and **consumes** the existing cluster — it reads the cluster by name
-  (`var.cluster_name`) to configure the kube/helm providers, and extension
-  `managed_databases` target `var.existing_database_cluster_id`.
+- **Consume:** set `enable_cluster = false`, `enable_managed_postgres = false`,
+  `enable_dns = false` when a SEPARATE "cloud substrate" Terraform owns the
+  cluster / DB / DNS. The stack then manages ONLY the in-cluster and identity
+  resources (namespaces, RWX storage, realm, extension claims) and **consumes**
+  the existing cluster — it reads the cluster by name (`var.cluster_name`) to
+  configure the kube/helm providers, and extension `managed_databases` target
+  `var.existing_database_cluster_id`.
 
 A disabled cloud module is `count`-gated to zero (consumed, never destroyed).
 
@@ -173,7 +198,7 @@ Manages a DNS zone's records.
 
 ## `object-bucket`
 
-A single object-storage bucket (for application/biome use, not Terraform state).
+A single object-storage bucket (for application/extension use, not Terraform state).
 
 **Required inputs**
 
@@ -195,7 +220,7 @@ A single object-storage bucket (for application/biome use, not Terraform state).
 
 - The "bucket" is a **storage account** (`name` must match `^[a-z0-9]{3,24}$`
   and be globally unique); `endpoint` is its primary **Blob** endpoint, not an
-  S3 endpoint — the platform's `@xemahq/blob-storage` Azure adapter targets it.
+  S3 endpoint — a consumer's Azure blob adapter targets it.
 - **Global uniqueness is across every Azure tenant**, because the name is a
   public DNS label (`<name>.blob.core.windows.net`). A stack that DERIVES the
   name must therefore also let it be overridden: the Azure stack derives
@@ -307,15 +332,20 @@ every cloud's stack:
 
 - **`cluster-addons/rwx-storage`** — a ReadWriteMany `StorageClass` backed by an
   NFS provisioner, installed via the `helm` + `kubernetes` providers.
-- **`cluster-addons/workload-namespaces`** — the namespaces that must exist before
-  the Helm app bring-up runs.
+- **`cluster-addons/workload-namespaces`** — a roster of namespaces that must
+  exist before anything applies workloads. The roster is a required input; the
+  module knows nothing about who lives in a namespace.
+- **`cluster-addons/shared-templates-volume`** — a ReadWriteMany NFS export
+  shared across N namespaces: one namespace owns (writes) the tree, any number
+  mount (read) it, one static PV + PVC pair per namespace, all on the same
+  export. The owner, the consumers and every claim name are required inputs.
 - **`identity-realm`** — the full Keycloak realm (realm + clients + roles +
   protocol mappers) via the `keycloak` provider.
 - **`cluster-addons/secrets`** — materializes operator-provided credentials as
   Kubernetes Secrets (the management-plane "secret backend" Helm values reference
   via `secretKeyRef`), via the `kubernetes` provider.
-- **`cluster-addons/ingress-tls`** — the ingress edge every Xema hostname sits
-  behind: `ingress-nginx` (a cloud `LoadBalancer`, annotations passed through),
+- **`cluster-addons/ingress-tls`** — the ingress edge every hostname on the
+  deployment sits behind: `ingress-nginx` (a cloud `LoadBalancer`, annotations passed through),
   `cert-manager` plus one ACME `ClusterIssuer` (closed-set solver:
   `http01 | dns01-azure`), and the External Secrets Operator plus one
   `ClusterSecretStore` (closed-set backend: `azure-key-vault`). Chart versions are
@@ -329,6 +359,47 @@ every cloud's stack:
   validated DNS-1123 inputs echoed as outputs; a stack exposes both as its own
   inputs and outputs (and in its `substrate` map) so a consumer reads the names
   from the stack rather than restating them.
-- **extension/biome substrate** — see [extensions.md](extensions.md). Not a
-  resource module; a documented claim contract the stack `for_each`-wires to the
-  active cloud's `object-bucket` / `managed-postgres` / `dns` primitives.
+- **extension substrate** — see [extensions.md](extensions.md). Not a resource
+  module; a documented claim contract the stack `for_each`-wires to the active
+  cloud's `object-bucket` / `managed-postgres` / `dns` primitives, keyed by a
+  consumer-chosen extension id.
+
+---
+
+## Binding contract
+
+Every stack exposes ONE output, `substrate`, and it is the only thing a consumer
+needs to read to bind itself to the substrate: a map of non-secret facts with
+the SAME key shape on every cloud. Credentials are never in it — they are the
+stack's separate `sensitive` outputs, read on purpose. A key is `null` when its
+area is disabled (`enable_* = false`), consumed elsewhere, or not modelled on
+that cloud; a consumer branches on `null`, never on which cloud it is on.
+
+| Key | Type | Meaning | Azure | DigitalOcean |
+| --- | --- | --- | --- | --- |
+| `deployment_name` | `string` | the one name the stack derives from | derived | `null` (nothing derived) |
+| `environment` | `string` | `dev \| prod` | input | `null` (no environment axis) |
+| `region` | `string` | cloud region | input | input |
+| `tenant_id` | `string` | identity tenant of the secrets reader identity | secrets backend | `null` |
+| `cluster_name` | `string` | the created or consumed cluster's name | derived/override | input, `null` when `""` |
+| `cluster_resource_group_name` | `string` | the cluster's resource group | created/derived | `null` |
+| `oidc_issuer_url` | `string` | the cluster's OIDC issuer for federated identities (`""` when no cluster facts were needed) | cluster | `null` |
+| `storage_class_name` | `string` | the ReadWriteMany StorageClass | rwx addon | rwx addon |
+| `namespaces` | `set(string)` | the roster ensured on the cluster — exactly `workload_namespaces`; carries NO roles, which namespace plays which part is the consumer's own knowledge | namespaces addon | namespaces addon |
+| `postgres_host` / `postgres_port` | `string` / `number` | the created server | managed postgres | managed postgres |
+| `postgres_app_role` | `string` | the application role the stack created | managed postgres | `null` (roles are a flat input, `postgres_roles`) |
+| `postgres_provisioner_role` | `string` | the role that may CREATE databases at runtime | managed postgres | `null` |
+| `postgres_databases` | `set(string)` | the databases ensured on the created server — `platform_databases` after that stack's naming rule (Azure prefixes `<deployment_name>_`; DigitalOcean uses the names verbatim) | managed postgres | managed postgres |
+| `blob_account` / `blob_endpoint` / `blob_container_prefix` | `string` | the platform object-storage account, its endpoint, the container prefix | object storage | `null` (no platform bucket; extension buckets are the separate `extension_buckets` output) |
+| `key_vault_name` / `key_vault_uri` / `external_secrets_client_id` | `string` | the secrets backend and the identity that reads it | secrets backend | `null` |
+| `cluster_secret_store_name` | `string` | the `ClusterSecretStore` every `ExternalSecret` names | ingress addon + secrets backend | `null` |
+| `redis_host` / `redis_port` | `string` / `number` | the managed cache (TLS port) | cache | `null` |
+| `dns_zone` | `string` | the managed zone apex | dns | dns |
+| `dns_name_servers` | `list(string)` | delegate the apex to these | dns | `null` (DigitalOcean's are fixed) |
+| `ingress` | `object({ service_name, namespace, class_name, cluster_issuer_name })` | the ingress edge the consumer's `Ingress` objects target | ingress addon | `null` |
+| `keycloak_url` / `realm_name` | `string` | the identity realm and where it lives | identity realm | identity realm |
+
+Adding a key is a change to BOTH stacks in the same commit — a consumer must be
+able to read the same shape on every cloud, and a key present on one stack only
+is a cloud leaking into the contract. A new cloud's stack exposes the same map,
+filling what it models and `null` for the rest.

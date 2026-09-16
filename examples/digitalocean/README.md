@@ -5,6 +5,11 @@ A runnable root that calls the
 stack with placeholder values. Copy it into your operator's **private** config
 root and replace the placeholders — nothing real ever lands in this public repo.
 
+Two inputs have no default — you must pass them, and the tfvars examples show
+one deployment's answer: `platform_databases` (logical database names, verbatim;
+`[]` when consuming a shared cluster) and `workload_namespaces` (full names).
+Derive both from what you deploy; the substrate does not know your services.
+
 ## Two modes
 
 The stack is **independently toggleable** per substrate area via `enable_*`
@@ -13,11 +18,11 @@ inputs (all default to `true`). This root supports both modes:
 1. **Greenfield (default).** Enable everything — the stack CREATES the cluster,
    managed Postgres, DNS zone, in-cluster addons, and the realm. Use
    `terraform.tfvars.example`.
-2. **Consume (xema-specific).** Set `enable_cluster = false`,
-   `enable_managed_postgres = false`, and `enable_dns = false` when a SEPARATE
-   "cloud substrate" Terraform already owns the cluster / DB / DNS. This root then
-   manages ONLY the xema-specific resources (RWX storage, namespaces, realm,
-   extension claims) and CONSUMES the existing cluster by name. Use
+2. **Consume.** Set `enable_cluster = false`, `enable_managed_postgres = false`,
+   and `enable_dns = false` when a SEPARATE "cloud substrate" Terraform already
+   owns the cluster / DB / DNS. This root then manages ONLY the in-cluster and
+   identity resources (RWX storage, namespaces, realm, extension claims) and
+   CONSUMES the existing cluster by name. Use
    `consume.tfvars.example` (supplies `cluster_name` to read the existing cluster
    and `existing_database_cluster_id` to host extension databases).
 
@@ -87,6 +92,6 @@ apply on the import path. Follow [`../../docs/import-runbook.md`](../../docs/imp
 
 ## Extensions
 
-The example `extensions = {…}` block shows two biomes claiming dedicated
-substrate — one object bucket + one managed database. Most biomes need **no**
-entry. See [`../../docs/extensions.md`](../../docs/extensions.md).
+The example `extensions = {…}` block shows two extensions claiming dedicated
+substrate — one object bucket + one managed database. Most consumers need
+**no** entry. See [`../../docs/extensions.md`](../../docs/extensions.md).

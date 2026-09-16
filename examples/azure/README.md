@@ -5,11 +5,16 @@ A runnable root that calls the
 placeholder values. Copy it into your operator's **private** config root and
 replace the placeholders — nothing real ever lands in this public repo.
 
-Everything is derived from `deployment_name` (`acme-dev` in the examples):
-cluster `acme-dev-aks`, server `acme-dev-pg`, storage account `acmedevblob`,
-vault `acme-dev-kv`, namespaces `acme-dev`, `acme-dev-shared`, …, databases
-`acme_dev_identity_api`, …, roles `acme_dev` / `acme_dev_provisioner`. See the
+Everything the substrate owns is derived from `deployment_name` (`acme-dev` in
+the examples): cluster `acme-dev-aks`, server `acme-dev-pg`, storage account
+`acmedevblob`, vault `acme-dev-kv`, roles `acme_dev` / `acme_dev_provisioner`,
+and the `acme_dev_` prefix of every database. See the
 [stack README](../../stacks/azure/xema-substrate/README.md#derived-names).
+
+Two things are NOT derived and have no default — you must pass them, and the
+tfvars examples show one deployment's answer: `platform_databases` (unprefixed
+logical names) and `workload_namespaces` (full names). Derive both from what
+you deploy; the substrate does not know your services.
 
 Four of those names are unique across **every** Azure tenant (the vault, the
 storage account, the Flexible Server, the cache), so each has an optional
@@ -27,11 +32,10 @@ than restating them.
 1. **Greenfield (default).** Enable everything — the stack CREATES the cluster,
    Flexible Server, DNS zone, blob account, Key Vault, in-cluster addons and
    the realm. Use `terraform.tfvars.example`.
-2. **Consume (xema-specific).** Set `enable_cluster = false`,
-   `enable_managed_postgres = false`, and `enable_dns = false` when a SEPARATE
-   "cloud substrate" Terraform already owns them. This root then manages ONLY
-   the xema-specific resources and CONSUMES the existing cluster by name. Use
-   `consume.tfvars.example`.
+2. **Consume.** Set `enable_cluster = false`, `enable_managed_postgres = false`,
+   and `enable_dns = false` when a SEPARATE "cloud substrate" Terraform already
+   owns them. This root then manages ONLY the in-cluster and identity resources
+   and CONSUMES the existing cluster by name. Use `consume.tfvars.example`.
 
 ## Files
 
@@ -98,6 +102,6 @@ When greenfield-created resources already exist, **adopt** them instead — writ
 
 ## Extensions
 
-The example `extensions = {…}` block shows two biomes claiming dedicated
-substrate — one storage account + one managed database. Most biomes need **no**
-entry. See [`../../docs/extensions.md`](../../docs/extensions.md).
+The example `extensions = {…}` block shows two extensions claiming dedicated
+substrate — one storage account + one managed database. Most consumers need
+**no** entry. See [`../../docs/extensions.md`](../../docs/extensions.md).

@@ -1,24 +1,26 @@
-# Extension / biome substrate
+# Extension substrate
 
-A way to provision **dedicated cloud substrate for a biome (or any extension)**
-that isn't otherwise modelled in Terraform — without hand-writing a new module per
-biome.
+A way to provision **dedicated cloud substrate for an extension** — any consumer
+of the substrate that needs a cloud resource of its own — that isn't otherwise
+modelled in Terraform, without hand-writing a new module per extension. The
+substrate never learns what an extension IS: it is a stable id the consumer
+chooses, and a set of typed claims.
 
 ## When you need this (and when you don't)
 
-Most biomes need **no** Terraform at all. A biome runs *in* the cluster and, when
-it needs storage, gets a **schema on the shared platform database**, provisioned at
-runtime by the platform's biome installer. That path is owned by the platform, not
-Terraform. **Do not** model every biome here.
+Most consumers need **no** Terraform at all. A workload runs *in* the cluster
+and, when it needs storage, gets a **schema on a shared database**, provisioned
+at runtime by whatever installs it. That path is owned by the platform running
+in the cluster, not by Terraform. **Do not** model every workload here.
 
-You need an extension claim **only** when a biome requires a **dedicated
-out-of-cluster cloud resource** the runtime installer cannot create:
+You need an extension claim **only** when something requires a **dedicated
+out-of-cluster cloud resource** that nothing running in the cluster can create:
 
 - its **own** managed database (hard isolation, not a shared schema),
 - a dedicated **object-storage bucket**,
 - a public **DNS hostname** of its own.
 
-If a biome needs none of those, it needs no entry here. This keeps the mechanism an
+If it needs none of those, it needs no entry here. This keeps the mechanism an
 **escape hatch**, not a parallel provisioning system — which is what makes it
 robust instead of confusing.
 
@@ -60,12 +62,13 @@ the mental model stay small.
 
 ## Shape
 
-The stack accepts one `extensions` input — a map **keyed by extension id** (the
-biome id), each value carrying any subset of the claim kinds:
+The stack accepts one `extensions` input — a map **keyed by extension id**, a
+stable id the consumer chooses (the substrate never interprets it), each value
+carrying any subset of the claim kinds:
 
 ```hcl
 extensions = {
-  # biome id => its substrate claims
+  # extension id => its substrate claims
   "acme/legal-review" = {
     object_buckets = {
       evidence = { name = "acme-legal-evidence", versioning = true }
@@ -83,9 +86,9 @@ extensions = {
 }
 ```
 
-Keys are stable ids, so adding/removing a biome adds/removes only its own resources
-(`for_each` keyed by `"<biome>/<claim>"`) — never a destroy-and-recreate of
-unrelated resources.
+Keys are stable ids, so adding/removing an extension adds/removes only its own
+resources (`for_each` keyed by `"<extension>/<claim>"`) — never a
+destroy-and-recreate of unrelated resources.
 
 ## How it is wired (no magic)
 
@@ -129,18 +132,19 @@ The claim **shape** is identical across clouds (it's the contract); only the
 ## Where the values come from
 
 - **By hand:** an operator writes the `extensions` map in their private `*.tfvars`.
-  Fine for a handful of biomes.
-- **Generated:** the operator's private config ships a small generator that reads
-  installed biome manifests for an optional substrate block and emits the
-  `extensions` tfvars. The generator is **Xema-specific** (it understands the biome
-  manifest format) so it lives in the operator's **private** repo, not here — this
-  public module stays a generic, manifest-agnostic, claim-driven primitive. Anyone
-  can drive it from any source.
+  Fine for a handful of extensions.
+- **Generated:** the consumer derives the `extensions` map from whatever
+  describes what it deploys (its distribution, its manifests) and emits the
+  tfvars. That generator understands the consumer's own formats, so it lives in
+  the consumer's **private** repo, not here — this public module stays a
+  generic, manifest-agnostic, claim-driven primitive. Anyone can drive it from
+  any source.
 
 ## Boundary recap
 
 - Terraform extension claims = **dedicated, out-of-cluster** substrate only.
-- Shared-database schemas, in-cluster resources, and biome installation itself
-  stay owned by the **platform runtime**. Terraform never reaches into them.
-- A claim is **additive and isolated**: present only for biomes that genuinely need
-  dedicated substrate.
+- Shared-database schemas, in-cluster resources, and installing the workloads
+  themselves stay owned by the **platform runtime**. Terraform never reaches
+  into them.
+- A claim is **additive and isolated**: present only for extensions that
+  genuinely need dedicated substrate.
