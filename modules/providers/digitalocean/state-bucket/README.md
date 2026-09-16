@@ -12,7 +12,7 @@ policy differ (it holds state, so it must be private + versioned).
 module "state_bucket" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/state-bucket?ref=v0.1.0"
 
-  name   = "xema-prod-tfstate"
+  name   = "acme-prod-tfstate"
   region = "fra1"
 }
 

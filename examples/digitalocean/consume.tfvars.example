@@ -61,17 +61,13 @@ rwx_is_default_class   = false
 
 # --- namespaces: YOUR roster, derived from what you deploy ---
 # The stack has no default and refuses to plan without it: which namespaces
-# exist is a fact about the workloads you run, not about the substrate. This
-# EXAMPLE lists what one deployment of the reference platform uses; yours
-# comes from your own distribution.
+# exist is a fact about the workloads you run, not about the substrate. These
+# are PLACEHOLDER names of the shape one deployment uses (an app namespace, an
+# infra namespace, a workers namespace); yours come from your own distribution.
 workload_namespaces = [
-  "xema-prod",
-  "shared-prod",
-  "xema-infra",
-  "xema-opencode-workers",
-  "xema-biome-sidecars",
-  "xema-biome-apis",
-  "xema-image-builders",
+  "acme-prod",
+  "acme-prod-infra",
+  "acme-prod-workers",
 ]
 
 # --- identity realm ---

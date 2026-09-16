@@ -11,7 +11,7 @@ object storage — **not** for Terraform state (use
 module "bucket" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/object-bucket?ref=v0.1.0"
 
-  name       = "xema-prod-artifacts"
+  name       = "acme-prod-artifacts"
   region     = "fra1"
   acl        = "private"
   versioning = true

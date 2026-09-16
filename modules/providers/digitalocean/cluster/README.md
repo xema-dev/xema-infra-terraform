@@ -28,7 +28,7 @@ module "cluster" {
     }
   }
 
-  tags = { deployment = "xema-prod" }
+  tags = { deployment = "acme-prod" }
 }
 ```
 

@@ -20,7 +20,7 @@ module "postgres" {
   databases = ["xema_core", "xema_biomes"]
   roles     = ["xema_app"]
 
-  tags = { deployment = "xema-prod" }
+  tags = { deployment = "acme-prod" }
 }
 ```
 

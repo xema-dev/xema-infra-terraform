@@ -15,9 +15,9 @@ realm. In a Xema deployment the realm coexists with `identity-api`, which
 fail-loud). Do **not** double-manage those — it causes a drift war and changes how
 `identity-api` works.
 
-> **Scoped to ONE realm — never master/other realms.** The canonical Xema
-> deployment runs on an external, **shared** Keycloak that also hosts non-Xema
-> realms. This module manages exactly `var.realm_name` (e.g. `xema-prod`). It
+> **Scoped to ONE realm — never master/other realms.** A deployment typically
+> runs on an external, **shared** Keycloak that also hosts other products'
+> realms. This module manages exactly `var.realm_name` (e.g. `acme-prod`). It
 > declares no provider block and creates no other realm; the `realm_name`
 > validation refuses `master`.
 
@@ -48,7 +48,7 @@ platform-access reconciliation (do not flip it to verify/off for these objects).
 > i18n, and signing crypto are NOT managed here (operator/`identity-api` own them)
 > — adopting an existing realm never strips them. See `main.tf`.
 
-**For the canonical `xema-prod` adoption** the realm is imported **shell-only**
+**When adopting a realm that `identity-api` already reconciles** it is imported **shell-only**
 (`clients`/`realm_roles`/`protocol_mappers` empty) precisely because `identity-api`
 owns the platform clients/roles/mappers. Keep them empty unless adding a NEW object
 that `identity-api` does not reconcile.
@@ -59,8 +59,8 @@ that `identity-api` does not reconcile.
 module "identity_realm" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/identity-realm?ref=v0.1.0"
 
-  realm_name   = "xema-prod"
-  display_name = "Xema"
+  realm_name   = "acme-prod"
+  display_name = "Acme"
 
   clients = {
     web-app = {
@@ -101,16 +101,16 @@ import syntax:
 
 - **Realm** — id is the realm **name**:
   ```
-  terraform import module.identity_realm.keycloak_realm.this xema-prod
+  terraform import module.identity_realm.keycloak_realm.this acme-prod
   ```
 - **Client** — id is `"<realm>/client/<uuid>"`:
   ```
-  terraform import 'module.identity_realm.keycloak_openid_client.this["web-app"]' xema-prod/client/<uuid>
+  terraform import 'module.identity_realm.keycloak_openid_client.this["web-app"]' acme-prod/client/<uuid>
   ```
 - **Realm role** — a realm-level role is a `keycloak_role` with no `client_id`;
   id is `"<realm>/<role-name>"`:
   ```
-  terraform import 'module.identity_realm.keycloak_role.this["member"]' xema-prod/member
+  terraform import 'module.identity_realm.keycloak_role.this["member"]' acme-prod/member
   ```
 
 | Input | Required | Description |

@@ -10,7 +10,7 @@ Manages a DO DNS zone (`digitalocean_domain`) and its records
 module "dns" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/dns?ref=v0.1.0"
 
-  domain = "xema.dev"
+  domain = "example.com"
 
   records = {
     apex = {
@@ -21,7 +21,7 @@ module "dns" {
     www = {
       name  = "www"
       type  = "CNAME"
-      value = "xema.dev." # CNAME value MUST be an FQDN with a trailing dot
+      value = "example.com." # CNAME value MUST be an FQDN with a trailing dot
     }
     spf = {
       name  = "@"
