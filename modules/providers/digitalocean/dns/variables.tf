@@ -1,5 +1,5 @@
 variable "domain" {
-  description = "Managed zone apex (e.g. \"xema.dev\")."
+  description = "Managed zone apex (e.g. \"example.com\")."
   type        = string
 }
 

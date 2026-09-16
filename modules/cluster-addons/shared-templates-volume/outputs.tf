@@ -1,14 +1,17 @@
-output "orchestrator_pvc_name" {
-  description = "PVC the orchestrator mounts RW (set as the helm claimName)."
-  value       = kubernetes_persistent_volume_claim.orchestrator.metadata[0].name
+output "owner_pvc_name" {
+  description = "The claim the owning workload mounts (read-write), in owner_namespace."
+  value       = kubernetes_persistent_volume_claim.owner.metadata[0].name
 }
 
-output "workers_pvc_name" {
-  description = "PVC workers mount RO (must equal xema-pool-<SHARED_TEMPLATES_POOL_SLUG>)."
-  value       = kubernetes_persistent_volume_claim.workers.metadata[0].name
+output "consumer_pvc_names" {
+  description = "The claim each consumer workload mounts, keyed by namespace."
+  value       = { for ns, pvc in kubernetes_persistent_volume_claim.consumer : ns => pvc.metadata[0].name }
 }
 
-output "shared_templates_pool_slug" {
-  description = "Slug to set as SHARED_TEMPLATES_POOL_SLUG on workspace-storage-pool-api (derived from the workers PVC name: strip the `xema-pool-` prefix)."
-  value       = replace(var.workers_pvc_name, "xema-pool-", "")
+output "persistent_volume_names" {
+  description = "Every cluster-scoped PersistentVolume this module created: the owner's, then one per consumer namespace."
+  value = concat(
+    [kubernetes_persistent_volume.owner.metadata[0].name],
+    [for pv in kubernetes_persistent_volume.consumer : pv.metadata[0].name],
+  )
 }

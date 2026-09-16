@@ -11,3 +11,8 @@ output "argo_smart_routing_managed" {
   EOT
   value       = var.manage_argo_smart_routing
 }
+
+output "websocket_paths" {
+  description = "The origin paths the consumer declared as WebSocket-carrying — the evidence the websockets setting is held on for."
+  value       = var.websocket_paths
+}

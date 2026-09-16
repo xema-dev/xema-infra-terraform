@@ -1,28 +1,26 @@
-# Shared templates volume (fast-launch WS3 reference-mount substrate).
+# A ReadWriteMany NFS export shared across N namespaces.
 #
-# The workspace-orchestrator (namespace `orchestrator_namespace`) writes the
-# content-addressed skill mirror RW; every session worker (namespace
-# `workers_namespace`) reads it RO. PVCs are namespaced and a PV binds 1:1 to a
-# single PVC, so a single PVC cannot span both namespaces. We therefore create
-# TWO static PVs that reference the SAME NFS export (server + path) — one bound
-# by a PVC in the orchestrator namespace and one by a PVC in the workers
-# namespace. Both point at the same bytes, so a skill the orchestrator
-# materializes is immediately visible to every worker.
+# One namespace OWNS the tree (its workload writes it); any number of other
+# namespaces MOUNT it (their workloads read it). PVCs are namespaced and a PV
+# binds 1:1 to a single PVC, so one PVC cannot span namespaces. This module
+# therefore creates one static PV + PVC pair PER NAMESPACE — one for the owner
+# and one per consumer — every PV referencing the SAME NFS export (server +
+# path). They all point at the same bytes, so what the owner writes is
+# immediately visible in every consumer namespace.
 #
 # This is STATIC NFS binding (storageClassName = "") — distinct from the dynamic
-# nfs-rwx StorageClass in ../rwx-storage (1 PVC = 1 fresh volume, which cannot
-# be shared cross-namespace). The worker-side PVC name is contract-bound to the
-# storage driver: it MUST equal `xema-pool-<SHARED_TEMPLATES_POOL_SLUG>`.
+# ReadWriteMany StorageClass in ../rwx-storage, where 1 PVC = 1 fresh volume
+# that cannot be shared across namespaces. Every PV is pre-bound (claim_ref) so
+# no PV can cross-bind to the wrong claim.
 
 locals {
-  pv_orchestrator = "${var.name_prefix}-orchestrator"
-  pv_workers      = "${var.name_prefix}-workers"
+  pv_owner = "${var.name_prefix}-owner"
 }
 
-resource "kubernetes_persistent_volume" "orchestrator" {
+resource "kubernetes_persistent_volume" "owner" {
   metadata {
-    name   = local.pv_orchestrator
-    labels = merge(var.labels, { "xema.io/volume" = "templates-shared" })
+    name   = local.pv_owner
+    labels = var.labels
   }
   spec {
     capacity                         = { storage = var.capacity }
@@ -36,18 +34,19 @@ resource "kubernetes_persistent_volume" "orchestrator" {
         path   = var.nfs_export_path
       }
     }
-    # Pre-bind so the two PVs cannot cross-bind to the wrong PVC.
     claim_ref {
-      namespace = var.orchestrator_namespace
-      name      = var.orchestrator_pvc_name
+      namespace = var.owner_namespace
+      name      = var.owner_pvc_name
     }
   }
 }
 
-resource "kubernetes_persistent_volume" "workers" {
+resource "kubernetes_persistent_volume" "consumer" {
+  for_each = var.consumer_mounts
+
   metadata {
-    name   = local.pv_workers
-    labels = merge(var.labels, { "xema.io/volume" = "templates-shared" })
+    name   = "${var.name_prefix}-consumer-${each.key}"
+    labels = var.labels
   }
   spec {
     capacity                         = { storage = var.capacity }
@@ -58,42 +57,54 @@ resource "kubernetes_persistent_volume" "workers" {
     persistent_volume_source {
       nfs {
         server = var.nfs_server
-        path   = var.nfs_export_path # IDENTICAL to the orchestrator PV — same bytes.
+        path   = var.nfs_export_path # IDENTICAL to the owner PV — same bytes.
       }
     }
     claim_ref {
-      namespace = var.workers_namespace
-      name      = var.workers_pvc_name
+      namespace = each.key
+      name      = each.value
     }
   }
 }
 
-resource "kubernetes_persistent_volume_claim" "orchestrator" {
+resource "kubernetes_persistent_volume_claim" "owner" {
   metadata {
-    name      = var.orchestrator_pvc_name
-    namespace = var.orchestrator_namespace
+    name      = var.owner_pvc_name
+    namespace = var.owner_namespace
     labels    = var.labels
   }
   spec {
     access_modes       = ["ReadWriteMany"]
     storage_class_name = ""
-    volume_name        = kubernetes_persistent_volume.orchestrator.metadata[0].name
+    volume_name        = kubernetes_persistent_volume.owner.metadata[0].name
     resources {
       requests = { storage = var.capacity }
     }
   }
+
+  # Cross-input guard (a variable validation sees one variable only on 1.6):
+  # the owner already holds its claim, so listing it as a consumer would plan a
+  # second PV/PVC pair in the same namespace for the same export.
+  lifecycle {
+    precondition {
+      condition     = !contains(keys(var.consumer_mounts), var.owner_namespace)
+      error_message = "consumer_mounts must not contain owner_namespace (\"${var.owner_namespace}\"): the owner already holds its claim, owner_pvc_name."
+    }
+  }
 }
 
-resource "kubernetes_persistent_volume_claim" "workers" {
+resource "kubernetes_persistent_volume_claim" "consumer" {
+  for_each = var.consumer_mounts
+
   metadata {
-    name      = var.workers_pvc_name
-    namespace = var.workers_namespace
+    name      = each.value
+    namespace = each.key
     labels    = var.labels
   }
   spec {
     access_modes       = ["ReadWriteMany"]
     storage_class_name = ""
-    volume_name        = kubernetes_persistent_volume.workers.metadata[0].name
+    volume_name        = kubernetes_persistent_volume.consumer[each.key].metadata[0].name
     resources {
       requests = { storage = var.capacity }
     }

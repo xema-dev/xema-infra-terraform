@@ -1,5 +1,5 @@
 variable "realm_name" {
-  description = "The single realm this module owns (e.g. \"xema-prod\"). The module is scoped to exactly this realm and never touches master or any other realm on the shared Keycloak."
+  description = "The single realm this module owns (e.g. \"acme-prod\"). The module is scoped to exactly this realm and never touches master or any other realm on the shared Keycloak."
   type        = string
 
   validation {

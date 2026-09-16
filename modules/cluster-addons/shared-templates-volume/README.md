@@ -1,38 +1,62 @@
-# shared-templates-volume
+# `cluster-addons/shared-templates-volume`
 
-Cross-namespace shared **templates volume** for the fast-launch reference-mount
-substrate (WS3). The workspace-orchestrator writes a content-addressed skill
-mirror into it once; every session worker reads it RO at launch (no per-launch
-HTTP body fetch).
+A **ReadWriteMany NFS export shared across N namespaces**: one namespace owns
+the tree (its workload writes it), any number of other namespaces mount the
+same bytes (their workloads read it). The module knows nothing about what the
+tree holds or who writes it — those are the consumer's facts, passed as inputs.
 
-## Why two PV/PVC pairs
+## Why one PV/PVC pair per namespace
 
-The orchestrator and the workers live in **different namespaces**
-(`xema-prod` vs `xema-opencode-workers`). PVCs are namespaced and a PV binds 1:1
-to a single PVC, so one PVC cannot span both. This module creates **two static
-PVs that reference the same NFS export** (`nfs_server` + `nfs_export_path`) — one
-bound by a PVC in each namespace. Both point at the same bytes.
+PVCs are namespaced and a PV binds 1:1 to a single PVC, so one PVC cannot span
+namespaces. This module creates **one static PV + PVC pair per namespace** —
+the owner's and one per consumer — every PV referencing the **same NFS export**
+(`nfs_server` + `nfs_export_path`). Each PV is pre-bound (`claim_ref`) to its
+claim, so nothing can cross-bind.
 
 This is **static** NFS binding (`storage_class_name = ""`), distinct from the
-dynamic `nfs-rwx` StorageClass in [`../rwx-storage`](../rwx-storage) (1 PVC = 1
-fresh volume, not shareable cross-namespace).
+dynamic ReadWriteMany StorageClass in [`../rwx-storage`](../rwx-storage) (1 PVC
+= 1 fresh volume, not shareable across namespaces).
 
-## Contract
+## Inputs
 
-- `workers_pvc_name` MUST equal `xema-pool-<SHARED_TEMPLATES_POOL_SLUG>` — the
-  storage driver derives the worker mount's claim name from the slug. The
-  default `xema-pool-templates-shared` pairs with `SHARED_TEMPLATES_POOL_SLUG=templates-shared`.
-- `orchestrator_pvc_name` MUST equal the orchestrator helm `claimName`
-  (`xema-templates-shared`), mounted at `TEMPLATES_POOL_ROOT_PATH`.
+| Input | Required | Description |
+| --- | --- | --- |
+| `nfs_server` | **yes** | host/IP of the NFS server backing the export |
+| `nfs_export_path` | **yes** | the export path; every PV references this identical path |
+| `owner_namespace` | **yes** | the namespace that OWNS the export (its workload writes it) |
+| `owner_pvc_name` | **yes** | the claim created there — must equal the `claimName` the owning workload references |
+| `consumer_mounts` | **yes** | the namespaces that MOUNT the export, keyed by namespace, each value the claim name to create there (at least one; the owner may not appear) |
+| `name_prefix` | **yes** | prefix for the cluster-scoped PV names: `<prefix>-owner`, `<prefix>-consumer-<namespace>` |
+| `capacity` | no | requested size on every PV/PVC (`50Gi`; NFS does not enforce it) |
+| `mount_options` | no | NFS mount options on every PV (`["nfsvers=4.1"]`) |
+| `labels` | no | labels on every PV/PVC |
 
-## Wiring (no apply required to author)
+Outputs: `owner_pvc_name`, `consumer_pvc_names` (keyed by namespace),
+`persistent_volume_names`.
 
-1. `module "shared_templates_volume" { source = "../../modules/cluster-addons/shared-templates-volume"  nfs_server = ...  nfs_export_path = ... }`
-2. Orchestrator helm: volume `xema-templates-shared` at `/var/lib/xema/storage`
-   (already in `charts/workspace-orchestrator-api/main.values.yaml`).
-3. `SHARED_TEMPLATES_POOL_SLUG=templates-shared` on workspace-storage-pool-api
-   (already in the xema-prod values).
+## Usage
 
-The kubectl bring-up equivalent (for clusters not yet TF-managed) is the admin
-bootstrap manifest `deployments/xema-prod/bootstrap/templates-shared-volume.yaml`
-in `xema-deploy`.
+```hcl
+module "shared_export" {
+  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/shared-templates-volume?ref=v1.0.0"
+
+  nfs_server      = "10.0.0.5"
+  nfs_export_path = "/exports/shared-tree"
+
+  # EXAMPLE names — yours come from the workloads that mount the export.
+  owner_namespace = "acme-prod"
+  owner_pvc_name  = "shared-tree"
+  consumer_mounts = {
+    "acme-workers" = "shared-tree-ro"
+  }
+  name_prefix = "acme-shared-tree"
+}
+```
+
+The claim names are a contract between this module and the workloads that
+mount the export: a workload references its claim by name, so the name passed
+here must be the one that workload expects. Read the names back from the
+outputs rather than restating them.
+
+The `kubernetes` provider is configured by the **root/stack**, not here (see
+[CONVENTIONS.md](../../../docs/CONVENTIONS.md)).
