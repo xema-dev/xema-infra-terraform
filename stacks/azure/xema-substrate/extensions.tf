@@ -1,4 +1,4 @@
-# Extension / biome substrate claim wiring.
+# Extension substrate claim wiring.
 #
 # See docs/extensions.md. The claim KIND set is CLOSED — v1 ships three kinds:
 #   object_buckets    -> module.extension_bucket (a storage account each)
@@ -7,7 +7,7 @@
 #                        server (created module.postgres, or the existing one)
 #   dns_records       -> merged into module.dns (requires enable_dns)
 #
-# The flattening locals live in locals.tf (keyed by "<biome>/<claim>").
+# The flattening locals live in locals.tf (keyed by "<extension>/<claim>").
 
 # One dedicated storage account per object_buckets claim.
 module "extension_bucket" {
@@ -76,7 +76,7 @@ resource "postgresql_grant" "extension_owner_connect" {
   privileges  = ["CONNECT"]
 }
 
-# Fail fast (rather than silently drop) if a biome claims a DNS record but the
+# Fail fast (rather than silently drop) if an extension claims a DNS record but the
 # dns module is disabled for this deployment.
 resource "terraform_data" "extension_guards" {
   count = length(local.ext_dns) > 0 ? 1 : 0

@@ -16,8 +16,8 @@ module "substrate" {
   # Greenfield (default): everything true → create cluster + DB + DNS + addons +
   # realm. Consume mode: set enable_cluster/enable_managed_postgres/enable_dns to
   # false to consume cloud infra owned by a separate "cloud substrate" Terraform;
-  # the stack then manages ONLY xema-specific resources and reads the existing
-  # cluster by name. See consume.tfvars.example.
+  # the stack then manages ONLY the in-cluster and identity resources and reads
+  # the existing cluster by name. See consume.tfvars.example.
   enable_cluster             = var.enable_cluster
   enable_managed_postgres    = var.enable_managed_postgres
   enable_dns                 = var.enable_dns
@@ -53,8 +53,14 @@ module "substrate" {
   postgres_name           = var.postgres_name
   postgres_engine_version = var.postgres_engine_version
   postgres_size           = var.postgres_size
-  postgres_databases      = var.postgres_databases
-  postgres_roles          = var.postgres_roles
+  # The database roster is YOURS: derive it from what you deploy. The stack has
+  # no default and refuses to plan without it ([] when consuming a cluster).
+  platform_databases = var.platform_databases
+  postgres_roles     = var.postgres_roles
+
+  # --- workload namespaces ---
+  # The namespace roster is YOURS too. No default.
+  workload_namespaces = var.workload_namespaces
 
   # --- dns ---
   dns_domain  = var.dns_domain
@@ -67,8 +73,13 @@ module "substrate" {
   realm_roles            = var.realm_roles
   realm_protocol_mappers = var.realm_protocol_mappers
 
-  # --- extension / biome substrate claims ---
+  # --- extension substrate claims ---
   extensions = var.extensions
+}
+
+output "substrate" {
+  description = "The binding contract: non-secret facts a consumer binds to (docs/CONTRACTS.md § Binding contract)."
+  value       = module.substrate.substrate
 }
 
 output "cluster_endpoint" {
@@ -93,6 +104,6 @@ output "realm_id" {
 }
 
 output "extension_buckets" {
-  description = "Extension-claimed bucket names keyed by \"<biome>/<claim>\"."
+  description = "Extension-claimed bucket names keyed by \"<extension>/<claim>\"."
   value       = module.substrate.extension_buckets
 }

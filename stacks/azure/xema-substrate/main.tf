@@ -1,7 +1,9 @@
-# The Azure Xema substrate stack. Each area is independently toggleable (see
-# variables.tf § enable_*) so a deployment can manage ONLY its xema-specific
-# resources and CONSUME cloud infra owned by a separate Terraform. Every name is
-# DERIVED from var.deployment_name (locals.tf); nothing here names a deployment.
+# The Azure substrate stack. Each area is independently toggleable (see
+# variables.tf § enable_*) so a deployment can manage ONLY its in-cluster and
+# identity resources and CONSUME cloud infra owned by a separate Terraform.
+# Every name is DERIVED from var.deployment_name (locals.tf); nothing here
+# names a deployment, a service or an application — the database and
+# namespace rosters are inputs the consumer supplies.
 
 # ---------------------------------------------------------------------------
 # Cross-input guards. Terraform 1.6 validation blocks see one variable only, so
@@ -159,7 +161,7 @@ module "cache" {
 }
 
 # ---------------------------------------------------------------------------
-# Xema-specific in-cluster + identity resources
+# In-cluster + identity resources
 # ---------------------------------------------------------------------------
 
 # Azure Files CSI is built into AKS, so the provisioner chart is NOT managed —
@@ -180,7 +182,7 @@ module "workload_namespaces" {
   source = "../../../modules/cluster-addons/workload-namespaces"
   count  = var.enable_workload_namespaces ? 1 : 0
 
-  namespaces = local.workload_namespaces
+  namespaces = var.workload_namespaces
   labels     = var.workload_namespace_labels
 }
 

@@ -24,7 +24,7 @@ locals {
   blob_account_name     = var.storage_account_name != "" ? var.storage_account_name : "${local.compact}blob"
   redis_name            = var.redis_cache_name != "" ? var.redis_cache_name : "${local.dep}-redis"
   realm_name            = local.dep
-  realm_display_name    = var.realm_display_name != "" ? var.realm_display_name : "Xema (${local.dep})"
+  realm_display_name    = var.realm_display_name != "" ? var.realm_display_name : local.dep
   blob_container_prefix = var.blob_container_prefix != "" ? var.blob_container_prefix : local.dep
 
   tags = merge(
@@ -36,44 +36,15 @@ locals {
     var.tags,
   )
 
-  # The namespaces the Helm bring-up expects. Same roles as the DigitalOcean
-  # canonical set, spelled from the deployment name instead of hardcoded.
-  workload_namespaces = setunion(
-    [
-      local.dep,
-      "${local.dep}-shared",
-      "${local.dep}-infra",
-      "${local.dep}-opencode-workers",
-      "${local.dep}-biome-sidecars",
-    ],
-    var.extra_workload_namespaces,
-  )
+  # The roster of workload namespaces is an INPUT (var.workload_namespaces):
+  # which namespaces a deployment runs in is a fact the consumer derives from
+  # what it deploys, never something the substrate knows. The same holds for the
+  # databases: var.platform_databases carries the logical names, and the ONE
+  # rewrite this stack applies is the Postgres-identifier prefix below.
+  postgres_databases = toset([for d in var.platform_databases : "${local.pg}_${d}"])
 
-  # One database per platform service that owns one, plus the shared biome
-  # database and the backing stores that run in-cluster but persist here.
-  platform_databases = [
-    "${local.pg}_identity_api",
-    "${local.pg}_secrets_api",
-    "${local.pg}_event_hub_api",
-    "${local.pg}_llm_gateway_api",
-    "${local.pg}_mcp_gateway_api",
-    "${local.pg}_org_database_pool_api",
-    "${local.pg}_redis_pool_api",
-    "${local.pg}_biomes",
-    "${local.pg}_openfga",
-    "${local.pg}_temporal",
-    "${local.pg}_temporal_visibility",
-    "${local.pg}_gitea",
-    "${local.pg}_keycloak",
-  ]
-  postgres_databases = setunion(
-    local.platform_databases,
-    var.enable_billing_database ? ["${local.pg}_billing_api"] : [],
-    var.postgres_extra_databases,
-  )
-
-  # The application role, and the provisioner the org-database pool uses to
-  # CREATE per-org databases at runtime.
+  # Two roles: the application role, and a provisioner role that may CREATE
+  # databases at runtime (for a consumer that provisions per-tenant databases).
   postgres_app_role         = local.pg
   postgres_provisioner_role = "${local.pg}_provisioner"
   postgres_roles            = [local.postgres_app_role, local.postgres_provisioner_role]
@@ -139,8 +110,8 @@ locals {
   ext_db_server_id = var.enable_managed_postgres ? one(module.postgres[*].cluster_id) : var.existing_postgres_server_id
 
   # ---------------------------------------------------------------------------
-  # Extension claim flattening, keyed by "<biome>/<claim>" so adding/removing a
-  # biome only adds/removes its own resources.
+  # Extension claim flattening, keyed by "<extension>/<claim>" so adding/removing
+  # an extension only adds/removes its own resources.
   # ---------------------------------------------------------------------------
   ext_buckets = merge([
     for bid, e in var.extensions :

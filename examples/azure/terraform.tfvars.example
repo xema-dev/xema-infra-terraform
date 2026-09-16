@@ -13,7 +13,7 @@
 # consume.tfvars.example.
 
 # --- identity: every resource, namespace, database and role derives from these ---
-deployment_name = "acme-dev"    # -> acme-dev-aks, acme-dev-pg, acmedevblob, acme_dev_identity_api, ...
+deployment_name = "acme-dev"    # -> acme-dev-aks, acme-dev-pg, acmedevblob, acme_dev_<database>, ...
 environment     = "dev"         # dev | prod
 region          = "westeurope"
 apex_domain     = "example.com" # the zone this stack manages (enable_dns)
@@ -82,11 +82,39 @@ node_pools = {
   }
 }
 
+# --- databases + namespaces: YOUR rosters, derived from what you deploy ---
+# The stack has no default for either and refuses to plan without them: which
+# databases and namespaces exist is a fact about the workloads you run, not
+# about the substrate. This EXAMPLE lists what one deployment of the reference
+# platform uses; yours comes from your own distribution.
+platform_databases = [ # unprefixed; the stack prefixes "acme_dev_"
+  "identity_api",
+  "secrets_api",
+  "event_hub_api",
+  "llm_gateway_api",
+  "mcp_gateway_api",
+  "org_database_pool_api",
+  "redis_pool_api",
+  "biomes",
+  "openfga",
+  "temporal",
+  "temporal_visibility",
+  "gitea",
+  "keycloak",
+  # "billing_api",           # add it when the edition you deploy bills
+]
+workload_namespaces = [ # full names; nothing derived
+  "acme-dev",
+  "acme-dev-shared",
+  "acme-dev-infra",
+  "acme-dev-opencode-workers",
+  "acme-dev-biome-sidecars",
+]
+
 # --- postgres ---
 # "private" answers only inside the VNet: apply from a VPN/bastion/runner there,
 # or use "public" with explicit firewall rules for the operator's address.
 postgres_network_access = "private"
-enable_billing_database = false
 
 # --- dns ---
 dns_records = {
@@ -135,8 +163,8 @@ realm_protocol_mappers = {
   }
 }
 
-# --- extension / biome substrate claims ---
-# Only biomes needing DEDICATED out-of-cluster substrate appear here. See
+# --- extension substrate claims ---
+# Only extensions needing DEDICATED out-of-cluster substrate appear here. See
 # docs/extensions.md. Bucket names are storage-account names (3-24 alphanumerics).
 extensions = {
   "acme/legal-review" = {

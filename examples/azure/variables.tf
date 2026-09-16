@@ -107,7 +107,7 @@ variable "enable_rwx_storage" {
 }
 
 variable "enable_workload_namespaces" {
-  description = "Ensure the derived workload namespaces exist."
+  description = "Ensure the workload_namespaces roster exists."
   type        = bool
   default     = true
 }
@@ -275,10 +275,16 @@ variable "postgres_public_firewall_rules" {
   default = {}
 }
 
-variable "enable_billing_database" {
-  description = "Also derive the billing_api database."
-  type        = bool
-  default     = false
+variable "platform_databases" {
+  description = "Logical databases to ensure on the created server, UNPREFIXED; the stack prefixes \"<deployment_name>_\" (hyphens as underscores). Required — derive it from what you deploy."
+  type        = set(string)
+}
+
+# --- workload namespaces ---
+
+variable "workload_namespaces" {
+  description = "Namespaces to ensure exist, by full name. Required — derive it from what you deploy."
+  type        = set(string)
 }
 
 # --- dns ---
@@ -387,7 +393,7 @@ variable "realm_protocol_mappers" {
 # --- extensions ---
 
 variable "extensions" {
-  description = "Dedicated out-of-cluster substrate claimed by biomes, keyed by extension id. See docs/extensions.md."
+  description = "Dedicated out-of-cluster substrate claimed by extensions, keyed by extension id. See docs/extensions.md."
   type = map(object({
     object_buckets = optional(map(object({
       name       = string

@@ -2,9 +2,10 @@
 # Enable / disable toggles
 # ---------------------------------------------------------------------------
 # Each area of the substrate can be independently enabled or disabled. This lets
-# one deployment manage ONLY its xema-specific resources (namespaces, RWX
-# storage, identity realm, extension claims) while a SEPARATE "cloud substrate"
-# Terraform owns the shared cloud infra (cluster, managed database, DNS zone).
+# one deployment manage ONLY its in-cluster and identity resources (namespaces,
+# RWX storage, identity realm, extension claims) while a SEPARATE "cloud
+# substrate" Terraform owns the shared cloud infra (cluster, managed database,
+# DNS zone).
 # When a cloud module is disabled, the stack CONSUMES the existing resource
 # instead of creating it (e.g. it reads the cluster by name for the kubernetes
 # provider, and creates extension databases against existing_database_cluster_id).
@@ -209,10 +210,16 @@ variable "postgres_node_count" {
   }
 }
 
-variable "postgres_databases" {
-  description = "Base logical databases on the CREATED cluster. Leave empty when consuming a shared cluster (managing a subset there would plan to drop the rest)."
+variable "platform_databases" {
+  description = <<-EOT
+    The logical databases to ensure on the CREATED cluster, by name, used
+    verbatim. REQUIRED, no default: which databases exist is a fact about what
+    the consumer deploys, derived from its own distribution — the substrate
+    does not know it. Pass [] when consuming a shared cluster
+    (enable_managed_postgres = false): managing a subset there would plan to
+    drop the rest, so a consumed cluster's databases are not managed here.
+  EOT
   type        = set(string)
-  default     = []
 }
 
 variable "postgres_roles" {
@@ -260,7 +267,7 @@ variable "dns_records" {
 # ---------------------------------------------------------------------------
 
 variable "rwx_storage_class_name" {
-  description = "Name of the ReadWriteMany StorageClass to create. Must match what the Helm app bring-up references."
+  description = "Name of the ReadWriteMany StorageClass to create. The consumer references this name in its workloads; read it back from the substrate output rather than restating it."
   type        = string
   default     = "nfs-rwx-storage"
 }
@@ -300,17 +307,19 @@ variable "rwx_allow_volume_expansion" {
 # ---------------------------------------------------------------------------
 
 variable "workload_namespaces" {
-  description = "Namespaces that must exist before the Helm application bring-up runs. Defaults to the canonical Xema set."
+  description = <<-EOT
+    The roster of namespaces to ensure exist on the (created or consumed)
+    cluster, by full name. REQUIRED, no default: which namespaces a deployment
+    runs in is a fact the consumer derives from what it deploys — the substrate
+    does not know it. Each name is a DNS-1123 label. Ignored when
+    enable_workload_namespaces = false.
+  EOT
   type        = set(string)
-  default = [
-    "xema-prod",
-    "shared-prod",
-    "xema-infra",
-    "xema-opencode-workers",
-    "xema-biome-sidecars",
-    "xema-biome-apis",
-    "xema-image-builders",
-  ]
+
+  validation {
+    condition     = alltrue([for ns in var.workload_namespaces : can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", ns))])
+    error_message = "Each workload_namespaces entry must be a DNS-1123 label (1-63 lowercase alphanumerics or hyphens, starting and ending alphanumeric)."
+  }
 }
 
 variable "workload_namespace_labels" {
@@ -325,7 +334,7 @@ variable "workload_namespace_labels" {
 # ---------------------------------------------------------------------------
 
 variable "realm_name" {
-  description = "The single Keycloak realm this stack owns (e.g. \"xema-prod\"). Never \"master\". Required when enable_identity_realm."
+  description = "The single Keycloak realm this stack owns (e.g. \"acme-prod\"). Never \"master\". Required when enable_identity_realm."
   type        = string
   default     = ""
 
@@ -402,18 +411,22 @@ variable "realm_protocol_mappers" {
 }
 
 # ---------------------------------------------------------------------------
-# Extension / biome substrate claims (see docs/extensions.md, extensions.tf)
+# Extension substrate claims (see docs/extensions.md, extensions.tf)
 # ---------------------------------------------------------------------------
 
 variable "extensions" {
   description = <<-EOT
-    Dedicated substrate claimed by biomes/extensions, keyed by extension id (the
-    biome id). Each value carries any subset of a CLOSED set of three claim kinds:
+    Dedicated substrate claimed by extensions — consumers of this substrate that
+    need a cloud resource of their own — keyed by a stable extension id the
+    consumer chooses. Each value carries any subset of a CLOSED set of three
+    claim kinds:
       - object_buckets   : map(stable id => { name, acl?, versioning? })
       - managed_databases: map(stable id => { database, owner? })  (on the resolved cluster)
       - dns_records      : map(stable id => { name, type?, value, ttl? })  (requires enable_dns)
-    Only declare a biome here when it needs a DEDICATED cloud resource the runtime
-    biome installer cannot create. Shared-schema biomes need NO entry.
+    Declare an extension here only when it needs a DEDICATED out-of-cluster
+    resource that nothing running in the cluster can create. What the consumer
+    provisions for itself at runtime (schemas on a shared database, in-cluster
+    objects) needs NO entry.
   EOT
   type = map(object({
     object_buckets = optional(map(object({

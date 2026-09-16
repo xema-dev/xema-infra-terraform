@@ -166,10 +166,14 @@ variable "postgres_size" {
   default     = ""
 }
 
-variable "postgres_databases" {
-  description = "Base set of logical databases to ensure exist."
+variable "platform_databases" {
+  description = "Logical databases to ensure on the created cluster, verbatim. Required — derive it from what you deploy; [] when consuming a shared cluster."
   type        = set(string)
-  default     = []
+}
+
+variable "workload_namespaces" {
+  description = "Namespaces to ensure exist, by full name. Required — derive it from what you deploy."
+  type        = set(string)
 }
 
 variable "postgres_roles" {
@@ -249,7 +253,7 @@ variable "realm_protocol_mappers" {
 }
 
 variable "extensions" {
-  description = "Dedicated out-of-cluster substrate claimed by biomes, keyed by extension id. See docs/extensions.md."
+  description = "Dedicated out-of-cluster substrate claimed by extensions, keyed by extension id. See docs/extensions.md."
   type = map(object({
     object_buckets = optional(map(object({
       name       = string

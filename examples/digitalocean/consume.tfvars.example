@@ -4,11 +4,11 @@
 # replace every REPLACE_ME / placeholder with REAL values. NEVER commit real
 # tokens or ids — secrets shown here are FAKE placeholders only.
 #
-# This file demonstrates CONSUME (xema-specific) mode: a SEPARATE "cloud
-# substrate" Terraform (owned by another team/agent) already owns the cluster,
-# the managed Postgres, and the DNS zone. This root then manages ONLY the
-# xema-specific resources — RWX storage, workload namespaces, the Keycloak
-# realm, and extension/biome claims — and CONSUMES the existing cluster by name.
+# This file demonstrates CONSUME mode: a SEPARATE "cloud substrate" Terraform
+# (owned by another team/agent) already owns the cluster, the managed Postgres,
+# and the DNS zone. This root then manages ONLY the in-cluster and identity
+# resources — RWX storage, workload namespaces, the Keycloak realm, and
+# extension claims — and CONSUMES the existing cluster by name.
 #
 # What changes vs greenfield:
 #   - enable_cluster / enable_managed_postgres / enable_dns are FALSE, so the
@@ -18,7 +18,7 @@
 #   - cluster sizing / postgres sizing / dns inputs are all unset (irrelevant
 #     when the modules are disabled).
 
-# --- scope toggles: consume cloud infra, manage only xema-specific resources ---
+# --- scope toggles: consume cloud infra, manage only in-cluster + identity resources ---
 enable_cluster             = false
 enable_managed_postgres    = false
 enable_dns                 = false
@@ -50,9 +50,20 @@ cluster_name = "existing-shared-cluster" # the live DOKS cluster owned elsewhere
 # --- consume the existing managed Postgres (hosts extension databases) ---
 existing_database_cluster_id = "REPLACE_ME_EXISTING_PG_CLUSTER_ID"
 
-# --- cluster addons (xema-specific, applied to the consumed cluster) ---
+# --- consume the existing managed Postgres: manage NO databases on it ---
+# platform_databases has no default; [] is the explicit answer for a shared
+# cluster (managing a subset there would plan to drop the rest).
+platform_databases = []
+
+# --- cluster addons (applied to the consumed cluster) ---
 rwx_storage_class_name = "nfs-rwx-storage"
 rwx_is_default_class   = false
+
+# --- namespaces: YOUR roster, derived from what you deploy ---
+# The stack has no default and refuses to plan without it: which namespaces
+# exist is a fact about the workloads you run, not about the substrate. This
+# EXAMPLE lists what one deployment of the reference platform uses; yours
+# comes from your own distribution.
 workload_namespaces = [
   "xema-prod",
   "shared-prod",
@@ -63,7 +74,7 @@ workload_namespaces = [
   "xema-image-builders",
 ]
 
-# --- identity realm (xema-specific) ---
+# --- identity realm ---
 realm_name         = "xema-example"
 realm_display_name = "Xema (example)"
 
@@ -87,7 +98,7 @@ realm_protocol_mappers = {
   }
 }
 
-# --- extension / biome substrate claims ---
+# --- extension substrate claims ---
 # managed_databases land on existing_database_cluster_id (the consumed cluster).
 # dns_records are NOT allowed here while enable_dns = false (the stack fails fast).
 extensions = {

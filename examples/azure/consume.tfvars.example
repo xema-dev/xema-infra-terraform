@@ -4,12 +4,12 @@
 # replace every REPLACE_ME / placeholder with REAL values. NEVER commit real
 # ids or secrets — values shown here are FAKE placeholders only.
 #
-# This file demonstrates CONSUME (xema-specific) mode: a SEPARATE "cloud
-# substrate" Terraform (owned by another team/agent) already owns the cluster,
-# the Flexible Server and the DNS zone. This root then manages ONLY the
-# xema-specific resources — RWX storage, workload namespaces, the ingress edge,
-# the Key Vault, the Keycloak realm, and extension/biome claims — and CONSUMES
-# the existing cluster by name.
+# This file demonstrates CONSUME mode: a SEPARATE "cloud substrate" Terraform
+# (owned by another team/agent) already owns the cluster, the Flexible Server
+# and the DNS zone. This root then manages ONLY the in-cluster and identity
+# resources — RWX storage, workload namespaces, the ingress edge, the Key
+# Vault, the Keycloak realm, and extension claims — and CONSUMES the existing
+# cluster by name.
 #
 # What changes vs greenfield:
 #   - enable_cluster / enable_managed_postgres / enable_dns are FALSE.
@@ -23,7 +23,7 @@ deployment_name = "acme-dev"
 environment     = "dev"
 region          = "westeurope"
 
-# --- scope toggles: consume cloud infra, manage only xema-specific resources ---
+# --- scope toggles: consume cloud infra, manage only in-cluster + identity resources ---
 enable_cluster             = false
 enable_managed_postgres    = false
 enable_dns                 = false
@@ -53,14 +53,43 @@ existing_postgres_host           = "existing-shared-pg.postgres.database.azure.c
 existing_postgres_admin_login    = "pgadmin"
 existing_postgres_admin_password = "REPLACE_ME_EXISTING_PG_ADMIN_PASSWORD"
 
-# --- ingress + tls (xema-specific, applied to the consumed cluster) ---
+# --- databases + namespaces: YOUR rosters, derived from what you deploy ---
+# The stack has no default for either and refuses to plan without them. With
+# enable_managed_postgres = false the database roster is NOT applied (a consumed
+# server's databases are not managed here), but it is still declared so the
+# same tfvars flips to greenfield without a second edit.
+platform_databases = [ # unprefixed; the stack prefixes "acme_dev_"
+  "identity_api",
+  "secrets_api",
+  "event_hub_api",
+  "llm_gateway_api",
+  "mcp_gateway_api",
+  "org_database_pool_api",
+  "redis_pool_api",
+  "biomes",
+  "openfga",
+  "temporal",
+  "temporal_visibility",
+  "gitea",
+  "keycloak",
+  # "billing_api",           # add it when the edition you deploy bills
+]
+workload_namespaces = [ # full names; nothing derived
+  "acme-dev",
+  "acme-dev-shared",
+  "acme-dev-infra",
+  "acme-dev-opencode-workers",
+  "acme-dev-biome-sidecars",
+]
+
+# --- ingress + tls (applied to the consumed cluster) ---
 acme_email = "ops@example.com"
 tls_solver = "http01" # dns01-azure needs enable_dns
 
 # --- secrets backend ---
 key_vault_secrets = {} # seed via TF_VAR_key_vault_secrets
 
-# --- identity realm (xema-specific) ---
+# --- identity realm ---
 realm_display_name = "Xema (acme-dev)"
 
 realm_clients = {
@@ -74,7 +103,7 @@ realm_clients = {
 
 realm_roles = ["platform_admin", "org_owner", "member"]
 
-# --- extension / biome substrate claims ---
+# --- extension substrate claims ---
 # managed_databases land on existing_postgres_server_id (the consumed server).
 # dns_records are NOT allowed here while enable_dns = false (the stack fails fast).
 extensions = {

@@ -50,13 +50,13 @@ output "postgres_role_passwords" {
 }
 
 output "postgres_databases" {
-  description = "The derived platform databases ensured on the created server."
-  value       = local.postgres_databases
+  description = "The databases ensured on the created server — var.platform_databases after the deployment-name prefix; null when consumed."
+  value       = var.enable_managed_postgres ? local.postgres_databases : null
 }
 
 output "postgres_roles" {
-  description = "The derived roles ensured on the created server."
-  value       = local.postgres_roles
+  description = "The derived roles ensured on the created server; null when consumed."
+  value       = var.enable_managed_postgres ? local.postgres_roles : null
 }
 
 output "dns_domain" {
@@ -152,19 +152,22 @@ output "realm_client_secrets" {
 }
 
 output "extension_buckets" {
-  description = "Extension-claimed storage account names keyed by \"<biome>/<claim>\"."
+  description = "Extension-claimed storage account names keyed by \"<extension>/<claim>\"."
   value       = { for k, m in module.extension_bucket : k => m.bucket }
 }
 
 output "extension_databases" {
-  description = "Extension-claimed dedicated database names keyed by \"<biome>/<claim>\"."
+  description = "Extension-claimed dedicated database names keyed by \"<extension>/<claim>\"."
   value       = { for k, r in azurerm_postgresql_flexible_server_database.extension : k => r.name }
 }
 
-# The one map the Helm layer consumes. Only non-secret facts live here — the
-# credentials are the sensitive outputs above, read separately on purpose.
+# The BINDING CONTRACT: the one map a consumer reads to bind itself to this
+# substrate. Same key shape on every cloud (docs/CONTRACTS.md § Binding
+# contract); a key is null when its area is disabled, consumed elsewhere, or
+# not modelled by this cloud. Only non-secret facts live here — the credentials
+# are the sensitive outputs above, read separately on purpose.
 output "substrate" {
-  description = "Non-secret facts the Helm layer consumes, in one map. Every value is null when its area is disabled or consumed elsewhere."
+  description = "Non-secret facts a consumer binds to, in one map with the cross-cloud key shape documented in docs/CONTRACTS.md. Every value is null when its area is disabled or consumed elsewhere."
   value = {
     deployment_name = local.dep
     environment     = var.environment
@@ -175,23 +178,19 @@ output "substrate" {
     cluster_resource_group_name = var.enable_cluster ? one(module.cluster[*].resource_group_name) : local.cluster_resource_group_name
     oidc_issuer_url             = local.oidc_issuer_url
     storage_class_name          = one(module.rwx_storage[*].storage_class_name)
-    namespaces = {
-      platform         = local.dep
-      shared           = "${local.dep}-shared"
-      infra            = "${local.dep}-infra"
-      opencode_workers = "${local.dep}-opencode-workers"
-      biome_sidecars   = "${local.dep}-biome-sidecars"
-    }
+    # The roster the consumer supplied, as ensured on the cluster. It carries no
+    # roles: which namespace plays which part is the consumer's own knowledge.
+    namespaces = one(module.workload_namespaces[*].namespaces)
 
     postgres_host             = one(module.postgres[*].host)
     postgres_port             = one(module.postgres[*].port)
-    postgres_app_role         = local.postgres_app_role
-    postgres_provisioner_role = local.postgres_provisioner_role
-    postgres_databases        = local.postgres_databases
+    postgres_app_role         = var.enable_managed_postgres ? local.postgres_app_role : null
+    postgres_provisioner_role = var.enable_managed_postgres ? local.postgres_provisioner_role : null
+    postgres_databases        = var.enable_managed_postgres ? local.postgres_databases : null
 
     blob_account          = one(module.blob[*].bucket)
     blob_endpoint         = one(module.blob[*].endpoint)
-    blob_container_prefix = local.blob_container_prefix
+    blob_container_prefix = var.enable_object_storage ? local.blob_container_prefix : null
 
     key_vault_name             = var.enable_secrets_backend ? local.key_vault_name : null
     key_vault_uri              = one(module.secrets_backend[*].vault_uri)

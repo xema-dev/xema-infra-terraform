@@ -63,8 +63,24 @@ node_pools = {
 postgres_name           = "xema-example-pg"
 postgres_engine_version = "16"
 postgres_size           = "db-s-1vcpu-2gb"
-postgres_databases      = ["xema_platform", "xema_biomes"]
-postgres_roles          = ["xema_app"]
+# The database roster is YOURS (no default). EXAMPLE names, used verbatim.
+platform_databases = ["xema_platform", "xema_biomes"]
+postgres_roles     = ["xema_app"]
+
+# --- namespaces: YOUR roster, derived from what you deploy ---
+# The stack has no default and refuses to plan without it: which namespaces
+# exist is a fact about the workloads you run, not about the substrate. This
+# EXAMPLE lists what one deployment of the reference platform uses; yours
+# comes from your own distribution.
+workload_namespaces = [
+  "xema-prod",
+  "shared-prod",
+  "xema-infra",
+  "xema-opencode-workers",
+  "xema-biome-sidecars",
+  "xema-biome-apis",
+  "xema-image-builders",
+]
 
 # --- dns ---
 dns_domain = "example.com"
@@ -103,9 +119,9 @@ realm_protocol_mappers = {
   }
 }
 
-# --- extension / biome substrate claims ---
-# Only biomes needing DEDICATED out-of-cluster substrate appear here. See
-# docs/extensions.md. Example: one biome claiming a bucket, one claiming a DB.
+# --- extension substrate claims ---
+# Only extensions needing DEDICATED out-of-cluster substrate appear here. See
+# docs/extensions.md. Example: one extension claiming a bucket, one claiming a DB.
 extensions = {
   "acme/legal-review" = {
     object_buckets = {

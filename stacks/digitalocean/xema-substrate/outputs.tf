@@ -58,6 +58,11 @@ output "workload_namespaces" {
   value       = one(module.workload_namespaces[*].namespaces)
 }
 
+output "postgres_databases" {
+  description = "The databases ensured on the created cluster (var.platform_databases, verbatim); null when consumed."
+  value       = var.enable_managed_postgres ? var.platform_databases : null
+}
+
 output "realm_id" {
   description = "The managed Keycloak realm id (equal to the realm name); null when disabled."
   value       = one(module.identity_realm[*].realm_id)
@@ -70,11 +75,64 @@ output "realm_client_secrets" {
 }
 
 output "extension_buckets" {
-  description = "Extension-claimed object-storage bucket names keyed by \"<biome>/<claim>\"."
+  description = "Extension-claimed object-storage bucket names keyed by \"<extension>/<claim>\"."
   value       = { for k, m in module.extension_bucket : k => m.bucket }
 }
 
 output "extension_databases" {
-  description = "Extension-claimed dedicated database names keyed by \"<biome>/<claim>\"."
+  description = "Extension-claimed dedicated database names keyed by \"<extension>/<claim>\"."
   value       = { for k, r in digitalocean_database_db.extension : k => r.name }
+}
+
+# The BINDING CONTRACT: the one map a consumer reads to bind itself to this
+# substrate. The key shape is IDENTICAL to the Azure stack's (docs/CONTRACTS.md
+# § Binding contract) so a consumer binds the same way on every cloud; a key
+# is null when its area is disabled, consumed elsewhere, or not modelled on
+# this cloud (this stack derives no deployment_name, has no environment axis,
+# no platform object storage, no secrets backend, no cache and no ingress
+# addon, so those keys are always null here). Only non-secret facts live here
+# — the credentials are the sensitive outputs above, read separately on
+# purpose.
+output "substrate" {
+  description = "Non-secret facts a consumer binds to, in one map with the cross-cloud key shape documented in docs/CONTRACTS.md. Every value is null when its area is disabled, consumed elsewhere, or not modelled on DigitalOcean."
+  value = {
+    deployment_name = null
+    environment     = null
+    region          = var.region
+    tenant_id       = null
+
+    cluster_name                = var.cluster_name != "" ? var.cluster_name : null
+    cluster_resource_group_name = null
+    oidc_issuer_url             = null
+    storage_class_name          = one(module.rwx_storage[*].storage_class_name)
+    # The roster the consumer supplied, as ensured on the cluster. It carries no
+    # roles: which namespace plays which part is the consumer's own knowledge.
+    namespaces = one(module.workload_namespaces[*].namespaces)
+
+    postgres_host             = one(module.postgres[*].host)
+    postgres_port             = one(module.postgres[*].port)
+    postgres_app_role         = null
+    postgres_provisioner_role = null
+    postgres_databases        = var.enable_managed_postgres ? var.platform_databases : null
+
+    blob_account          = null
+    blob_endpoint         = null
+    blob_container_prefix = null
+
+    key_vault_name             = null
+    key_vault_uri              = null
+    external_secrets_client_id = null
+    cluster_secret_store_name  = null
+
+    redis_host = null
+    redis_port = null
+
+    dns_zone         = one(module.dns[*].domain)
+    dns_name_servers = null
+
+    ingress = null
+
+    keycloak_url = var.enable_identity_realm ? var.keycloak_url : null
+    realm_name   = var.enable_identity_realm ? var.realm_name : null
+  }
 }

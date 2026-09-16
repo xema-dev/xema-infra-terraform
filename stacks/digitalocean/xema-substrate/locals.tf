@@ -19,8 +19,8 @@ locals {
   # operator supplies.
   ext_db_cluster_id = var.enable_managed_postgres ? one(module.postgres[*].cluster_id) : var.existing_database_cluster_id
 
-  # Extension claim flattening, keyed by "<biome>/<claim>" so adding/removing a
-  # biome only adds/removes its own resources.
+  # Extension claim flattening, keyed by "<extension>/<claim>" so adding/removing
+  # an extension only adds/removes its own resources.
   ext_buckets = merge([
     for bid, e in var.extensions :
     { for k, v in e.object_buckets : "${bid}/${k}" => v }

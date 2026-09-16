@@ -118,9 +118,9 @@ variable "redis_cache_name" {
 # Enable / disable toggles
 # ---------------------------------------------------------------------------
 # Each area of the substrate can be independently enabled or disabled. This lets
-# one deployment manage ONLY its xema-specific resources (namespaces, RWX
-# storage, identity realm, extension claims) while a SEPARATE "cloud substrate"
-# Terraform owns the shared cloud infra. When a cloud module is disabled, the
+# one deployment manage ONLY its in-cluster and identity resources (namespaces,
+# RWX storage, identity realm, extension claims) while a SEPARATE "cloud
+# substrate" Terraform owns the shared cloud infra. When a cloud module is disabled, the
 # stack CONSUMES the existing resource instead of creating it.
 
 variable "enable_cluster" {
@@ -382,16 +382,24 @@ variable "postgres_administrator_password" {
   sensitive   = true
 }
 
-variable "enable_billing_database" {
-  description = "Also derive the \"<deployment>_billing_api\" database — billing is an edition decision, off by default."
-  type        = bool
-  default     = false
-}
-
-variable "postgres_extra_databases" {
-  description = "Additional logical databases on the CREATED server, beyond the derived platform set. Unprefixed; use them as given."
+variable "platform_databases" {
+  description = <<-EOT
+    The logical databases to ensure on the CREATED server, by UNPREFIXED name
+    (e.g. "identity", "billing", "temporal"). REQUIRED, no default: which
+    databases exist is a fact about what the consumer deploys, derived from its
+    own distribution — the substrate does not know it. Every name gets the ONE
+    Postgres rewrite this stack applies (locals.tf): it is prefixed with the
+    deployment name in identifier form, "<deployment_name with - as _>_<name>".
+    Each name: lowercase letters, digits and underscores, starting with a
+    letter. Ignored when enable_managed_postgres = false (a consumed server's
+    databases are not managed here).
+  EOT
   type        = set(string)
-  default     = []
+
+  validation {
+    condition     = alltrue([for d in var.platform_databases : can(regex("^[a-z][a-z0-9_]{0,42}$", d))])
+    error_message = "Each platform_databases entry must be 1-43 chars of lowercase letters, digits and underscores, starting with a letter (unprefixed; the stack prefixes the deployment name)."
+  }
 }
 
 variable "existing_postgres_server_id" {
@@ -582,13 +590,25 @@ variable "rwx_allow_volume_expansion" {
 }
 
 # ---------------------------------------------------------------------------
-# Workload namespaces (modules/cluster-addons/workload-namespaces) — DERIVED
+# Workload namespaces (modules/cluster-addons/workload-namespaces)
 # ---------------------------------------------------------------------------
 
-variable "extra_workload_namespaces" {
-  description = "Namespaces to ensure exist in addition to the derived set (locals.tf)."
+variable "workload_namespaces" {
+  description = <<-EOT
+    The roster of namespaces to ensure exist on the (created or consumed)
+    cluster, by full name. REQUIRED, no default: which namespaces a deployment
+    runs in is a fact the consumer derives from what it deploys — the substrate
+    does not know it. Nothing here is derived from deployment_name; pass the
+    names you want (a consumer that spells them "<deployment_name>-<role>" does
+    that derivation itself). Each name is a DNS-1123 label. Ignored when
+    enable_workload_namespaces = false.
+  EOT
   type        = set(string)
-  default     = []
+
+  validation {
+    condition     = alltrue([for ns in var.workload_namespaces : can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", ns))])
+    error_message = "Each workload_namespaces entry must be a DNS-1123 label (1-63 lowercase alphanumerics or hyphens, starting and ending alphanumeric)."
+  }
 }
 
 variable "workload_namespace_labels" {
@@ -603,7 +623,7 @@ variable "workload_namespace_labels" {
 # ---------------------------------------------------------------------------
 
 variable "realm_display_name" {
-  description = "Human-readable realm display name shown on login screens. Empty derives from deployment_name."
+  description = "Human-readable realm display name shown on login screens. Empty uses deployment_name verbatim; the consumer names its product, the substrate does not."
   type        = string
   default     = ""
 }
@@ -651,18 +671,22 @@ variable "realm_protocol_mappers" {
 }
 
 # ---------------------------------------------------------------------------
-# Extension / biome substrate claims (see docs/extensions.md, extensions.tf)
+# Extension substrate claims (see docs/extensions.md, extensions.tf)
 # ---------------------------------------------------------------------------
 
 variable "extensions" {
   description = <<-EOT
-    Dedicated substrate claimed by biomes/extensions, keyed by extension id (the
-    biome id). Each value carries any subset of a CLOSED set of three claim kinds:
+    Dedicated substrate claimed by extensions — consumers of this substrate that
+    need a cloud resource of their own — keyed by a stable extension id the
+    consumer chooses. Each value carries any subset of a CLOSED set of three
+    claim kinds:
       - object_buckets   : map(stable id => { name, acl?, versioning? })  (name = a storage account name)
       - managed_databases: map(stable id => { database, owner? })  (on the resolved server)
       - dns_records      : map(stable id => { name, type?, value, ttl? })  (requires enable_dns)
-    Only declare a biome here when it needs a DEDICATED cloud resource the runtime
-    biome installer cannot create. Shared-schema biomes need NO entry.
+    Declare an extension here only when it needs a DEDICATED out-of-cluster
+    resource that nothing running in the cluster can create. What the consumer
+    provisions for itself at runtime (schemas on a shared database, in-cluster
+    objects) needs NO entry.
   EOT
   type = map(object({
     object_buckets = optional(map(object({

@@ -1,7 +1,9 @@
-# The DigitalOcean Xema substrate stack. Each area is independently toggleable
-# (see variables.tf § enable_*) so a deployment can manage ONLY its xema-specific
-# resources (namespaces, RWX storage, identity realm, extension claims) and
-# CONSUME cloud infra (cluster, database, DNS) owned by a separate Terraform.
+# The DigitalOcean substrate stack. Each area is independently toggleable (see
+# variables.tf § enable_*) so a deployment can manage ONLY its in-cluster and
+# identity resources (namespaces, RWX storage, identity realm, extension claims)
+# and CONSUME cloud infra (cluster, database, DNS) owned by a separate Terraform.
+# Nothing here names a service or an application — the database and namespace
+# rosters are inputs the consumer supplies.
 
 # ---------------------------------------------------------------------------
 # Cloud infra (optional — usually owned by a separate "cloud substrate" tf)
@@ -42,7 +44,7 @@ module "postgres" {
   # Attach to the cluster's VPC (created cluster) or an explicit VPC, when set.
   vpc_id = var.vpc_id != "" ? var.vpc_id : (var.enable_cluster ? one(module.cluster[*].vpc_id) : "")
 
-  databases = var.postgres_databases
+  databases = var.platform_databases
   roles     = var.postgres_roles
   tags      = var.tags
 }
@@ -58,7 +60,7 @@ module "dns" {
 }
 
 # ---------------------------------------------------------------------------
-# Xema-specific in-cluster + identity resources
+# In-cluster + identity resources
 # ---------------------------------------------------------------------------
 
 module "rwx_storage" {

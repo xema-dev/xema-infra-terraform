@@ -29,9 +29,9 @@ module "substrate" {
   # Greenfield (default): everything true → create cluster + DB + DNS + blob +
   # vault + addons + realm. Consume mode: set enable_cluster /
   # enable_managed_postgres / enable_dns to false to consume cloud infra owned
-  # by a separate "cloud substrate" Terraform; the stack then manages ONLY
-  # xema-specific resources and reads the existing cluster by name. See
-  # consume.tfvars.example.
+  # by a separate "cloud substrate" Terraform; the stack then manages ONLY the
+  # in-cluster and identity resources and reads the existing cluster by name.
+  # See consume.tfvars.example.
   enable_cluster             = var.enable_cluster
   enable_managed_postgres    = var.enable_managed_postgres
   enable_dns                 = var.enable_dns
@@ -69,7 +69,13 @@ module "substrate" {
   # --- postgres ---
   postgres_network_access        = var.postgres_network_access
   postgres_public_firewall_rules = var.postgres_public_firewall_rules
-  enable_billing_database        = var.enable_billing_database
+  # The database roster is YOURS: derive it from what you deploy. The stack has
+  # no default and refuses to plan without it.
+  platform_databases = var.platform_databases
+
+  # --- workload namespaces ---
+  # The namespace roster is YOURS too — full names, nothing derived.
+  workload_namespaces = var.workload_namespaces
 
   # --- dns ---
   dns_records = var.dns_records
@@ -91,12 +97,12 @@ module "substrate" {
   realm_roles            = var.realm_roles
   realm_protocol_mappers = var.realm_protocol_mappers
 
-  # --- extension / biome substrate claims ---
+  # --- extension substrate claims ---
   extensions = var.extensions
 }
 
 output "substrate" {
-  description = "Non-secret facts the Helm layer consumes."
+  description = "The binding contract: non-secret facts a consumer binds to (docs/CONTRACTS.md § Binding contract)."
   value       = module.substrate.substrate
 }
 
@@ -141,6 +147,6 @@ output "realm_id" {
 }
 
 output "extension_buckets" {
-  description = "Extension-claimed storage account names keyed by \"<biome>/<claim>\"."
+  description = "Extension-claimed storage account names keyed by \"<extension>/<claim>\"."
   value       = module.substrate.extension_buckets
 }
