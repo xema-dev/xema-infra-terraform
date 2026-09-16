@@ -31,6 +31,22 @@ pass them into the module call, or it fails with "The argument is required".
 This root declares both in `variables.tf` and passes both in `main.tf`'s
 module block; every other required input follows the same shape.
 
+**VENDOR the pinned release; never reference our repository from `init`.**
+`?ref=v0.6.0` against `github.com/xema-dev/xema-infra-terraform` is how THIS
+example stays readable, and it is NOT the day-one shape for a customer-owned
+root: that repository is private, and permanent read access to it is never the
+handoff shape (owner ruling, 2026-09-16). A customer root carries the module set
+VENDORED at the pinned version — the release tarball
+(`https://github.com/xema-dev/xema-infra-terraform/archive/refs/tags/v0.6.0.tar.gz`,
+or a mirror of this repository in the customer's own Git) unpacked to
+`vendor/xema-infra-terraform-v0.6.0/`, and
+`source = "./vendor/xema-infra-terraform-v0.6.0/stacks/<cloud>/xema-substrate"`.
+The stacks reference their modules by RELATIVE path (`../../../modules/…`), so
+vendoring the tree whole keeps every module resolvable and `init` needs nothing
+of ours — providers still come from the public registries as usual. An upgrade
+is a new vendored tree beside the old one and a one-line `source` change, with
+the same reviewed plan; the CHANGELOG still names every input a release adds.
+
 **Module version + tfvars. Never a forked stack.** Adopting a release is a
 one-line `?ref=` change, `terraform init -upgrade`, and a plan that is
 reviewed — the [CHANGELOG](../../CHANGELOG.md) names every input a release

@@ -134,7 +134,7 @@ lives, and who holds the credentials. No `.tf` differs between modes.
 | --- | --- | --- | --- |
 | engine | **their choice**; Terraform (and HCP/TFE) fully supported | **OpenTofu**, unless the customer mandates Terraform/HCP | **OpenTofu** |
 | runs `apply` | the customer's operator, locally (this repo's CI never applies) | NeuralChowder's operator, locally, under DELEGATED IAM in the customer's account | NeuralChowder's operator |
-| consumer root (`main.tf` + `backend.hcl` + tfvars) | the customer's private repository, pinning `?ref=vX.Y.Z` | the customer's private repository; NeuralChowder has access to it | NeuralChowder's private repository |
+| consumer root (`main.tf` + `backend.hcl` + tfvars) | the customer's private repository, with the module set VENDORED at a released version (`vendor/xema-infra-terraform-vX.Y.Z/`, from the release tarball or a mirror of this repository in the customer's Git; `init` needs nothing of ours) | the customer's private repository, vendored the same way; NeuralChowder has access to it | NeuralChowder's private repository, `?ref=vX.Y.Z` |
 | cloud account | the customer's | **the customer's, from day one** | NeuralChowder's |
 | state backend (`backend.hcl`) + KMS / key authority | the customer's bucket and keys (`providers/<cloud>/state-bucket`, bootstrapped once) | **the customer's bucket and keys, from day one** — never the only authoritative copy in a NeuralChowder-only system | NeuralChowder's |
 | state-backend credential (`AWS_*` / `ARM_*` for `init`) | the customer's | the customer's, delegated to NeuralChowder | NeuralChowder's |
