@@ -66,14 +66,12 @@ distribution, and a stack invoked without them refuses to plan. There is no
 per-database switch — a database exists because it is in the list. A consumer
 that wants `<deployment_name>-<role>` namespaces spells that out itself.
 
-**A consumer ROOT must DECLARE them and pass them into the module call.** A
-`*.tfvars` / `*.auto.tfvars.json` sets variables of the ROOT, not of this
-stack: a root that declares no `variable "platform_databases"` and does not
-write `platform_databases = var.platform_databases` in its `module
-"substrate"` block fails with `The argument "platform_databases" is required`
-however complete its tfvars is. The same holds for `workload_namespaces` and
-every other required input. `examples/customer/` is the shape — every
-required input declared in the root's `variables.tf` and passed through.
+**A consumer root must declare the rosters too.** An `.auto.tfvars.json`
+carries the roster fine — it sets ROOT variables, so a consumer must ALSO
+declare `platform_databases` / `workload_namespaces` as root variables and
+pass them into the module call, or it fails with "The argument is required".
+`examples/customer/` is the shape — both declared in the root's `variables.tf`
+and passed through in `main.tf`.
 
 ### Overriding the globally-unique names
 

@@ -24,13 +24,12 @@ The commands below say `tofu`; every one of them is the same with
 `terraform` in its place. Same files, same state, no wrapper — see
 `docs/CONTRACTS.md § Engine and authoring profile`.
 
-**The required inputs are declared HERE and passed through.** A
-`terraform.tfvars` (or `*.auto.tfvars.json`) sets variables of this ROOT, not
-of the stack: `platform_databases`, `workload_namespaces` and the other
-required inputs are each a `variable` in `variables.tf` and a
-`<name> = var.<name>` line in `main.tf`'s module block. A root that declares
-one without passing it — or passes one it never declared — fails with `The
-argument "platform_databases" is required` no matter what the tfvars says.
+**A consumer root must declare the rosters too.** An `.auto.tfvars.json`
+carries the roster fine — it sets ROOT variables, so a consumer must ALSO
+declare `platform_databases` / `workload_namespaces` as root variables and
+pass them into the module call, or it fails with "The argument is required".
+This root declares both in `variables.tf` and passes both in `main.tf`'s
+module block; every other required input follows the same shape.
 
 **Module version + tfvars. Never a forked stack.** Adopting a release is a
 one-line `?ref=` change, `terraform init -upgrade`, and a plan that is

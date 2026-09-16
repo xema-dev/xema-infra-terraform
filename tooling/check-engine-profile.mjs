@@ -153,9 +153,11 @@ export function gradeLeaf(root, leaf) {
     if (ANY_PROFILE_LOCAL.test(body)) findings.push(`${rel}/${e}: xema_engine_profile is declared outside versions.tf — it lives beside required_version, nowhere else`);
   }
   const evidence = [];
+  let filesScanned = 0;
   for (const e of fs.readdirSync(leaf)) {
     const p = path.join(leaf, e);
-    if (!fs.statSync(p).isFile()) continue;
+    if (!fs.statSync(p).isFile() || !/\.(tf|tofu)$/.test(e)) continue;
+    filesScanned += 1;
     for (const rule of TOFU_ONLY) {
       if (!rule.file.test(e)) continue;
       if (rule.pattern === null) { evidence.push(`${rel}/${e}: ${rule.name}`); continue; }
@@ -167,7 +169,7 @@ export function gradeLeaf(root, leaf) {
   if (profile === Profile.TerraformPortable && evidence.length > 0) {
     findings.push(...evidence.map((ev) => `${ev} — an OpenTofu-only construct in a leaf that declares no profile (= terraform-portable). Declare locals { xema_engine_profile = "opentofu-native" } in its versions.tf, or remove the construct`));
   }
-  return { leaf: rel, profile, evidence, findings };
+  return { leaf: rel, profile, evidence, findings, filesScanned };
 }
 
 export function grade(root = ROOT) {
@@ -187,7 +189,15 @@ export function run(root = ROOT, { list = null } = {}) {
     return findings.length > 0 ? 1 : 0;
   }
   const native = graded.filter((g) => g.profile === Profile.OpenTofuNative).length;
-  console.log(`${LABEL} corpus: ${graded.length} leaf(s) under modules/ and stacks/ — ${graded.length - native} terraform-portable (default, undeclared), ${native} opentofu-native (declared); ${TOFU_ONLY.length} OpenTofu-only construct(s) detectable`);
+  const files = graded.reduce((n, g) => n + g.filesScanned, 0);
+  // The corpus is printed beside the verdict so a layout change that moves
+  // modules out from under modules/ or stacks/ reads as a shrinking number,
+  // never as a clean tree.
+  console.log(`${LABEL} modules scanned: ${graded.length}, files scanned: ${files} — ${graded.length - native} terraform-portable (default, undeclared), ${native} opentofu-native (declared); ${TOFU_ONLY.length} OpenTofu-only construct(s) detectable`);
+  if (files === 0) {
+    console.error(`${LABEL} FAIL: zero .tf files scanned — an empty corpus is not coverage`);
+    return 1;
+  }
   for (const g of graded) console.log(`  ${g.profile}  ${g.leaf}${g.evidence.length ? `  (tofu-only: ${g.evidence.length})` : ''}`);
   if (findings.length > 0) {
     console.error(`${LABEL} FAIL: ${findings.length} finding(s)`);
