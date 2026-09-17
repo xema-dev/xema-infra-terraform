@@ -44,10 +44,16 @@ variable "role_options" {
 
 variable "connect_grants" {
   description = <<-EOT
-    Which roles may CONNECT to which databases, as `role => set(database)`. A
-    role absent from the map gets CONNECT to nothing beyond what it owns —
-    stated rather than defaulted, because "every role may reach every database"
-    is exactly the posture the PUBLIC revoke below exists to end.
+    Which roles may reach which databases, as `role => set(database)`. A role
+    absent from the map reaches nothing — stated rather than defaulted, because
+    "every role may reach every database" is exactly the posture the PUBLIC
+    revoke ends.
+
+    A role that OWNS the database it is granted gets `CONNECT, TEMPORARY,
+    CREATE`; any other role gets `CONNECT`. That is not a convenience: this
+    provider's grant is DECLARATIVE, so granting an owner CONNECT alone REVOKES
+    its CREATE and TEMPORARY, and an owner that cannot CREATE on its own
+    database cannot run a migration.
   EOT
   type        = map(set(string))
   default     = {}

@@ -24,10 +24,27 @@
 #   nothing outside the objects named in its inputs.
 
 locals {
-  # `role => set(database)` flattened to one entry per grant.
+  # `role => set(database)` flattened to one entry per grant, each carrying the
+  # privilege set that grant must hold.
+  #
+  # THE OWNER'S SET IS NOT `CONNECT`, AND ASSUMING IT WAS IS A MEASURED DEFECT.
+  # This provider's `postgresql_grant` is DECLARATIVE: it sets exactly the
+  # privileges listed and revokes the rest. So granting an owner CONNECT alone
+  # takes CREATE and TEMPORARY away from it — and an owner that cannot CREATE on
+  # its own database cannot create a schema or a table, which is every migration
+  # this platform runs. Proven against PostgreSQL 18.6: the incumbent bootstrap
+  # SQL leaves `<role>=CTc/<role>`, this module left `<role>=c/<role>`.
   connect_grants = merge([
     for role, databases in var.connect_grants : {
-      for database in databases : "${role}/${database}" => { role = role, database = database }
+      for database in databases : "${role}/${database}" => {
+        role     = role
+        database = database
+        privileges = (
+          try(var.database_owners[database], null) == role
+          ? ["CONNECT", "TEMPORARY", "CREATE"]
+          : ["CONNECT"]
+        )
+      }
     }
   ]...)
 
@@ -121,7 +138,7 @@ resource "postgresql_grant" "connect" {
   database    = postgresql_database.this[each.value.database].name
   role        = postgresql_role.this[each.value.role].name
   object_type = "database"
-  privileges  = ["CONNECT"]
+  privileges  = each.value.privileges
 
   depends_on = [postgresql_grant.revoke_public]
 }

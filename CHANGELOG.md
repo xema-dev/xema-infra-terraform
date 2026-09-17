@@ -34,6 +34,13 @@ created with a shell on the host. A server that refuses fails the apply naming
 the extension, deliberately: an application booting against a database missing
 its extension fails later and further away.
 
+A role granted a database it OWNS receives `CONNECT, TEMPORARY, CREATE`; any
+other role receives `CONNECT`. The provider's grant is declarative, so an owner
+granted CONNECT alone LOSES CREATE and TEMPORARY — proven against PostgreSQL
+18.6 by applying this module and the bootstrap SQL it replaces to two identical
+servers and diffing the catalogs: the SQL leaves `<role>=CTc/<role>`, the
+CONNECT-only form left `<role>=c/<role>`.
+
 Role passwords are GENERATED and exposed through `role_passwords` (sensitive);
 a password supplied as an input has been written somewhere before it reaches
 state. Every object is importable, so a server whose databases were created by

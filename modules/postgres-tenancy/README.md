@@ -51,6 +51,18 @@ has been written somewhere before it reaches state. Read them out once and route
 them into the secret store the deployment reads —
 `tofu output -json role_passwords` (or `terraform`).
 
+## The owner keeps owner privileges
+
+A role listed in `connect_grants` for a database it OWNS is granted `CONNECT,
+TEMPORARY, CREATE`; any other role is granted `CONNECT`.
+
+This provider's `postgresql_grant` is **declarative** — it sets exactly the
+privileges listed and revokes the rest — so granting an owner `CONNECT` alone
+takes CREATE and TEMPORARY away from it, and an owner that cannot CREATE on its
+own database cannot create a schema or a table. Measured against PostgreSQL
+18.6, against the hand-run bootstrap SQL this module replaces: the SQL leaves
+`<role>=CTc/<role>`, and the CONNECT-only form left `<role>=c/<role>`.
+
 ## Extensions, and why a failure here is the point
 
 A trusted extension (`pg_trgm`, `pgcrypto`) can be created by a database owner,
@@ -90,7 +102,7 @@ which is a rotation, so schedule it like one.
 | `roles` | **yes** | the login roles to ensure; each gets a generated password |
 | `role_options` | no | per-role `create_database` / `connection_limit` |
 | `database_owners` | no | `database => role`; who owns it, hence who can migrate it |
-| `connect_grants` | no | `role => set(database)`; stated, never defaulted |
+| `connect_grants` | no | `role => set(database)`; stated, never defaulted. An owner gets `CONNECT, TEMPORARY, CREATE`; anyone else `CONNECT` |
 | `extensions` | no | `database => set(extension)` |
 | `revoke_public_connect` | no | default `true` — a database PUBLIC can reach is not a boundary |
 
