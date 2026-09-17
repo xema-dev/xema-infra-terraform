@@ -537,6 +537,14 @@ every cloud's stack:
   export. The owner, the consumers and every claim name are required inputs.
 - **`identity-realm`** — the full Keycloak realm (realm + clients + roles +
   protocol mappers) via the `keycloak` provider.
+- **`postgres-tenancy`** — databases, login roles, grants and EXTENSIONS inside
+  a PostgreSQL server the module does not own, via the `postgresql` provider.
+  The counterpart to `providers/<cloud>/managed-postgres`, which does the same
+  through a cloud control plane for a server it created: a box's Postgres or a
+  server another team's Terraform owns has no control plane to reach, so its
+  tenancy is done inside the server over SQL. `CREATE EXTENSION vector` is the
+  reason it exists — `vector` is not a trusted extension, so a database owner
+  cannot create it and an application's own migration cannot either.
 - **`cluster-addons/secrets`** — materializes operator-provided credentials as
   Kubernetes Secrets (the management-plane "secret backend" Helm values reference
   via `secretKeyRef`), via the `kubernetes` provider.

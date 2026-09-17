@@ -4,6 +4,42 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## UNRELEASED — `postgres-tenancy`
+
+**`CREATE EXTENSION` stops being a shell on the box.** A new module does
+databases, login roles, grants and extensions INSIDE a PostgreSQL server the
+module does not own — the counterpart to `providers/<cloud>/managed-postgres`,
+which does the same through a cloud control plane for a server it created.
+
+Nothing existing changes: it is additive, and no stack consumes it (the Azure
+and DigitalOcean stacks keep doing their own tenancy through their control
+planes, with their own state addresses). A consumer whose server is a box's
+Postgres, or a Flexible Server another team owns, calls it from its root:
+
+```hcl
+module "tenancy" {
+  source = "github.com/xema-dev/xema-infra-terraform//modules/postgres-tenancy?ref=vX.Y.Z"
+
+  databases       = ["acme_biomes", "acme_openfga"]
+  roles           = ["acme_app"]
+  database_owners = { acme_biomes = "acme_app", acme_openfga = "acme_app" }
+  connect_grants  = { acme_app = ["acme_biomes", "acme_openfga"] }
+  extensions      = { acme_biomes = ["vector", "pg_trgm"] }
+}
+```
+
+`vector` is not a trusted extension, so a database owner cannot create it and
+an application's own migration cannot either — which is why it was being
+created with a shell on the host. A server that refuses fails the apply naming
+the extension, deliberately: an application booting against a database missing
+its extension fails later and further away.
+
+Role passwords are GENERATED and exposed through `role_passwords` (sensitive);
+a password supplied as an input has been written somewhere before it reaches
+state. Every object is importable, so a server whose databases were created by
+a hand-run SQL file adopts without recreating anything — note that an import
+does not read a password back, so the first apply after one is a rotation.
+
 ## UNRELEASED — `cluster-addons/deployer-identity`
 
 **The RBAC bootstrap stops being a hand step.** A deployment's namespaces, the
