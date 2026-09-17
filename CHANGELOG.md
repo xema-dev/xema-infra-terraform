@@ -4,6 +4,56 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## UNRELEASED — `cluster-addons/deployer-identity`
+
+**The RBAC bootstrap stops being a hand step.** A deployment's namespaces, the
+least-privileged ServiceAccount its pipeline deploys as, that account's token
+and the cluster-identity facts a deploy verifies before it writes are now a
+module, applied by the same run that creates the cluster. What used to be
+`kubectl apply -f bootstrap/00-namespaces-and-deployer-rbac.yaml` with a
+cluster-admin kubeconfig on somebody's laptop — once per deployment, re-applied
+from a runbook whenever a grant changed — is a flag and one declared namespace.
+
+### To adopt
+
+Nothing changes for a consumer that does not opt in: `enable_deployer_identity`
+defaults to **false**, so `init -upgrade` on this version creates no
+ServiceAccount and no token.
+
+```hcl
+enable_deployer_identity       = true
+deployer_namespace             = "acme-prod"          # what the deployment DECLARES
+deployer_additional_namespaces = ["acme-prod-infra"]  # no implicit suffix is derived
+# DigitalOcean stack only — it names every resource explicitly rather than
+# deriving them from one deployment name:
+deployer_deployment_name       = "acme-prod"
+```
+
+Then, once per deployment:
+
+```sh
+tofu output -raw deployer_kubeconfig   # or: terraform output -raw
+```
+
+### New outputs
+
+| output | |
+| --- | --- |
+| `deployer_kubeconfig` | sensitive; the value a deployment's `kubeconfigRef` names. Null when the area is disabled |
+| `substrate.cluster_identity` | non-secret: `server`, `ca_certificate_sha256` (sha256 of the DECODED CA), `kube_system_namespace_uid` |
+
+`cluster_identity` carries no context name on purpose. A context name is a local
+kubeconfig ALIAS — the same cluster is `owl-k8s` in one operator's file and
+`default` in another's — so a consumer comparing aliases refuses a correct
+cluster and admits a wrong one that happens to share the name. The three facts
+above cannot be satisfied by a rename.
+
+### Adopting an existing hand-applied bootstrap
+
+Every object is importable, so a cluster bootstrapped by hand moves under
+Terraform with no re-apply and no downtime; `manage_namespaces = false` leaves
+namespace ownership wherever it already is. Import ids are in the module README.
+
 ## v0.6.1 — 2026-09-16 (tag `v0.6.1` = `7735dac`, cut from `develop` like `v0.6.0`; promotion to `main` is PR #1)
 
 **`tooling/bind/bind-outputs.mjs --secret-inputs` MERGES.** Aimed at the

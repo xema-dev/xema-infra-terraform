@@ -150,6 +150,9 @@ export const DISPOSITIONS = Object.freeze({
   'substrate.oidc_issuer_url': ign('the cluster OIDC issuer feeds federated identities inside the stack, not the deployment root'),
   'substrate.storage_class_name': ign('a StorageClass name is a chart value (infra.yaml / values overlays), not a secret input'),
   'substrate.namespaces': ign('the namespace roster is the deployment root\'s own deployment.yaml; the stack only ensured it'),
+  'substrate.cluster_identity': op(
+    'the three facts a deploy verifies before it writes, for deployment.yaml#clusterIdentity. NOT merged: that file is a rich document (lists, nested maps, a block scalar) and this script\'s merge is a two-level mapping writer that refuses shapes it cannot prove the end of. Print the block and paste it once: `terraform output -json substrate | jq -r \'"clusterIdentity:", "  server: \\(.cluster_identity.server)", "  caCertificateSha256: \\(.cluster_identity.ca_certificate_sha256)", "  kubeSystemNamespaceUid: \\(.cluster_identity.kube_system_namespace_uid)"\'`. Null when enable_deployer_identity = false',
+  ),
   'substrate.postgres_provisioner_role': ign('the deployment root has no provisioner-role input; its pooler and app legs both use postgres.role'),
   'substrate.postgres_databases': ign('database NAMES are the deployment root\'s secret-inputs (postgres.*Database), derived from its own roster; the stack only ensured them'),
   'substrate.blob_account': ign('the deployment root\'s object-store surface is S3-shaped (objectStore.endpoint); an Azure Blob account has no key there'),
@@ -166,6 +169,9 @@ export const DISPOSITIONS = Object.freeze({
   // ── top-level outputs ────────────────────────────────────────────────────
   cluster_id: ign('a provider id for imports'),
   cluster_endpoint: ign('the deployment root reaches the cluster through a kube-context; the endpoint travels inside kubeconfig_raw'),
+  deployer_kubeconfig: op(
+    'the LEAST-PRIVILEGED credential a pipeline deploys with — a namespaced ServiceAccount token, not the cluster-admin one kubeconfig_raw carries. Never written to either file: it belongs in whatever secret store the deploy plane reads, and this script writes only the deployment root\'s two. `terraform output -raw deployer_kubeconfig` into that store (and rotate by tainting the token Secret). Null when enable_deployer_identity = false',
+  ),
   kubeconfig_raw: op('the kube-context the deployment root deploys through: `terraform output -raw kubeconfig_raw > ~/.kube/<deployment>.yaml` (chmod 600), then name that context in the deploy dispatch'),
   vpc_id: ign('a network id; nothing in the deployment root reads it'),
   oidc_issuer_url: ign('duplicate of substrate.oidc_issuer_url'),

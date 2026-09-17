@@ -93,6 +93,12 @@ output "extension_databases" {
 # addon, so those keys are always null here). Only non-secret facts live here
 # — the credentials are the sensitive outputs above, read separately on
 # purpose.
+output "deployer_kubeconfig" {
+  description = "Kubeconfig for the deployer ServiceAccount — the value a deployment's kubeconfigRef names. A credential and an OPERATOR step: `tofu output -raw deployer_kubeconfig` into the secret store whatever runs helm reads. Null when enable_deployer_identity = false."
+  value       = one(module.deployer_identity[*].deployer_kubeconfig)
+  sensitive   = true
+}
+
 output "substrate" {
   description = "Non-secret facts a consumer binds to, in one map with the cross-cloud key shape documented in docs/CONTRACTS.md. Every value is null when its area is disabled, consumed elsewhere, or not modelled on DigitalOcean."
   value = {
@@ -108,6 +114,12 @@ output "substrate" {
     # The roster the consumer supplied, as ensured on the cluster. It carries no
     # roles: which namespace plays which part is the consumer's own knowledge.
     namespaces = one(module.workload_namespaces[*].namespaces)
+
+    # The three facts that identify this cluster whatever anybody calls it:
+    # endpoint, sha256 of the DECODED cluster CA, and the UID of kube-system.
+    # A context NAME is not among them — it is an alias in a file, so the
+    # same cluster under another alias is the same cluster.
+    cluster_identity = one(module.deployer_identity[*].cluster_identity)
 
     postgres_host             = one(module.postgres[*].host)
     postgres_port             = one(module.postgres[*].port)

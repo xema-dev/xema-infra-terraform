@@ -466,3 +466,64 @@ variable "extensions" {
     error_message = "Each extension dns_records type must be one of A, AAAA, CNAME, TXT, MX, NS, SRV, CAA, SOA."
   }
 }
+
+# ---------------------------------------------------------------------------
+# Deployer identity — the namespaces a deployment owns and the least-privileged
+# ServiceAccount its pipeline deploys as. Default OFF: a consumer adopting a new
+# module version must not silently gain a ServiceAccount and a token it did not
+# ask for. Turning it on is one flag plus the namespace the deployment declares.
+# ---------------------------------------------------------------------------
+
+variable "enable_deployer_identity" {
+  description = "Manage the deployment's namespaces, its least-privileged deployer ServiceAccount, that account's token, and the cluster-identity facts a pipeline verifies before it writes."
+  type        = bool
+  default     = false
+}
+
+variable "deployer_deployment_name" {
+  description = <<-EOT
+    The deployment this identity belongs to. It names the cluster-scoped objects
+    (unique per deployment on a shared cluster) and labels the namespaces.
+    Required when enable_deployer_identity = true. This stack names every
+    resource explicitly rather than deriving them all from one deployment name,
+    so the deployer carries its own.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "deployer_namespace" {
+  description = <<-EOT
+    The namespace the deployment's workloads run in — the one its own descriptor
+    DECLARES. Required when enable_deployer_identity = true, and deliberately not
+    derived from deployment_name or from any directory: a namespace inferred from
+    a folder is how a deployment declaring `xema-prod` came to be asked for a
+    namespace named after the directory holding its files.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "deployer_additional_namespaces" {
+  description = "Every OTHER namespace the same identity deploys into — typically the deployment's infrastructure namespace. No implicit suffix is derived."
+  type        = list(string)
+  default     = []
+}
+
+variable "deployer_service_account_name" {
+  description = "Name of the deployer ServiceAccount, its Role and its RoleBindings. The token Secret is \"<name>-token\"."
+  type        = string
+  default     = "github-deployer"
+}
+
+variable "deployer_manage_namespaces" {
+  description = "Create the deployer's namespaces here. False when they already exist and are owned elsewhere; the grants are still created inside them."
+  type        = bool
+  default     = true
+}
+
+variable "deployer_context_name" {
+  description = "The alias written into the emitted kubeconfig's context/cluster/user. An alias identifies no cluster — the identity is the `cluster_identity` output — but a consumer that still compares one needs it to match."
+  type        = string
+  default     = "default"
+}

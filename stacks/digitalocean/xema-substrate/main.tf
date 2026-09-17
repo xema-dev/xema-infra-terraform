@@ -83,6 +83,36 @@ module "workload_namespaces" {
   labels     = var.workload_namespace_labels
 }
 
+# Cross-input guard. A `validation` block sees one variable, so a requirement
+# that spans two fails here, naming the input, before anything is created.
+resource "terraform_data" "input_guards" {
+  lifecycle {
+    precondition {
+      condition     = !var.enable_deployer_identity || var.deployer_deployment_name != ""
+      error_message = "enable_deployer_identity = true requires deployer_deployment_name: it names the cluster-scoped objects, which must be unique per deployment on a shared cluster."
+    }
+    precondition {
+      condition     = !var.enable_deployer_identity || var.deployer_namespace != ""
+      error_message = "enable_deployer_identity = true requires deployer_namespace: the namespace a deployment declares is a fact about the deployment, and the substrate refuses to invent one from deployment_name or from a directory."
+    }
+  }
+}
+
+module "deployer_identity" {
+  source = "../../../modules/cluster-addons/deployer-identity"
+  count  = var.enable_deployer_identity ? 1 : 0
+
+  deployment_name       = var.deployer_deployment_name
+  namespace             = var.deployer_namespace
+  additional_namespaces = var.deployer_additional_namespaces
+  service_account_name  = var.deployer_service_account_name
+  manage_namespaces     = var.deployer_manage_namespaces
+  context_name          = var.deployer_context_name
+
+  cluster_endpoint           = local.kube_host != null ? local.kube_host : ""
+  cluster_ca_certificate_b64 = local.kube_ca_b64 != null ? local.kube_ca_b64 : ""
+}
+
 module "identity_realm" {
   source = "../../../modules/identity-realm"
   count  = var.enable_identity_realm ? 1 : 0

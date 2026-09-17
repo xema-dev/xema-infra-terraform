@@ -540,6 +540,14 @@ every cloud's stack:
 - **`cluster-addons/secrets`** — materializes operator-provided credentials as
   Kubernetes Secrets (the management-plane "secret backend" Helm values reference
   via `secretKeyRef`), via the `kubernetes` provider.
+- **`cluster-addons/deployer-identity`** — the namespaces a deployment owns, the
+  least-privileged ServiceAccount its pipeline deploys as, that account's token,
+  and the three facts that identify the cluster (endpoint, sha256 of the decoded
+  CA, `kube-system` UID). A pipeline's kubeconfig is a credential only a
+  cluster-admin can mint, so it belongs in the apply that creates the cluster and
+  comes out as an OUTPUT — not a manifest somebody applies by hand once per
+  deployment. The namespace is a required input: it is what the deployment
+  DECLARES, never something derived from a directory name.
 - **`cluster-addons/ingress-tls`** — the ingress edge every hostname on the
   deployment sits behind: `ingress-nginx` (a cloud `LoadBalancer`, annotations passed through),
   `cert-manager` plus one ACME `ClusterIssuer` (closed-set solver:

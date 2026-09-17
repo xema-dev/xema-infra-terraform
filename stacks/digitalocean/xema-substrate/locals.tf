@@ -1,7 +1,7 @@
 locals {
   # Any in-cluster resource (RWX storage, namespaces) needs a kubernetes/helm
   # connection. When the cluster is consumed (not created) we read it by name.
-  needs_kube = var.enable_rwx_storage || var.enable_workload_namespaces
+  needs_kube = var.enable_rwx_storage || var.enable_workload_namespaces || var.enable_deployer_identity
 
   # Kubernetes connection: from the created cluster, else the existing one read
   # via the data source. Null when no in-cluster resource is managed (the

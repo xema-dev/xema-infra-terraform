@@ -1,6 +1,7 @@
 {
   "cluster_endpoint": { "sensitive": false, "type": "string", "value": "https://0f0f0f0f-0000-4000-8000-000000000000.k8s.ondigitalocean.com" },
   "cluster_id": { "sensitive": false, "type": "string", "value": "0f0f0f0f-0000-4000-8000-000000000000" },
+  "deployer_kubeconfig": { "sensitive": true, "type": "string", "value": "apiVersion: v1\nkind: Config\nusers:\n- name: github-deployer\n  user:\n    token: FIXTURE-DEPLOYER-TOKEN\n" },
   "dns_domain": { "sensitive": false, "type": "string", "value": "acme.example" },
   "dns_record_ids": { "sensitive": false, "type": ["map", "string"], "value": { "ingress": "1" } },
   "extension_buckets": { "sensitive": false, "type": ["map", "string"], "value": {} },
@@ -17,6 +18,7 @@
     "sensitive": false,
     "type": ["object", {}],
     "value": {
+      "cluster_identity": { "ca_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "kube_system_namespace_uid": "11111111-2222-3333-4444-555555555555", "server": "https://fixture.k8s.example" },
       "blob_account": null, "blob_container_prefix": null, "blob_endpoint": null,
       "cluster_name": "acme-prod", "cluster_resource_group_name": null, "cluster_secret_store_name": null,
       "deployment_name": null, "dns_name_servers": null, "dns_zone": "acme.example", "environment": null,

@@ -28,6 +28,10 @@ resource "terraform_data" "input_guards" {
       condition     = !var.enable_identity_realm || var.keycloak_url != ""
       error_message = "enable_identity_realm = true requires keycloak_url."
     }
+    precondition {
+      condition     = !var.enable_deployer_identity || var.deployer_namespace != ""
+      error_message = "enable_deployer_identity = true requires deployer_namespace: the namespace a deployment declares is a fact about the deployment, and the substrate refuses to invent one from deployment_name or from a directory."
+    }
   }
 }
 
@@ -184,6 +188,21 @@ module "workload_namespaces" {
 
   namespaces = var.workload_namespaces
   labels     = var.workload_namespace_labels
+}
+
+module "deployer_identity" {
+  source = "../../../modules/cluster-addons/deployer-identity"
+  count  = var.enable_deployer_identity ? 1 : 0
+
+  deployment_name       = local.dep
+  namespace             = var.deployer_namespace
+  additional_namespaces = var.deployer_additional_namespaces
+  service_account_name  = var.deployer_service_account_name
+  manage_namespaces     = var.deployer_manage_namespaces
+  context_name          = var.deployer_context_name
+
+  cluster_endpoint           = local.kube_host != null ? local.kube_host : ""
+  cluster_ca_certificate_b64 = local.kube_ca_b64 != null ? local.kube_ca_b64 : ""
 }
 
 module "ingress_tls" {

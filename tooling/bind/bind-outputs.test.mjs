@@ -277,3 +277,49 @@ test('CLI: aimed at a committed secret-inputs.yaml, --secret-inputs MERGES (55 l
     fs.rmSync(outside, { recursive: true, force: true });
   }
 });
+
+// ── the deployer identity ────────────────────────────────────────────────────
+//
+// Both outputs are OPERATOR steps, and the test that matters is the negative
+// one: a ServiceAccount kubeconfig is a credential, so it must reach NEITHER
+// file this script writes. The positive half — that a document carrying them
+// is classified rather than refused — is the regression guard for the table's
+// own `unknown stack output(s)` throw, which fires on any output nobody
+// classified and would otherwise break every consumer the day the stack grows
+// the area.
+for (const cloud of ['digitalocean', 'azure']) {
+  test(`${cloud}: the deployer kubeconfig is an operator step and reaches neither file`, () => {
+    const doc = fixture(cloud);
+    const { fragment, externals, report } = bind(doc);
+
+    assert.ok(
+      report.operator.some((line) => line.startsWith('deployer_kubeconfig:')),
+      'deployer_kubeconfig is reported as an operator step',
+    );
+    const written = JSON.stringify(fragment) + JSON.stringify(externals);
+    assert.ok(!written.includes('FIXTURE-DEPLOYER-TOKEN'), 'the deployer token reached a written file');
+    assert.ok(!written.includes('kind: Config'), 'a kubeconfig reached a written file');
+  });
+
+  test(`${cloud}: cluster identity is an operator step — three facts, no context alias`, () => {
+    const doc = fixture(cloud);
+    const identity = doc.substrate.value.cluster_identity;
+    assert.deepEqual(
+      Object.keys(identity).sort(),
+      ['ca_certificate_sha256', 'kube_system_namespace_uid', 'server'],
+      'the identity is exactly the three facts a rename cannot satisfy',
+    );
+    assert.ok(
+      !Object.keys(identity).some((key) => /context/.test(key)),
+      'a context name is an alias and must not be part of the identity',
+    );
+    assert.match(identity.ca_certificate_sha256, /^[a-f0-9]{64}$/);
+
+    const { fragment, report } = bind(doc);
+    assert.ok(
+      report.operator.some((line) => line.startsWith('substrate.cluster_identity:')),
+      'substrate.cluster_identity is reported as an operator step',
+    );
+    assert.equal(fragment.clusterIdentity, undefined, 'the identity is not a secret input');
+  });
+}
