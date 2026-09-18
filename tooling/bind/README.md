@@ -73,7 +73,7 @@ top-level outputs that duplicate a map key are ignored as duplicates.
 | `redis_primary_key` (Azure) | externals | `redis-password` | omitted — absent or null on a cloud without a managed cache |
 | `postgres_uri` | **operator** — never written | the ADMIN credential the deployment root's database bootstrap runs under: `psql "$(terraform output -raw postgres_uri)" -f deployments/<d>/bootstrap/postgres-databases.sql` | — |
 | `kubeconfig_raw` | **operator** — never written | the kube-context the deployment root deploys through | — |
-| `postgres_role_passwords` (Azure) | **operator** — never written | see below | — |
+| `postgres_role_passwords` (Azure) | **ignored**, with a reason on stderr | see below — role passwords are declared and reconciled, not bound | — |
 | `blob_primary_access_key` (Azure) | **operator** — never written | see below | — |
 | everything else (`cluster_id`, `vpc_id`, `dns_*`, `storage_class_name`, `workload_namespaces`, `postgres_databases`, `realm_id`, `extension_*`, `key_vault_*`, `cluster_issuer_name`, `cluster_secret_store_name`, `blob_account`/`blob_endpoint`, and every other `substrate.*` key) | **ignored**, each with a reason on stderr | nothing in the two files consumes it | — |
 
@@ -84,19 +84,33 @@ committed fragment.
 
 ## What is deliberately NOT bound, and why — read before "fixing"
 
-- **The Postgres role password.** The deployment root MINTS
-  `shared-postgres-credentials.password` itself (a GENERATED key of its secret
-  surface, not an external), and its database bootstrap tells the operator to
-  create the role WITH that minted value. No externals name receives a Postgres
-  credential. So `postgres_uri` is the admin credential for that bootstrap and
-  is an operator step, and Azure's `postgres_role_passwords` — the passwords
-  the stack gave the roles it created — are a SECOND authority for a password
-  the generator also mints. Until one of the two repositories yields (the
-  generator accepts an external, or the stack stops setting the app role's
-  password), the operator reconciles by hand: `ALTER ROLE <app role> PASSWORD
-  '<the minted value>'`. This tool refuses to invent the missing externals key;
-  a value under a name nothing reads is a credential sitting in a file looking
-  bound.
+- **The Postgres role password.** It is DECLARED, not bound, and there is
+  exactly one authority for it: the deployment's own sealed secret surface. The
+  deployment root mints `shared-postgres-credentials.password` (a GENERATED key,
+  not an external), and a scripted path reconciles Postgres to it —
+  `xema-deploy`'s `scripts/apply-postgres-bootstrap.sh` for the deployment-wide
+  `postgres.role`, and its `provision-service-database-roles` workflow for the
+  per-service `<svc>_migrator` / `<svc>_runtime` pairs a
+  `ServiceDatabaseRoleContract` declares. Both read the sealed Secret and run
+  `ALTER ROLE … PASSWORD`; the Secret is the desired state and Postgres is
+  reconciled to it.
+
+  So Azure's `postgres_role_passwords` are IGNORED. They are whatever the stack
+  set when it created the roles, they are superseded by the next reconcile, and
+  copying them anywhere would create a second value for a fact that already has
+  one.
+
+  **This used to say the operator reconciled the two by hand with
+  `ALTER ROLE <app role> PASSWORD '<the minted value>'`, and that path is
+  removed.** A duplicate authority for a credential is bad in a way worth
+  naming: the hand path leaves no receipt, so a divergence between the two
+  surfaces as an authentication failure at some later deploy rather than as a
+  conflict at the moment it is created. `postgres_uri` remains `operator` —
+  that one is the ADMIN credential the database bootstrap runs under, which is
+  a different fact and genuinely has no home in either file.
+
+  This tool still refuses to invent a missing externals key; a value under a
+  name nothing reads is a credential sitting in a file looking bound.
 - **Azure Blob.** The deployment root's object-store surface is S3-shaped
   (`objectStore.endpoint`, `objectStore.accessKey`, external
   `object-store-secret-key`). An Azure Blob endpoint under that key would be

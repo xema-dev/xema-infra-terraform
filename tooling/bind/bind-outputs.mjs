@@ -80,10 +80,15 @@
 // the role password and no externals name receives it. So the join for the
 // role password does not exist in either repository today, and this script
 // refuses to invent one: `postgres_uri` is `operator`, printed with the command
-// it is for. The Azure `postgres_role_passwords` are `operator` for the same
-// reason — the role the stack created and the role the generator minted a
-// password for are two authorities for one password until one of the two
-// repositories yields. Likewise the Azure blob account: the deployment root's
+// it is for. The Azure `postgres_role_passwords` are `ignore`: they were
+// `operator` — "reconcile by hand with ALTER ROLE" — while two authorities
+// competed for one password, and that competition is over. Role passwords are
+// DECLARED in the deployment's sealed secret surface and RECONCILED into
+// Postgres by a scripted path; the stack's value is whatever it set at creation
+// and is overwritten by the next reconcile. A hand-run ALTER ROLE leaves no
+// receipt, so a divergence from it surfaces as an authentication failure rather
+// than as a conflict — which is why it is removed rather than documented better.
+// Likewise the Azure blob account: the deployment root's
 // object-store surface is S3-shaped (`objectStore.endpoint`, a MinIO/S3
 // endpoint); an Azure Blob endpoint under that key would be consumed as an S3
 // endpoint, so `blob_*` are `ignore`, not `fragment`.
@@ -178,7 +183,7 @@ export const DISPOSITIONS = Object.freeze({
   postgres_host: ign('duplicate of substrate.postgres_host'),
   postgres_port: ign('duplicate of substrate.postgres_port'),
   postgres_uri: op('the ADMIN credential the database bootstrap runs under: `psql "$(terraform output -raw postgres_uri)" -f deployments/<d>/bootstrap/postgres-databases.sql`. It is NOT the role password: the deployment root mints shared-postgres-credentials.password itself and its bootstrap says to create the role with THAT value — no externals name receives a Postgres credential today'),
-  postgres_role_passwords: op('Azure: the passwords the stack gave the roles it created. The deployment root mints its own role password (shared-postgres-credentials, GENERATED) and no externals name receives one, so this and the minted value are two authorities for one password; reconcile by hand (ALTER ROLE … PASSWORD to the minted value) until one repository yields'),
+  postgres_role_passwords: ign('Azure: the passwords the stack happened to set when it created the roles. They are NOT an authority for any role password — the deployment declares those in its sealed secret surface and a scripted path reconciles Postgres to them (apply-postgres-bootstrap.sh for the deployment-wide postgres.role, the provision-service-database-roles workflow for the per-service migrator/runtime pairs). Whatever the stack set is superseded on the next reconcile, so copying it anywhere creates a second value for a fact that already has one'),
   postgres_databases: ign('duplicate of substrate.postgres_databases'),
   postgres_roles: ign('the roles the stack ensured; the deployment root names its role in postgres.role'),
   dns_domain: ign('duplicate of substrate.dns_zone'),

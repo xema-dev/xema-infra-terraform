@@ -68,7 +68,12 @@ test('azure: the app role, the cache and the redis key bind; blob and role passw
   assert.equal(fragment.redis.port, 6380);
   assert.equal(externals['redis-password'], 'FIXTURE-REDIS-KEY');
   assert.deepEqual(Object.keys(externals).sort(), ['keycloak-identity-client-secret', 'redis-password']);
-  assert.ok(report.operator.some((l) => l.startsWith('postgres_role_passwords:')));
+  // Role passwords are declared in the deployment's sealed secret surface and
+  // reconciled into Postgres by a scripted path, so the stack's values are not
+  // an authority and are IGNORED. This asserted `operator` while a hand-run
+  // ALTER ROLE reconciled two competing sources; that path is removed.
+  assert.ok(report.ignored.some((l) => l.startsWith('postgres_role_passwords:')));
+  assert.ok(!report.operator.some((l) => l.startsWith('postgres_role_passwords:')));
   assert.ok(report.operator.some((l) => l.startsWith('blob_primary_access_key:')));
   assert.ok(report.ignored.some((l) => l.startsWith('substrate.blob_endpoint:')));
 });
