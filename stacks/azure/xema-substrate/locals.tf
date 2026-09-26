@@ -16,8 +16,9 @@ locals {
   pg      = replace(var.deployment_name, "-", "_")
   compact = replace(var.deployment_name, "-", "")
 
-  cluster_name                = var.cluster_name != "" ? var.cluster_name : "${local.dep}-aks"
-  cluster_resource_group_name = var.cluster_resource_group_name != "" ? var.cluster_resource_group_name : "${local.dep}-rg"
+  cluster_name = var.cluster_name != "" ? var.cluster_name : "${local.dep}-aks"
+  cluster_resource_group_name = (var.cluster_resource_group_name != "" ? var.cluster_resource_group_name
+  : (var.network != null ? var.network.resource_group_name : "${local.dep}-rg"))
   # The four GLOBALLY-unique names: derived unless overridden (variables.tf).
   postgres_name         = var.postgres_server_name != "" ? var.postgres_server_name : "${local.dep}-pg"
   key_vault_name        = var.key_vault_name != "" ? var.key_vault_name : "${local.dep}-kv"
@@ -83,8 +84,21 @@ locals {
     ? one(module.cluster[*].oidc_issuer_url)
   : (local.needs_cluster_facts ? data.azurerm_kubernetes_cluster.existing[0].oidc_issuer_url : ""))
 
-  vpc_id              = var.enable_cluster ? one(module.cluster[*].vpc_id) : var.existing_vnet_id
-  delegated_subnet_id = var.enable_cluster ? one(module.cluster[*].delegated_subnet_id) : var.existing_delegated_subnet_id
+  # The network is the foundation's, whether or not this stack creates the cluster.
+  vpc_id              = var.network == null ? "" : var.network.vnet_id
+  delegated_subnet_id = var.network == null ? "" : var.network.postgres_subnet_id
+
+  private_backing_services = var.backing_services_network_access == "private"
+  # Which private endpoints this stack needs: one per CREATED backing service.
+  # WANTED is what the input guard checks; BUILT is the same list only once a
+  # network exists, so a root that omits `network` gets the guard's message
+  # instead of a null-attribute error.
+  private_endpoint_services_wanted = local.private_backing_services ? compact([
+    var.enable_object_storage ? "blob" : "",
+    var.enable_cache ? "redis" : "",
+    var.enable_secrets_backend ? "vault" : "",
+  ]) : []
+  private_endpoint_services = var.network == null ? [] : local.private_endpoint_services_wanted
 
   # ---------------------------------------------------------------------------
   # Postgres facts for the postgresql provider and extension claims.

@@ -4,6 +4,66 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## UNRELEASED — `azure-private-foundation` (BREAKING for Azure roots)
+
+**Every Azure backing service can be private, and the network moves into a
+foundation that is applied first.** PostgreSQL was already VNet-private; the
+cache, the storage account and the key vault now are too
+(`backing_services_network_access = "private"`, the default), each behind a
+private endpoint. There is no VPN: a **management runner** — one small VM in the
+VNet, SSH keys only, inbound SSH from an allowlist — is where the substrate's
+data-plane resources are applied from, and the Kubernetes API stays public,
+narrowed by `cluster_authorized_ip_ranges`.
+
+New:
+- `modules/providers/azure/network` — VNet, subnets `aks` / `postgres` /
+  `private-endpoints` / `management`, one private DNS zone per private-link
+  service (`blob | redis | vault`), linked to the VNet.
+- `modules/providers/azure/private-endpoint` — one endpoint for one service,
+  registered into its private DNS zone.
+- `modules/providers/azure/management-runner` — the runner VM.
+- `stacks/azure/xema-foundation` — resource group + network + runner. Its
+  `network` output is the substrate's `network` input, unchanged.
+- `modules/providers/azure/cache` gains an `id` output (the endpoint's target).
+
+What an Azure consumer root on the previous tag must change:
+
+```hcl
+# NEW root, applied FIRST (from anywhere):
+module "foundation" {
+  source = "github.com/xema-dev/xema-infra-terraform//stacks/azure/xema-foundation?ref=vX.Y.Z"
+
+  deployment_name = "acme-prod"
+  region          = "germanywestcentral"
+  management_runner = {
+    ssh_public_keys   = ["ssh-ed25519 AAAA..."]
+    allowed_ssh_cidrs = ["203.0.113.10/32"]
+  }
+}
+
+# The substrate root, applied FROM THE RUNNER:
+module "substrate" {
+  # ...
+  network                      = <the foundation's `network` output>
+  cluster_authorized_ip_ranges = [<your IPs>, <the runner's public_ip_address>]
+  # backing_services_network_access = "public" keeps the old reachability
+}
+```
+
+- **Removed** from `stacks/azure/xema-substrate`: `existing_vnet_id`,
+  `existing_delegated_subnet_id` — both are `network` now, in every mode.
+- **Removed** from `modules/providers/azure/cluster`: `vnet_address_space`,
+  `aks_subnet_prefix`, `postgres_subnet_prefix` (the network module owns them)
+  and the `vpc_id` / `delegated_subnet_id` outputs. **Added, required:**
+  `vnet_id`, `node_subnet_id`.
+- The cluster's resource group now defaults to the network's (the foundation's).
+- **State:** a root that already applied the old cluster module holds a VNet and
+  two subnets under `module.cluster`; adopting this means `moved` blocks to the
+  foundation's addresses or a fresh environment. Measured 2026-09-26: the live
+  roots (xema-deploy `terraform/live/xema-prod` on the DigitalOcean stack at
+  `v0.5.0`, `cloudflare-edge` at a pinned sha) use no Azure module, and no Azure
+  root has been applied, so nothing live is affected.
+
 ## UNRELEASED — `postgres-tenancy`
 
 **`CREATE EXTENSION` stops being a shell on the box.** A new module does

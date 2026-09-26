@@ -13,6 +13,14 @@
 resource "terraform_data" "input_guards" {
   lifecycle {
     precondition {
+      condition     = var.network != null || !(var.enable_cluster || (var.enable_managed_postgres && var.postgres_network_access == "private") || length(local.private_endpoint_services_wanted) > 0)
+      error_message = "network is required when this stack creates the cluster, a private PostgreSQL server, or a private backing service: pass the foundation stack's `network` output."
+    }
+    precondition {
+      condition     = var.network == null || alltrue([for s in local.private_endpoint_services : contains(keys(var.network.private_dns_zone_ids), s)])
+      error_message = "A private backing service needs its private DNS zone: the foundation's private_link_services must include every one of ${jsonencode(local.private_endpoint_services_wanted)}."
+    }
+    precondition {
       condition     = !var.enable_dns || var.apex_domain != ""
       error_message = "enable_dns = true requires apex_domain."
     }
@@ -48,7 +56,9 @@ module "cluster" {
   kubernetes_version   = var.kubernetes_version
   node_pools           = var.node_pools
   default_pool_id      = var.default_pool_id
-  resource_group_name  = var.cluster_resource_group_name # "" => the module creates "<name>-rg"
+  resource_group_name  = local.cluster_resource_group_name
+  vnet_id              = local.vpc_id
+  node_subnet_id       = var.network == null ? "" : var.network.aks_subnet_id
   sku_tier             = var.azure_sizing.aks_sku_tier
   authorized_ip_ranges = var.cluster_authorized_ip_ranges
   enable_log_analytics = var.cluster_enable_log_analytics
@@ -131,7 +141,9 @@ module "blob" {
   versioning  = var.blob_versioning
   replication = var.azure_sizing.blob_replication
   containers  = local.blob_containers
-  tags        = local.tags
+
+  public_network_access_enabled = !local.private_backing_services
+  tags                          = local.tags
 }
 
 module "secrets_backend" {
@@ -149,8 +161,9 @@ module "secrets_backend" {
     oidc_issuer_url = local.oidc_issuer_url
   }
 
-  purge_protection_enabled = local.key_vault_purge_protection
-  tags                     = local.tags
+  purge_protection_enabled      = local.key_vault_purge_protection
+  public_network_access_enabled = !local.private_backing_services
+  tags                          = local.tags
 }
 
 module "cache" {
@@ -161,7 +174,38 @@ module "cache" {
   region   = var.region
   sku      = var.azure_sizing.redis_sku
   capacity = var.azure_sizing.redis_capacity
-  tags     = local.tags
+
+  public_network_access_enabled = !local.private_backing_services
+  tags                          = local.tags
+}
+
+# ---------------------------------------------------------------------------
+# Private endpoints — one per created backing service when
+# backing_services_network_access = "private". Each service module only turns
+# its public endpoint off; the network side is composed here, in the network
+# the foundation owns.
+# ---------------------------------------------------------------------------
+
+locals {
+  private_endpoint_targets = {
+    blob  = one(module.blob[*].account_id)
+    redis = one(module.cache[*].id)
+    vault = one(module.secrets_backend[*].key_vault_id)
+  }
+}
+
+module "private_endpoint" {
+  source   = "../../../modules/providers/azure/private-endpoint"
+  for_each = toset(local.private_endpoint_services)
+
+  name                = "${local.dep}-${each.value}"
+  region              = var.region
+  resource_group_name = var.network.resource_group_name
+  service             = each.value
+  target_resource_id  = local.private_endpoint_targets[each.value]
+  subnet_id           = var.network.private_endpoint_subnet_id
+  private_dns_zone_id = var.network.private_dns_zone_ids[each.value]
+  tags                = local.tags
 }
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,22 @@
+#cloud-config
+# The management runner's BASE: packages only, from the distribution's own
+# signed repositories. The deployment TOOLING (OpenTofu, the deployment engine,
+# kubectl, helm) is deliberately not installed here — it is pinned by the
+# deployment's own lock and installed from artifacts the customer controls, so
+# rebuilding this VM can never silently change a tool version.
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - gnupg
+  - jq
+  - unzip
+  - postgresql-client
+  - redis-tools
+runcmd:
+  # Azure CLI from Microsoft's signed apt repository (the documented install).
+  - curl -sLS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+  - echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/azure-cli.list
+  - apt-get update && apt-get install -y azure-cli

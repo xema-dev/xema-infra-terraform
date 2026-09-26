@@ -46,16 +46,6 @@ output "client_key" {
   sensitive   = true
 }
 
-output "vpc_id" {
-  description = "Virtual network id the cluster lives in."
-  value       = azurerm_virtual_network.this.id
-}
-
-output "delegated_subnet_id" {
-  description = "Id of the subnet delegated to PostgreSQL Flexible Server (feed to providers/azure/managed-postgres)."
-  value       = azurerm_subnet.postgres.id
-}
-
 output "oidc_issuer_url" {
   description = "OIDC issuer URL of the cluster, for federated (workload identity) credentials."
   value       = azurerm_kubernetes_cluster.this.oidc_issuer_url

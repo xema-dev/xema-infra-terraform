@@ -116,13 +116,34 @@ are the separate **sensitive** outputs (`postgres_uri`,
 `postgres_role_passwords`, `blob_primary_access_key`, `redis_primary_key`,
 `realm_client_secrets`, `kubeconfig_raw`), on purpose.
 
+## The network comes from the foundation — apply it first
+
+The VNet is **not** created here. `stacks/azure/xema-foundation` owns it — the
+network, one private DNS zone per private-link service, and the **management
+runner** — and this stack takes the foundation's `network` output as its
+`network` input, unchanged. The order is fixed by what each step can reach:
+
+| step | what | run from | why there |
+| --- | --- | --- | --- |
+| 0 | `modules/providers/azure/state-bucket` | anywhere, once | the backend every later step writes its state to |
+| 1 | `stacks/azure/xema-foundation` | anywhere | touches only the Azure control plane |
+| 2 | **this stack** | **the management runner** | PostgreSQL roles and Key Vault secrets are written INSIDE services with no public endpoint |
+
+`backing_services_network_access` (`private` by default, like
+`postgres_network_access`) turns the cache's, storage account's and key vault's
+public endpoints off and attaches one private endpoint each, in the
+foundation's `private-endpoints` subnet. The Kubernetes API stays public,
+narrowed by `cluster_authorized_ip_ranges` — include the runner's public IP
+(the foundation's `management_runner.public_ip_address`) so the runner can
+reach it too.
+
 ## Two modes — greenfield vs consume
 
 Every area is **independently toggleable** via an `enable_*` input:
 
 | Input | Default | What it gates |
 | --- | --- | --- |
-| `enable_cluster` | `true` | Create AKS + VNet. `false` ⇒ read the existing cluster by `cluster_name` / `cluster_resource_group_name`. |
+| `enable_cluster` | `true` | Create AKS (in `network`). `false` ⇒ read the existing cluster by `cluster_name` / `cluster_resource_group_name`. |
 | `enable_managed_postgres` | `true` | Create the Flexible Server. `false` ⇒ extension databases target `existing_postgres_server_id` (+ `existing_postgres_host` and admin creds for owner roles). |
 | `enable_dns` | `true` | Manage the `apex_domain` zone. `false` ⇒ DNS owned elsewhere (extension `dns_records` and `dns01-azure` then fail fast). |
 | `enable_object_storage` | `true` | Create the blob storage account. |
@@ -134,9 +155,9 @@ Every area is **independently toggleable** via an `enable_*` input:
 | `enable_identity_realm` | `true` | Manage the Keycloak realm (needs a reachable `keycloak_url`). |
 
 A disabled cloud module is `count`-gated to zero — the stack **consumes** the
-existing resource instead of creating it; it never plans a destroy. When
-`enable_cluster = false` but `enable_managed_postgres = true` with private
-access, supply `existing_vnet_id` + `existing_delegated_subnet_id`.
+existing resource instead of creating it; it never plans a destroy. `network`
+is required in both modes whenever the stack creates something that lives in
+it (the cluster, a private PostgreSQL server, a private backing service).
 
 ## Extension claims
 

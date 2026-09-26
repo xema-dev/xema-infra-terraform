@@ -23,3 +23,8 @@ output "resource_group_name" {
   description = "Resource group holding the cache (created or supplied)."
   value       = local.resource_group_name
 }
+
+output "id" {
+  description = "Resource id of the cache — the target of its private endpoint (providers/azure/private-endpoint)."
+  value       = azurerm_redis_cache.this.id
+}

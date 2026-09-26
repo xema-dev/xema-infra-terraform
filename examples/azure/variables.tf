@@ -138,16 +138,23 @@ variable "cluster_resource_group_name" {
   default     = ""
 }
 
-variable "existing_vnet_id" {
-  description = "VNet id for a created private Postgres when the cluster is consumed."
-  type        = string
-  default     = ""
+variable "network" {
+  description = "The foundation stack's `network` output (stacks/azure/xema-foundation), passed through unchanged. Required when this root creates the cluster, a private PostgreSQL server or a private backing service."
+  type = object({
+    resource_group_name        = string
+    vnet_id                    = string
+    aks_subnet_id              = string
+    postgres_subnet_id         = string
+    private_endpoint_subnet_id = string
+    private_dns_zone_ids       = map(string)
+  })
+  default = null
 }
 
-variable "existing_delegated_subnet_id" {
-  description = "Delegated subnet id for a created private Postgres when the cluster is consumed."
+variable "backing_services_network_access" {
+  description = "private (default: cache, storage account and key vault behind private endpoints) or public."
   type        = string
-  default     = ""
+  default     = "private"
 }
 
 variable "existing_postgres_server_id" {

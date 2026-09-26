@@ -18,8 +18,8 @@ output "kubeconfig_raw" {
 }
 
 output "vpc_id" {
-  description = "Virtual network id of the created cluster; null when consumed."
-  value       = one(module.cluster[*].vpc_id)
+  description = "Virtual network id this deployment lives in (the foundation's); null when no network was given."
+  value       = var.network == null ? null : var.network.vnet_id
 }
 
 output "oidc_issuer_url" {

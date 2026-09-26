@@ -53,7 +53,7 @@ variable "replication" {
 }
 
 variable "public_network_access_enabled" {
-  description = "Whether the account's endpoints accept traffic from the public internet (authenticated; anonymous access is governed by acl). false requires a private endpoint, which this module does not create."
+  description = "Whether the account's endpoints accept traffic from the public internet (authenticated; anonymous access is governed by acl). false requires a private endpoint: the stack composes one with providers/azure/private-endpoint (this module knows nothing about networks)."
   type        = bool
   default     = true
 }

@@ -65,12 +65,13 @@ module "cluster" {
 | `name`, `region`, `kubernetes_version` | yes | cluster identity + version prefix |
 | `node_pools`, `default_pool_id` | yes | pools keyed by id; which is the default |
 | `resource_group_name` | no | use an existing resource group (else `"<name>-rg"` is created) |
-| `vnet_address_space`, `aks_subnet_prefix`, `postgres_subnet_prefix`, `service_cidr`, `dns_service_ip`, `pod_cidr` | no | network layout |
+| `vnet_id`, `node_subnet_id` | yes | the network the nodes live in — CONSUMED from `providers/azure/network`, never created here |
+| `service_cidr`, `dns_service_ip`, `pod_cidr` | no | in-cluster address ranges |
 | `sku_tier`, `automatic_upgrade_channel`, `authorized_ip_ranges` | no | control-plane tier, upgrades, API allow-list |
 | `enable_log_analytics`, `log_analytics_retention_days`, `tags` | no | monitoring + tagging |
 
 Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw` (sensitive),
 `cluster_ca_certificate` (sensitive), `token` (sensitive, always `""`),
-`client_certificate` / `client_key` (sensitive), `vpc_id`, `delegated_subnet_id`,
+`client_certificate` / `client_key` (sensitive),
 `oidc_issuer_url`, `kubelet_identity_id`, `cluster_identity_principal_id`,
 `resource_group_name`, `node_resource_group`, `log_analytics_workspace_id`.

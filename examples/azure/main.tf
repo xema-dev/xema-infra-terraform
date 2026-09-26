@@ -43,11 +43,13 @@ module "substrate" {
   enable_ingress_tls         = var.enable_ingress_tls
   enable_identity_realm      = var.enable_identity_realm
 
+  # --- the network, from stacks/azure/xema-foundation (applied first) ---
+  network                         = var.network
+  backing_services_network_access = var.backing_services_network_access
+
   # --- consume-mode facts (existing cluster / server) ---
   cluster_name                     = var.cluster_name
   cluster_resource_group_name      = var.cluster_resource_group_name
-  existing_vnet_id                 = var.existing_vnet_id
-  existing_delegated_subnet_id     = var.existing_delegated_subnet_id
   existing_postgres_server_id      = var.existing_postgres_server_id
   existing_postgres_host           = var.existing_postgres_host
   existing_postgres_admin_login    = var.existing_postgres_admin_login

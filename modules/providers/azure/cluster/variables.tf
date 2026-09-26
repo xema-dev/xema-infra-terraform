@@ -76,31 +76,23 @@ variable "default_pool_id" {
 }
 
 variable "resource_group_name" {
-  description = "Existing resource group to create the cluster and its network in. Empty string creates a dedicated resource group named \"<name>-rg\"."
+  description = "Existing resource group to create the cluster in. Empty string creates a dedicated resource group named \"<name>-rg\"."
   type        = string
   default     = ""
 }
 
-variable "vnet_address_space" {
-  description = "Address space of the virtual network the module creates."
-  type        = list(string)
-  default     = ["10.0.0.0/16"]
+variable "vnet_id" {
+  description = "Virtual network the cluster's nodes live in (providers/azure/network's vnet_id). The cluster identity is granted Network Contributor on it."
+  type        = string
 }
 
-variable "aks_subnet_prefix" {
-  description = "Address prefix of the AKS node subnet (inside vnet_address_space)."
+variable "node_subnet_id" {
+  description = "Subnet the node pools are placed in (providers/azure/network's aks_subnet_id)."
   type        = string
-  default     = "10.0.0.0/20"
-}
-
-variable "postgres_subnet_prefix" {
-  description = "Address prefix of the subnet delegated to Microsoft.DBforPostgreSQL/flexibleServers (inside vnet_address_space). Consumed by providers/azure/managed-postgres via the delegated_subnet_id output."
-  type        = string
-  default     = "10.0.16.0/24"
 }
 
 variable "service_cidr" {
-  description = "Kubernetes Service CIDR. Must not overlap vnet_address_space."
+  description = "Kubernetes Service CIDR. Must not overlap the VNet address space."
   type        = string
   default     = "10.100.0.0/16"
 }
@@ -112,7 +104,7 @@ variable "dns_service_ip" {
 }
 
 variable "pod_cidr" {
-  description = "Pod CIDR for Azure CNI overlay. Must not overlap vnet_address_space or service_cidr."
+  description = "Pod CIDR for Azure CNI overlay. Must not overlap the VNet address space or service_cidr."
   type        = string
   default     = "10.244.0.0/16"
 }

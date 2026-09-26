@@ -20,39 +20,12 @@ resource "azurerm_resource_group" "this" {
 }
 
 # ---------------------------------------------------------------------------
-# Network: one VNet, an AKS node subnet, and a subnet DELEGATED to PostgreSQL
-# Flexible Server so the managed-postgres module can attach privately.
+# Network: CONSUMED, never created. providers/azure/network owns the VNet and
+# its subnets, because the network must exist before the cluster does — the
+# management runner inside it is where the stack's data-plane resources are
+# applied from — and because one network serves the cluster, the PostgreSQL
+# server and every private endpoint alike.
 # ---------------------------------------------------------------------------
-
-resource "azurerm_virtual_network" "this" {
-  name                = "${var.name}-vnet"
-  location            = var.region
-  resource_group_name = local.resource_group_name
-  address_space       = var.vnet_address_space
-  tags                = var.tags
-}
-
-resource "azurerm_subnet" "aks" {
-  name                 = "aks"
-  resource_group_name  = local.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.aks_subnet_prefix]
-}
-
-resource "azurerm_subnet" "postgres" {
-  name                 = "postgres"
-  resource_group_name  = local.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.postgres_subnet_prefix]
-
-  delegation {
-    name = "postgresql-flexible-server"
-    service_delegation {
-      name    = "Microsoft.DBforPostgreSQL/flexibleServers"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
-    }
-  }
-}
 
 # ---------------------------------------------------------------------------
 # Cluster identity. A USER-assigned identity (not system-assigned) so the
@@ -69,7 +42,7 @@ resource "azurerm_user_assigned_identity" "cluster" {
 }
 
 resource "azurerm_role_assignment" "cluster_network" {
-  scope                = azurerm_virtual_network.this.id
+  scope                = var.vnet_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.cluster.principal_id
 }
@@ -114,7 +87,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   default_node_pool {
     name                 = var.default_pool_id
     vm_size              = local.default_pool.size
-    vnet_subnet_id       = azurerm_subnet.aks.id
+    vnet_subnet_id       = var.node_subnet_id
     node_count           = local.default_pool.min_nodes == null ? local.default_pool.node_count : null
     auto_scaling_enabled = local.default_pool.min_nodes != null
     min_count            = local.default_pool.min_nodes
@@ -177,7 +150,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "additional" {
   name                  = each.key
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
   vm_size               = each.value.size
-  vnet_subnet_id        = azurerm_subnet.aks.id
+  vnet_subnet_id        = var.node_subnet_id
   mode                  = "User"
   node_count            = each.value.min_nodes == null ? each.value.node_count : null
   auto_scaling_enabled  = each.value.min_nodes != null

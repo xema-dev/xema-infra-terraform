@@ -124,7 +124,7 @@ variable "redis_cache_name" {
 # stack CONSUMES the existing resource instead of creating it.
 
 variable "enable_cluster" {
-  description = "Create the AKS cluster (+ VNet). Set false to consume an existing cluster, read by var.cluster_name / var.cluster_resource_group_name."
+  description = "Create the AKS cluster (in var.network). Set false to consume an existing cluster, read by var.cluster_name / var.cluster_resource_group_name."
   type        = bool
   default     = true
 }
@@ -272,7 +272,7 @@ variable "cluster_name" {
 }
 
 variable "cluster_resource_group_name" {
-  description = "Resource group of the cluster. Empty derives \"<deployment_name>-rg\" (created with the cluster in greenfield mode; must already exist in consume mode)."
+  description = "Resource group of the cluster. Empty uses var.network's resource group (the foundation's), or \"<deployment_name>-rg\" when no network is given; it must already exist."
   type        = string
   default     = ""
 }
@@ -332,16 +332,36 @@ variable "cluster_enable_log_analytics" {
   default     = false
 }
 
-variable "existing_vnet_id" {
-  description = "Virtual network id to link the Postgres private DNS zone to when enable_cluster = false but enable_managed_postgres = true with private access."
-  type        = string
-  default     = ""
+variable "network" {
+  description = <<-EOT
+    The network this deployment lives in, CONSUMED from the foundation stack
+    (stacks/azure/xema-foundation) — never created here, because it must exist
+    before this stack runs: the management runner inside it is where this
+    stack's data-plane resources (PostgreSQL roles, Key Vault secrets) are
+    applied from. Pass the foundation's `network` output through unchanged.
+    Required whenever this stack creates the cluster, a private PostgreSQL
+    server, or any private backing service; null otherwise.
+  EOT
+  type = object({
+    resource_group_name        = string
+    vnet_id                    = string
+    aks_subnet_id              = string
+    postgres_subnet_id         = string
+    private_endpoint_subnet_id = string
+    private_dns_zone_ids       = map(string)
+  })
+  default = null
 }
 
-variable "existing_delegated_subnet_id" {
-  description = "Subnet delegated to Microsoft.DBforPostgreSQL/flexibleServers, when enable_cluster = false but enable_managed_postgres = true with private access."
+variable "backing_services_network_access" {
+  description = "How the created cache, storage account and key vault are reached: \"private\" (public endpoint OFF, one private endpoint each in var.network) or \"public\" (public endpoint, TLS + key). The same closed set as postgres_network_access, and the same default."
   type        = string
-  default     = ""
+  default     = "private"
+
+  validation {
+    condition     = contains(["private", "public"], var.backing_services_network_access)
+    error_message = "backing_services_network_access must be one of private, public."
+  }
 }
 
 # ---------------------------------------------------------------------------
