@@ -5,21 +5,34 @@ name: Release
 # Consumers pin those digests in their own lock and keep the artifacts in
 # storage THEY control — this workflow is where a release is made, never where
 # a deployment fetches it from at plan time.
+#
+# `workflow_dispatch` releases an EXISTING tag with THIS workflow file. A tag
+# push runs the workflow as it was at the tagged commit, so without this a
+# release whose publish step was broken could only be recovered by moving a
+# pushed tag — which is never done here.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release (e.g. v0.7.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   release:
     runs-on: [self-hosted, linux]
     timeout-minutes: 10
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,14 +40,26 @@ jobs:
           fetch-depth: 0
 
       - name: Build the release artifacts
-        run: tooling/release/build-release.sh "${GITHUB_REF_NAME}" dist
+        run: tooling/release/build-release.sh "${TAG}" dist
 
+      # actions/github-script, not the gh CLI: the self-hosted runners carry no
+      # gh, and a release must not depend on what a runner image happens to hold.
       - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release create "${GITHUB_REF_NAME}" dist/* \
-            --verify-tag \
-            --title "${GITHUB_REF_NAME}" \
-            --notes "Pin by the digests in SHA256SUMS; verify an unpacked tree with 'sha256sum -c MANIFEST.sha256'. What a consumer root must change is in CHANGELOG.md."
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const tag = process.env.TAG;
+            const { owner, repo } = context.repo;
+            const release = await github.rest.repos.createRelease({
+              owner, repo, tag_name: tag, name: tag,
+              body: "Pin by the digests in SHA256SUMS; verify an unpacked tree with 'sha256sum -c MANIFEST.sha256'. What a consumer root must change is in CHANGELOG.md.",
+            });
+            for (const name of fs.readdirSync('dist')) {
+              await github.rest.repos.uploadReleaseAsset({
+                owner, repo, release_id: release.data.id, name,
+                data: fs.readFileSync(path.join('dist', name)),
+              });
+              core.info(`uploaded ${name}`);
+            }
