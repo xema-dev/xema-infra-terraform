@@ -12,8 +12,9 @@ tree as a deterministic archive, `MANIFEST.sha256` (every file's sha256) and
 `SHA256SUMS` (`tooling/release/build-release.sh`, run by
 `.github/workflows/release.yml` on every `v*` tag).
 
-**How a consumer should take a release from now on:** pin the archive's and the
-manifest's digests in its own lock, keep the artifacts in storage it controls
+**How a consumer should take a release from now on:** pin the MANIFEST's digest
+as the release's identity (it is the same wherever the release is rebuilt) and
+the published archive's digest to verify its download, in its own lock, keep the artifacts in storage it controls
 (its own registry, its own storage, or unpacked in its own repository), and
 verify an unpacked tree with `sha256sum -c MANIFEST.sha256`. A deployment
 consuming a release that way plans and applies without this repository, this

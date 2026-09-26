@@ -21,10 +21,13 @@
 # a tree Terraform cannot resolve unless someone curates the closure by hand —
 # and a hand-curated copy is exactly what this replaces.
 #
-# DETERMINISTIC: `git archive` of a commit is byte-stable (entries carry the
-# commit's time, not the clock's) and `gzip -n` records no name or time, so the
-# same tag always yields the same digests — which is what makes a digest in a
-# customer's lock checkable against a rebuild.
+# WHICH DIGEST IS THE IDENTITY. MANIFEST.sha256 is a function of the tree's
+# BYTES only, so its digest is identical wherever the release is rebuilt —
+# measured for v0.7.0: CI (Linux) and a macOS rebuild agree. That is the digest
+# a lock pins as the release's identity. The ARCHIVE is not: `git archive` is
+# byte-stable, but two gzip implementations compress it differently (the same
+# v0.7.0 archive digests differently on Linux and macOS), so the archive digest
+# verifies a download of THE PUBLISHED FILE and nothing more.
 set -euo pipefail
 
 tag="${1:?usage: build-release.sh <tag> [out-dir]}"
