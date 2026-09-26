@@ -4,7 +4,23 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
-## UNRELEASED — `azure-private-foundation` (BREAKING for Azure roots)
+## v0.7.0 — the first RELEASE with artifacts
+
+v0.7.0 carries the two sections below (`azure-private-foundation` and
+`postgres-tenancy`), and it is the first tag published as a release: the whole
+tree as a deterministic archive, `MANIFEST.sha256` (every file's sha256) and
+`SHA256SUMS` (`tooling/release/build-release.sh`, run by
+`.github/workflows/release.yml` on every `v*` tag).
+
+**How a consumer should take a release from now on:** pin the archive's and the
+manifest's digests in its own lock, keep the artifacts in storage it controls
+(its own registry, its own storage, or unpacked in its own repository), and
+verify an unpacked tree with `sha256sum -c MANIFEST.sha256`. A deployment
+consuming a release that way plans and applies without this repository, this
+organisation or GitHub. A `?ref=` git source still works, and is a dependency on
+this repository at every `init`.
+
+### `azure-private-foundation` (BREAKING for Azure roots)
 
 **Every Azure backing service can be private, and the network moves into a
 foundation that is applied first.** PostgreSQL was already VNet-private; the
@@ -64,7 +80,7 @@ module "substrate" {
   `v0.5.0`, `cloudflare-edge` at a pinned sha) use no Azure module, and no Azure
   root has been applied, so nothing live is affected.
 
-## UNRELEASED — `postgres-tenancy`
+### `postgres-tenancy`
 
 **`CREATE EXTENSION` stops being a shell on the box.** A new module does
 databases, login roles, grants and extensions INSIDE a PostgreSQL server the

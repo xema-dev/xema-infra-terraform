@@ -1,0 +1,40 @@
+name: Release
+
+# A version tag becomes a RELEASE: the whole tree as a deterministic archive,
+# its per-file manifest and their checksums (tooling/release/build-release.sh).
+# Consumers pin those digests in their own lock and keep the artifacts in
+# storage THEY control — this workflow is where a release is made, never where
+# a deployment fetches it from at plan time.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build the release artifacts
+        run: tooling/release/build-release.sh "${GITHUB_REF_NAME}" dist
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Pin by the digests in SHA256SUMS; verify an unpacked tree with 'sha256sum -c MANIFEST.sha256'. What a consumer root must change is in CHANGELOG.md."
