@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.7.1 — bind fixtures use the reserved placeholder shape
+
+No consumer change: `tooling/bind/fixtures/*.json` only. The recorded
+`kube_system_namespace_uid` sample was `11111111-2222-3333-4444-555555555555`,
+the one GUID in these fixtures outside their own placeholder convention
+(`xxxxxxxx-0000-4000-8000-xxxxxxxxxxxx`, used by every other id beside it). A
+consumer that vendors this tree and sweeps it for committed identifiers cannot
+tell that value from a real one; it is now `11111111-0000-4000-8000-555555555555`.
+`bind-outputs.test.mjs`: 20/20.
+
 ## v0.7.0 — the first RELEASE with artifacts
 
 v0.7.0 carries the two sections below (`azure-private-foundation` and

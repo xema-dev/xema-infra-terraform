@@ -18,7 +18,7 @@
     "sensitive": false,
     "type": ["object", {}],
     "value": {
-      "cluster_identity": { "ca_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "kube_system_namespace_uid": "11111111-2222-3333-4444-555555555555", "server": "https://fixture.k8s.example" },
+      "cluster_identity": { "ca_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "kube_system_namespace_uid": "11111111-0000-4000-8000-555555555555", "server": "https://fixture.k8s.example" },
       "blob_account": null, "blob_container_prefix": null, "blob_endpoint": null,
       "cluster_name": "acme-prod", "cluster_resource_group_name": null, "cluster_secret_store_name": null,
       "deployment_name": null, "dns_name_servers": null, "dns_zone": "acme.example", "environment": null,

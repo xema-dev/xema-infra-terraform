@@ -32,7 +32,7 @@
     "sensitive": false,
     "type": ["object", {}],
     "value": {
-      "cluster_identity": { "ca_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "kube_system_namespace_uid": "11111111-2222-3333-4444-555555555555", "server": "https://fixture.k8s.example" },
+      "cluster_identity": { "ca_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "kube_system_namespace_uid": "11111111-0000-4000-8000-555555555555", "server": "https://fixture.k8s.example" },
       "blob_account": "acmeprodblob", "blob_container_prefix": "acme-prod", "blob_endpoint": "https://acmeprodblob.blob.core.windows.net/",
       "cluster_name": "acme-prod", "cluster_resource_group_name": "acme-prod", "cluster_secret_store_name": "platform",
       "deployment_name": "acme-prod", "dns_name_servers": ["ns1-01.azure-dns.com."], "dns_zone": "acme.example", "environment": "prod",
