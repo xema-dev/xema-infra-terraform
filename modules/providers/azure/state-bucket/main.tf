@@ -25,6 +25,10 @@ resource "azurerm_storage_account" "this" {
   https_traffic_only_enabled = true
   # State accounts are always private — never expose Terraform state.
   allow_nested_items_to_be_public = false
+  # false: the state is readable only with a Microsoft Entra identity holding a
+  # data-plane role (Storage Blob Data Contributor) — no account key exists to
+  # leak. The backend must then say use_azuread_auth = true.
+  shared_access_key_enabled = var.shared_access_key_enabled
 
   # Versioning + soft delete are forced on (not optional): they are the
   # recovery mechanism for a corrupted/overwritten state object.

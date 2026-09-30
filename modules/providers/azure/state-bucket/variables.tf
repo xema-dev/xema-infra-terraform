@@ -41,6 +41,12 @@ variable "soft_delete_retention_days" {
   }
 }
 
+variable "shared_access_key_enabled" {
+  description = "Allow account-key access (default true). false leaves Microsoft Entra ID as the only way in: every backend using this account must set use_azuread_auth = true and hold Storage Blob Data Contributor on it."
+  type        = bool
+  default     = true
+}
+
 variable "resource_group_name" {
   description = "Existing resource group to create the account in. Empty string creates a dedicated resource group named \"<name>-rg\"."
   type        = string

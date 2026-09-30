@@ -41,6 +41,8 @@ routing and DNS owned by someone else) can now say:
 
 Every primitive already accepted an existing `resource_group_name`.
 
+- `providers/azure/state-bucket` — `shared_access_key_enabled` (default true): false
+  leaves Entra ID as the only way to the state (backends set `use_azuread_auth`).
 - `stacks/azure/xema-substrate` passes all of it through, each input defaulting to
   today's behaviour (the stack's cloud phase planned before and after: 38
   resources, identical attributes):
