@@ -41,13 +41,13 @@ variable "vpc_id" {
 }
 
 variable "network_access" {
-  description = "How the server is reached: \"private\" (VNet-injected via delegated_subnet_id + a linked private DNS zone; no public endpoint) or \"public\" (public endpoint restricted to public_firewall_rules)."
+  description = "How the server is reached: \"private\" (VNet-injected via delegated_subnet_id + a private DNS zone; no public endpoint), \"private_endpoint\" (no public endpoint and no VNet injection; reached through a private endpoint composed by the caller, in a subnet that needs no delegation) or \"public\" (public endpoint restricted to public_firewall_rules)."
   type        = string
   default     = "private"
 
   validation {
-    condition     = contains(["private", "public"], var.network_access)
-    error_message = "network_access must be one of private, public."
+    condition     = contains(["private", "private_endpoint", "public"], var.network_access)
+    error_message = "network_access must be one of private, private_endpoint, public."
   }
 }
 

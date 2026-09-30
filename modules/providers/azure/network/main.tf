@@ -6,9 +6,10 @@ locals {
   # CLOSED map: a service not listed here has no private endpoint in this
   # module set, and asking for one is refused at plan time (variables.tf).
   private_link_zones = {
-    blob  = "privatelink.blob.core.windows.net"
-    redis = "privatelink.redis.cache.windows.net"
-    vault = "privatelink.vaultcore.azure.net"
+    blob     = "privatelink.blob.core.windows.net"
+    redis    = "privatelink.redis.cache.windows.net"
+    vault    = "privatelink.vaultcore.azure.net"
+    postgres = "privatelink.postgres.database.azure.com"
   }
 }
 

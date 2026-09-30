@@ -8,7 +8,7 @@ was committed, but what a `main.tf` + tfvars have to say differently.
 
 No consumer change: every new input defaults to the previous behaviour. Proven by
 planning the same greenfield root (network, cluster, Postgres, management runner)
-over the previous and the new modules: 23 resources, identical attributes; the only
+over the previous and the new modules: 24 resources (a private endpoint included), identical attributes; the only
 address that moves is the runner's public IP (`azurerm_public_ip.this` ->
 `this[0]`), carried by a `moved` block.
 
@@ -27,6 +27,14 @@ routing and DNS owned by someone else) can now say:
     (certificate) accounts off by default when set.
 - `providers/azure/managed-postgres` — `private_dns_zone_id`: consume an existing
   private DNS zone instead of creating and linking one.
+- `providers/azure/managed-postgres` — `network_access = "private_endpoint"`: no
+  public access and no VNet injection, reached through a private endpoint in a
+  subnet that needs no delegation (a customer-owned subnet stays untouched).
+- `providers/azure/private-endpoint` — service `postgres` (`postgresqlServer`), and
+  `register_dns_record` (default true): false leaves the endpoint's A record to the
+  network's owner, e.g. a landing zone that registers private endpoints in its
+  central zones by policy. `providers/azure/network` accepts `postgres` in
+  `private_link_services` (`privatelink.postgres.database.azure.com`).
 - `providers/azure/management-runner` — `public_ip_enabled` (default true) and an
   optional `allowed_ssh_cidrs`: a private-only VM on a network whose default route
   goes to a firewall, where a public IP would answer asymmetrically.

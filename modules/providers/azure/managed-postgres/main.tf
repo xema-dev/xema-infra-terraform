@@ -2,7 +2,11 @@ locals {
   create_resource_group = var.resource_group_name == ""
   resource_group_name   = local.create_resource_group ? azurerm_resource_group.this[0].name : var.resource_group_name
 
-  private               = var.network_access == "private"
+  private = var.network_access == "private"
+  # network_access = "private_endpoint" is neither: no public access and no VNet
+  # injection. The server is reached through a private endpoint composed OUTSIDE
+  # this module (providers/azure/private-endpoint, service "postgres"), in a
+  # subnet that needs no delegation.
   private_dns_zone_name = var.private_dns_zone_name != "" ? var.private_dns_zone_name : "${var.name}.private.postgres.database.azure.com"
 
   # A private server needs a private DNS zone its clients can resolve. By default
@@ -70,7 +74,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   backup_retention_days        = var.backup_retention_days
   geo_redundant_backup_enabled = var.geo_redundant_backup_enabled
 
-  public_network_access_enabled = !local.private
+  public_network_access_enabled = var.network_access == "public"
   delegated_subnet_id           = local.private ? var.delegated_subnet_id : null
   private_dns_zone_id           = local.private ? local.private_dns_zone_id : null
 
@@ -101,7 +105,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
 }
 
 resource "azurerm_postgresql_flexible_server_firewall_rule" "this" {
-  for_each = local.private ? {} : var.public_firewall_rules
+  for_each = var.network_access == "public" ? var.public_firewall_rules : {}
 
   name             = each.key
   server_id        = azurerm_postgresql_flexible_server.this.id
