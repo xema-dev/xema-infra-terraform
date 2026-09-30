@@ -5,6 +5,14 @@ locals {
   private               = var.network_access == "private"
   private_dns_zone_name = var.private_dns_zone_name != "" ? var.private_dns_zone_name : "${var.name}.private.postgres.database.azure.com"
 
+  # A private server needs a private DNS zone its clients can resolve. By default
+  # this module creates one and links it to var.vpc_id. When the network's owner
+  # already runs the zone (an enterprise landing zone whose DNS resolves Azure
+  # private zones centrally), it is CONSUMED by id instead: this module then
+  # creates neither the zone nor the link, and never takes ownership of either.
+  create_private_dns_zone = local.private && var.private_dns_zone_id == ""
+  private_dns_zone_id     = local.create_private_dns_zone ? one(azurerm_private_dns_zone.this[*].id) : var.private_dns_zone_id
+
   administrator_password = var.generate_administrator_password ? random_password.administrator[0].result : var.administrator_password
 }
 
@@ -29,7 +37,7 @@ resource "random_password" "administrator" {
 # ---------------------------------------------------------------------------
 
 resource "azurerm_private_dns_zone" "this" {
-  count = local.private ? 1 : 0
+  count = local.create_private_dns_zone ? 1 : 0
 
   name                = local.private_dns_zone_name
   resource_group_name = local.resource_group_name
@@ -37,7 +45,7 @@ resource "azurerm_private_dns_zone" "this" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "this" {
-  count = local.private ? 1 : 0
+  count = local.create_private_dns_zone ? 1 : 0
 
   name                = "${var.name}-link"
   private_dns_zone_id = azurerm_private_dns_zone.this[0].id
@@ -64,7 +72,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
 
   public_network_access_enabled = !local.private
   delegated_subnet_id           = local.private ? var.delegated_subnet_id : null
-  private_dns_zone_id           = local.private ? azurerm_private_dns_zone.this[0].id : null
+  private_dns_zone_id           = local.private ? local.private_dns_zone_id : null
 
   dynamic "high_availability" {
     for_each = var.node_count == 2 ? [1] : []
@@ -86,8 +94,8 @@ resource "azurerm_postgresql_flexible_server" "this" {
     }
 
     precondition {
-      condition     = !local.private || (var.delegated_subnet_id != "" && var.vpc_id != "")
-      error_message = "network_access = \"private\" requires both delegated_subnet_id (a subnet delegated to Microsoft.DBforPostgreSQL/flexibleServers) and vpc_id (the VNet to link the private DNS zone to)."
+      condition     = !local.private || (var.delegated_subnet_id != "" && (var.vpc_id != "" || var.private_dns_zone_id != ""))
+      error_message = "network_access = \"private\" requires delegated_subnet_id (a subnet delegated to Microsoft.DBforPostgreSQL/flexibleServers), and either vpc_id (the VNet to link the private DNS zone this module creates) or private_dns_zone_id (an existing zone the network's owner runs)."
     }
   }
 }

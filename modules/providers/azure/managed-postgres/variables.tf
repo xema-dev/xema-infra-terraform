@@ -68,6 +68,12 @@ variable "private_dns_zone_name" {
   }
 }
 
+variable "private_dns_zone_id" {
+  description = "Id of an EXISTING private DNS zone for a private server, owned outside this module (e.g. by an enterprise landing zone's central DNS). Set, this module creates no zone and no VNet link — resolution is the zone owner's. Empty (default) creates the zone and links it to vpc_id."
+  type        = string
+  default     = ""
+}
+
 variable "public_firewall_rules" {
   description = "Firewall rules for a PUBLIC server, keyed by a stable id: { start_ip_address, end_ip_address }. Ignored when network_access = \"private\". An empty map on a public server means nobody can connect."
   type = map(object({

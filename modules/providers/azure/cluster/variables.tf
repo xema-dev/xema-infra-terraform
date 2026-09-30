@@ -137,6 +137,52 @@ variable "authorized_ip_ranges" {
   default     = []
 }
 
+variable "outbound_type" {
+  description = "AKS egress: \"loadBalancer\" (default — AKS provisions its own public egress address), \"userDefinedRouting\" (no AKS-managed egress; the node subnet's existing route table decides, e.g. 0.0.0.0/0 to a firewall — requires route_table_id), \"managedNATGateway\" or \"userAssignedNATGateway\"."
+  type        = string
+  default     = "loadBalancer"
+
+  validation {
+    condition     = contains(["loadBalancer", "userDefinedRouting", "managedNATGateway", "userAssignedNATGateway"], var.outbound_type)
+    error_message = "outbound_type must be one of loadBalancer, userDefinedRouting, managedNATGateway, userAssignedNATGateway."
+  }
+}
+
+variable "route_table_id" {
+  description = "Id of the route table associated with node_subnet_id. Required with outbound_type = \"userDefinedRouting\"; the cluster identity is granted Network Contributor on it. The route table is never managed by this module."
+  type        = string
+  default     = ""
+}
+
+variable "private_cluster_enabled" {
+  description = "Expose the Kubernetes API only on a private address inside the VNet (no public endpoint). Default false."
+  type        = bool
+  default     = false
+}
+
+variable "private_cluster_public_fqdn_enabled" {
+  description = "For a private cluster: also publish the API's PRIVATE address under a public DNS name, so clients on a VNet with custom DNS resolve it without access to the Azure private zone. The endpoint stays private. Ignored when private_cluster_enabled = false."
+  type        = bool
+  default     = false
+}
+
+variable "entra_rbac" {
+  description = <<-EOT
+    Microsoft Entra ID authentication with Azure RBAC for Kubernetes authorization.
+    null (default) keeps AKS's certificate-based local accounts as the only access.
+      - tenant_id              : Entra tenant; "" uses the subscription's tenant
+      - admin_group_object_ids : Entra groups granted cluster-admin
+      - local_account_disabled : true turns certificate (local) accounts OFF, so
+                                 every caller must authenticate through Entra ID
+  EOT
+  type = object({
+    tenant_id              = optional(string, "")
+    admin_group_object_ids = optional(list(string), [])
+    local_account_disabled = optional(bool, true)
+  })
+  default = null
+}
+
 variable "enable_log_analytics" {
   description = "Create a Log Analytics workspace and wire the AKS monitoring (oms_agent) add-on to it."
   type        = bool

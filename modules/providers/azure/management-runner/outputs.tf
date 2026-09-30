@@ -1,6 +1,6 @@
 output "public_ip_address" {
-  description = "The runner's public IP: the SSH target, and its egress address — add it to the cluster's authorized_ip_ranges so the runner can reach the Kubernetes API."
-  value       = azurerm_public_ip.this.ip_address
+  description = "The runner's public IP: the SSH target, and its egress address — add it to the cluster's authorized_ip_ranges so the runner can reach the Kubernetes API. null when public_ip_enabled = false."
+  value       = one(azurerm_public_ip.this[*].ip_address)
 }
 
 output "private_ip_address" {

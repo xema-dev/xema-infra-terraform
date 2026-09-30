@@ -36,8 +36,15 @@ variable "ssh_public_keys" {
 }
 
 variable "allowed_ssh_cidrs" {
-  description = "Source CIDRs allowed to reach SSH. Required and non-empty; the whole internet is refused. Changing access at handoff is replacing this list."
+  description = "Source CIDRs allowed to reach SSH. With a public IP it must be non-empty; without one it may be empty (no inbound SSH rule at all) or name private ranges (a VPN, a bastion subnet). The whole internet is always refused. Changing access at handoff is replacing this list."
   type        = list(string)
+  default     = []
+}
+
+variable "public_ip_enabled" {
+  description = "Give the VM a public IP (default true). false keeps it private-only — required on a network whose default route goes to a firewall, where a public IP would answer asymmetrically — and it is then reached from inside the network, or managed through Azure (az vm run-command) with no network path at all."
+  type        = bool
+  default     = true
 }
 
 variable "os_disk_size_gb" {

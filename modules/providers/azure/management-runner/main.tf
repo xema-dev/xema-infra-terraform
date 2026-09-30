@@ -17,6 +17,8 @@ locals {
 }
 
 resource "azurerm_public_ip" "this" {
+  count = var.public_ip_enabled ? 1 : 0
+
   name                = "${var.name}-pip"
   location            = var.region
   resource_group_name = var.resource_group_name
@@ -33,17 +35,21 @@ resource "azurerm_network_security_group" "this" {
 
   # SSH from the declared sources only. Everything else inbound from the
   # internet falls to Azure's default DenyAllInBound.
-  security_rule {
-    name                       = "ssh-from-allowlist"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefixes    = var.allowed_ssh_cidrs
-    destination_address_prefix = "*"
+  dynamic "security_rule" {
+    for_each = length(var.allowed_ssh_cidrs) > 0 ? [1] : []
+    content {
+      name                       = "ssh-from-allowlist"
+      priority                   = 100
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "22"
+      source_address_prefixes    = var.allowed_ssh_cidrs
+      destination_address_prefix = "*"
+    }
   }
+
 }
 
 resource "azurerm_network_interface" "this" {
@@ -56,7 +62,7 @@ resource "azurerm_network_interface" "this" {
     name                          = "primary"
     subnet_id                     = var.subnet_id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.this.id
+    public_ip_address_id          = one(azurerm_public_ip.this[*].id)
   }
 }
 
@@ -106,12 +112,19 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   lifecycle {
     precondition {
-      condition     = length(var.allowed_ssh_cidrs) > 0 && length(setintersection(var.allowed_ssh_cidrs, local.open_sources)) == 0
-      error_message = "allowed_ssh_cidrs must name at least one source, and none may be the whole internet (0.0.0.0/0, ::/0, *, Internet, Any)."
+      condition     = (!var.public_ip_enabled || length(var.allowed_ssh_cidrs) > 0) && length(setintersection(var.allowed_ssh_cidrs, local.open_sources)) == 0
+      error_message = "With a public IP, allowed_ssh_cidrs must name at least one source; and no entry may be the whole internet (0.0.0.0/0, ::/0, *, Internet, Any)."
     }
     precondition {
       condition     = length(var.ssh_public_keys) > 0
       error_message = "ssh_public_keys must hold at least one key: password login is disabled."
     }
   }
+}
+
+# The public IP became optional (count); an existing single instance keeps its
+# identity instead of being destroyed and recreated.
+moved {
+  from = azurerm_public_ip.this
+  to   = azurerm_public_ip.this[0]
 }

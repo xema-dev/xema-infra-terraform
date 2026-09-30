@@ -4,6 +4,35 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — Azure modules can live inside an existing landing zone
+
+No consumer change: every new input defaults to the previous behaviour. Proven by
+planning the same greenfield root (network, cluster, Postgres, management runner)
+over the previous and the new modules: 23 resources, identical attributes; the only
+address that moves is the runner's public IP (`azurerm_public_ip.this` ->
+`this[0]`), carried by a `moved` block.
+
+What a root composing the primitives inside an enterprise landing zone (a network,
+routing and DNS owned by someone else) can now say:
+
+- `providers/azure/cluster`
+  - `outbound_type` — AKS's own egress setting. `userDefinedRouting` creates no
+    AKS egress; the node subnet's existing route (e.g. `0.0.0.0/0` to a firewall)
+    decides. Requires `route_table_id`, on which the cluster identity is granted
+    Network Contributor — a permission, never ownership of the route table.
+  - `private_cluster_enabled` / `private_cluster_public_fqdn_enabled` — API only on
+    a private address; optionally published under a public DNS name so resolvers
+    that cannot see Azure private zones (a VNet on custom DNS) still reach it.
+  - `entra_rbac` — Microsoft Entra ID authentication with Azure RBAC, local
+    (certificate) accounts off by default when set.
+- `providers/azure/managed-postgres` — `private_dns_zone_id`: consume an existing
+  private DNS zone instead of creating and linking one.
+- `providers/azure/management-runner` — `public_ip_enabled` (default true) and an
+  optional `allowed_ssh_cidrs`: a private-only VM on a network whose default route
+  goes to a firewall, where a public IP would answer asymmetrically.
+
+Every primitive already accepted an existing `resource_group_name`.
+
 ## v0.7.1 — bind fixtures use the reserved placeholder shape
 
 No consumer change: `tooling/bind/fixtures/*.json` only. The recorded
