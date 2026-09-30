@@ -37,7 +37,9 @@ resource "azurerm_key_vault" "this" {
 # ---------------------------------------------------------------------------
 
 resource "azurerm_role_assignment" "deployer" {
-  count = var.grant_deployer_secrets_officer ? 1 : 0
+  # The grant exists so the principal running Terraform can write the SEEDED secrets; with none to
+  # seed it would be a standing data-plane role with no purpose.
+  count = var.grant_deployer_secrets_officer && length(var.secret_names) > 0 ? 1 : 0
 
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
@@ -98,4 +100,7 @@ resource "azurerm_role_assignment" "reader" {
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.reader[0].principal_id
+  # A managed identity: stated, so an assigner limited to service principals (an ABAC condition)
+  # can evaluate the request, and a freshly created identity is not looked up before it replicates.
+  principal_type = "ServicePrincipal"
 }

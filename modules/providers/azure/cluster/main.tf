@@ -45,6 +45,9 @@ resource "azurerm_role_assignment" "cluster_network" {
   scope                = var.vnet_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.cluster.principal_id
+  # A managed identity: stated, so an assigner limited to service principals (an ABAC condition)
+  # can evaluate the request, and a freshly created identity is not looked up before it replicates.
+  principal_type = "ServicePrincipal"
 }
 
 # With outbound_type = "userDefinedRouting" the nodes' subnet carries a route
@@ -58,6 +61,9 @@ resource "azurerm_role_assignment" "cluster_route_table" {
   scope                = var.route_table_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.cluster.principal_id
+  # A managed identity: stated, so an assigner limited to service principals (an ABAC condition)
+  # can evaluate the request, and a freshly created identity is not looked up before it replicates.
+  principal_type = "ServicePrincipal"
 }
 
 resource "azurerm_log_analytics_workspace" "this" {

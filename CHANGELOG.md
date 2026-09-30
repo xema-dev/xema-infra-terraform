@@ -43,6 +43,15 @@ Every primitive already accepted an existing `resource_group_name`.
 
 - `providers/azure/state-bucket` — `shared_access_key_enabled` (default true): false
   leaves Entra ID as the only way to the state (backends set `use_azuread_auth`).
+- Role assignments to the modules' own managed identities (cluster network and route
+  table, the key-vault reader, the DNS-01 identity) declare `principal_type =
+  "ServicePrincipal"`, so a deployer whose role-assignment right is limited to
+  service principals (an ABAC condition) can make them.
+- **Behaviour change:** `providers/azure/secrets-backend` grants the Terraform
+  principal Key Vault Secrets Officer only when there are secrets to seed
+  (`secret_names` non-empty) — the purpose its own description states; its
+  propagation wait was already gated that way. A root seeding nothing no longer
+  leaves a standing data-plane role behind.
 - `stacks/azure/xema-substrate` passes all of it through, each input defaulting to
   today's behaviour (the stack's cloud phase planned before and after: 38
   resources, identical attributes):

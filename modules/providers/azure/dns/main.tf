@@ -119,4 +119,7 @@ resource "azurerm_role_assignment" "dns01" {
   scope                = azurerm_dns_zone.this.id
   role_definition_name = "DNS Zone Contributor"
   principal_id         = azurerm_user_assigned_identity.dns01[0].principal_id
+  # A managed identity: stated, so an assigner limited to service principals (an ABAC condition)
+  # can evaluate the request, and a freshly created identity is not looked up before it replicates.
+  principal_type = "ServicePrincipal"
 }
