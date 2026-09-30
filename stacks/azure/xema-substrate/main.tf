@@ -13,7 +13,7 @@
 resource "terraform_data" "input_guards" {
   lifecycle {
     precondition {
-      condition     = var.network != null || !(var.enable_cluster || (var.enable_managed_postgres && var.postgres_network_access == "private") || length(local.private_endpoint_services_wanted) > 0)
+      condition     = var.network != null || !(var.enable_cluster || (var.enable_managed_postgres && contains(["private", "private_endpoint"], var.postgres_network_access)) || length(local.private_endpoint_services_wanted) > 0)
       error_message = "network is required when this stack creates the cluster, a private PostgreSQL server, or a private backing service: pass the foundation stack's `network` output."
     }
     precondition {
@@ -67,6 +67,17 @@ module "cluster" {
   authorized_ip_ranges = var.cluster_authorized_ip_ranges
   enable_log_analytics = var.cluster_enable_log_analytics
   tags                 = local.tags
+
+  outbound_type                       = var.cluster_outbound_type
+  route_table_id                      = var.network == null ? "" : var.network.route_table_id
+  private_cluster_enabled             = var.cluster_private != null
+  private_cluster_public_fqdn_enabled = var.cluster_private != null ? var.cluster_private.public_fqdn : false
+  entra_rbac                          = var.cluster_entra_rbac
+
+  # null = the cluster module's own defaults (its range variables are non-nullable).
+  service_cidr   = var.cluster_address_ranges != null ? var.cluster_address_ranges.service_cidr : null
+  dns_service_ip = var.cluster_address_ranges != null ? var.cluster_address_ranges.dns_service_ip : null
+  pod_cidr       = var.cluster_address_ranges != null ? var.cluster_address_ranges.pod_cidr : null
 }
 
 # When NOT creating the cluster, read the existing one by name so the
@@ -101,7 +112,8 @@ module "postgres" {
 
   network_access        = var.postgres_network_access
   vpc_id                = local.vpc_id
-  delegated_subnet_id   = local.delegated_subnet_id
+  delegated_subnet_id   = var.postgres_network_access == "private" ? local.delegated_subnet_id : ""
+  resource_group_name   = var.resource_group_name
   public_firewall_rules = var.postgres_public_firewall_rules
 
   private_dns_zone_name           = local.postgres_private_dns_zone_name
@@ -188,7 +200,8 @@ module "dns" {
   region = var.region
 
   # Base records MERGED with the extension-claimed records (extensions.tf).
-  records = merge(var.dns_records, local.ext_dns_records)
+  records             = merge(var.dns_records, local.ext_dns_records)
+  resource_group_name = var.resource_group_name
 
   # The cert-manager DNS-01 identity, only when that solver is in use.
   dns01_workload_identity = {
@@ -211,6 +224,7 @@ module "blob" {
   containers  = local.blob_containers
 
   public_network_access_enabled = !local.private_backing_services
+  resource_group_name           = var.resource_group_name
   tags                          = local.tags
 }
 
@@ -234,6 +248,7 @@ module "secrets_backend" {
 
   purge_protection_enabled      = local.key_vault_purge_protection
   public_network_access_enabled = !local.private_backing_services
+  resource_group_name           = var.resource_group_name
   tags                          = local.tags
 }
 
@@ -247,6 +262,7 @@ module "cache" {
   capacity = var.azure_sizing.redis_capacity
 
   public_network_access_enabled = !local.private_backing_services
+  resource_group_name           = var.resource_group_name
   tags                          = local.tags
 }
 
@@ -259,9 +275,10 @@ module "cache" {
 
 locals {
   private_endpoint_targets = {
-    blob  = one(module.blob[*].account_id)
-    redis = one(module.cache[*].id)
-    vault = one(module.secrets_backend[*].key_vault_id)
+    blob     = one(module.blob[*].account_id)
+    redis    = one(module.cache[*].id)
+    vault    = one(module.secrets_backend[*].key_vault_id)
+    postgres = one(module.postgres[*].cluster_id)
   }
 }
 
@@ -271,7 +288,7 @@ module "private_endpoint" {
 
   name                = "${local.dep}-${each.value}"
   region              = var.region
-  resource_group_name = var.network.resource_group_name
+  resource_group_name = var.resource_group_name != "" ? var.resource_group_name : var.network.resource_group_name
   service             = each.value
   target_resource_id  = local.private_endpoint_targets[each.value]
   subnet_id           = var.network.private_endpoint_subnet_id

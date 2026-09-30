@@ -18,6 +18,7 @@ locals {
 
   cluster_name = var.cluster_name != "" ? var.cluster_name : "${local.dep}-aks"
   cluster_resource_group_name = (var.cluster_resource_group_name != "" ? var.cluster_resource_group_name
+    : var.resource_group_name != "" ? var.resource_group_name
   : (var.network != null ? var.network.resource_group_name : "${local.dep}-rg"))
   # The four GLOBALLY-unique names: derived unless overridden (variables.tf).
   postgres_name         = var.postgres_server_name != "" ? var.postgres_server_name : "${local.dep}-pg"
@@ -93,16 +94,23 @@ locals {
   vpc_id              = var.network == null ? "" : var.network.vnet_id
   delegated_subnet_id = var.network == null ? "" : var.network.postgres_subnet_id
 
+  # Local (certificate) accounts off: the kubernetes/helm providers can no
+  # longer present the cluster's client certificate and authenticate through
+  # kubelogin with the caller's Azure CLI identity instead (providers.tf).
+  kube_entra_auth = var.cluster_entra_rbac != null ? var.cluster_entra_rbac.local_account_disabled : false
+
   private_backing_services = var.backing_services_network_access == "private"
   # Which private endpoints this stack needs: one per CREATED backing service.
   # WANTED is what the input guard checks; BUILT is the same list only once a
   # network exists, so a root that omits `network` gets the guard's message
   # instead of a null-attribute error.
-  private_endpoint_services_wanted = local.private_backing_services ? compact([
+  private_endpoint_services_wanted = compact(concat(local.private_backing_services ? [
     var.enable_object_storage ? "blob" : "",
     var.enable_cache ? "redis" : "",
     var.enable_secrets_backend ? "vault" : "",
-  ]) : []
+    ] : [], [
+    var.enable_managed_postgres && var.postgres_network_access == "private_endpoint" ? "postgres" : "",
+  ]))
   private_endpoint_services = var.network == null ? [] : local.private_endpoint_services_wanted
 
   # ---------------------------------------------------------------------------
@@ -117,6 +125,9 @@ locals {
   # one — and the admin credentials are minted here and passed IN.
   # ---------------------------------------------------------------------------
   postgres_private_dns_zone_name = "${local.postgres_name}.private.postgres.database.azure.com"
+  # A private-endpoint server keeps its public NAME: Azure answers it with a
+  # CNAME into privatelink.postgres.database.azure.com, which resolves to the
+  # endpoint's private address wherever that zone is resolvable.
   postgres_created_host = (var.postgres_network_access == "private"
     ? local.postgres_private_dns_zone_name
   : "${local.postgres_name}.postgres.database.azure.com")

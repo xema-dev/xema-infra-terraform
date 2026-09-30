@@ -41,6 +41,21 @@ routing and DNS owned by someone else) can now say:
 
 Every primitive already accepted an existing `resource_group_name`.
 
+- `stacks/azure/xema-substrate` passes all of it through, each input defaulting to
+  today's behaviour (the stack's cloud phase planned before and after: 38
+  resources, identical attributes):
+  - `resource_group_name` — ONE existing resource group for everything the stack
+    creates (a landing zone that grants a deployment exactly one);
+  - `cluster_outbound_type`, `cluster_private` (`public_fqdn`), `cluster_entra_rbac`,
+    `cluster_address_ranges` (service/DNS/pod ranges — on a landing zone they must
+    avoid the corporate address plan; the module defaults sit in `10.100.0.0/16`);
+  - `network.route_table_id` (optional) — the route table `userDefinedRouting` uses;
+  - `postgres_network_access = "private_endpoint"` — the stack composes the
+    server's private endpoint beside the others, in `network.private_dns_zone_ids["postgres"]`.
+  - With `cluster_entra_rbac.local_account_disabled`, the stack's kubernetes/helm
+    providers authenticate through `kubelogin` with the caller's Azure CLI identity;
+    kubelogin must be on PATH where the stack runs.
+
 ## v0.7.1 — bind fixtures use the reserved placeholder shape
 
 No consumer change: `tooling/bind/fixtures/*.json` only. The recorded

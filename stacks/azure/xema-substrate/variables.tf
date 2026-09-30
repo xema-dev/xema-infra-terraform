@@ -271,8 +271,14 @@ variable "cluster_name" {
   default     = ""
 }
 
+variable "resource_group_name" {
+  description = "An EXISTING resource group every Azure resource this stack creates is placed in — the cluster, PostgreSQL, storage, key vault, cache and DNS zone alike. Empty (default) keeps each area in its own resource group (\"<name>-rg\", created by its module) and the cluster in the network's. A landing zone that grants a deployment exactly one resource group sets it."
+  type        = string
+  default     = ""
+}
+
 variable "cluster_resource_group_name" {
-  description = "Resource group of the cluster. Empty uses var.network's resource group (the foundation's), or \"<deployment_name>-rg\" when no network is given; it must already exist."
+  description = "Resource group of the cluster. Empty uses var.resource_group_name, else var.network's resource group (the foundation's), else \"<deployment_name>-rg\"; it must already exist."
   type        = string
   default     = ""
 }
@@ -326,6 +332,57 @@ variable "cluster_authorized_ip_ranges" {
   default     = []
 }
 
+variable "cluster_outbound_type" {
+  description = "AKS egress for the created cluster: \"loadBalancer\" (default — AKS's own public egress), \"userDefinedRouting\" (the node subnet's existing route decides, e.g. 0.0.0.0/0 to the network owner's firewall; needs network.route_table_id), \"managedNATGateway\" or \"userAssignedNATGateway\"."
+  type        = string
+  default     = "loadBalancer"
+}
+
+variable "cluster_private" {
+  description = <<-EOT
+    Kubernetes API reachability for the created cluster. null (default) keeps a
+    public API endpoint (narrowed by cluster_authorized_ip_ranges). Set, the API
+    is only on a private address inside the network:
+      - public_fqdn : also publish that private address under a public DNS name,
+                      for resolvers that cannot see Azure private DNS zones (a
+                      network on custom DNS). The endpoint stays private.
+    A private API is reached from inside the network — the management runner.
+  EOT
+  type = object({
+    public_fqdn = optional(bool, false)
+  })
+  default = null
+}
+
+variable "cluster_entra_rbac" {
+  description = <<-EOT
+    Microsoft Entra ID authentication with Azure RBAC for the created cluster.
+    null (default) keeps AKS certificate (local) accounts. With
+    local_account_disabled = true the kubernetes/helm providers of this stack
+    authenticate through kubelogin with the Azure CLI identity of whoever runs it
+    (`az login`, or azure/login in CI) — which then needs an AKS RBAC role.
+      - tenant_id              : "" uses the subscription's tenant
+      - admin_group_object_ids : Entra groups granted cluster-admin
+      - local_account_disabled : default true
+  EOT
+  type = object({
+    tenant_id              = optional(string, "")
+    admin_group_object_ids = optional(list(string), [])
+    local_account_disabled = optional(bool, true)
+  })
+  default = null
+}
+
+variable "cluster_address_ranges" {
+  description = "Kubernetes-internal address ranges of the created cluster (Azure CNI overlay). They must overlap neither the VNet nor ANY network it is peered or routed to — on an enterprise landing zone, ask for ranges unused in the corporate address plan. null keeps the cluster module's defaults."
+  type = object({
+    service_cidr   = string
+    dns_service_ip = string
+    pod_cidr       = string
+  })
+  default = null
+}
+
 variable "cluster_enable_log_analytics" {
   description = "Wire the created cluster's monitoring add-on to a Log Analytics workspace."
   type        = bool
@@ -349,6 +406,9 @@ variable "network" {
     postgres_subnet_id         = string
     private_endpoint_subnet_id = string
     private_dns_zone_ids       = map(string)
+    # The route table on aks_subnet_id — needed with cluster_outbound_type =
+    # "userDefinedRouting". Consumed, never managed.
+    route_table_id = optional(string, "")
   })
   default = null
 }
@@ -377,13 +437,13 @@ variable "postgres_engine_version" {
 }
 
 variable "postgres_network_access" {
-  description = "How the created server is reached: \"private\" (VNet-injected through the cluster's delegated subnet) or \"public\" (public endpoint restricted to postgres_public_firewall_rules)."
+  description = "How the created server is reached: \"private\" (VNet-injected through network.postgres_subnet_id, which must be delegated to PostgreSQL), \"private_endpoint\" (no public access; a private endpoint in network.private_endpoint_subnet_id — no subnet delegation needed) or \"public\" (public endpoint restricted to postgres_public_firewall_rules)."
   type        = string
   default     = "private"
 
   validation {
-    condition     = contains(["private", "public"], var.postgres_network_access)
-    error_message = "postgres_network_access must be one of private, public."
+    condition     = contains(["private", "private_endpoint", "public"], var.postgres_network_access)
+    error_message = "postgres_network_access must be one of private, private_endpoint, public."
   }
 }
 

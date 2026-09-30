@@ -95,18 +95,21 @@ variable "service_cidr" {
   description = "Kubernetes Service CIDR. Must not overlap the VNet address space."
   type        = string
   default     = "10.100.0.0/16"
+  nullable    = false
 }
 
 variable "dns_service_ip" {
   description = "Cluster DNS service IP (inside service_cidr)."
   type        = string
   default     = "10.100.0.10"
+  nullable    = false
 }
 
 variable "pod_cidr" {
   description = "Pod CIDR for Azure CNI overlay. Must not overlap the VNet address space or service_cidr."
   type        = string
   default     = "10.244.0.0/16"
+  nullable    = false
 }
 
 variable "sku_tier" {

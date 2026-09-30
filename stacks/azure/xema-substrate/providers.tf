@@ -14,19 +14,45 @@ provider "azurerm" {
 
 # AKS hands out client-certificate credentials rather than a token, so the
 # kube/helm providers authenticate with cert + key (see providers/azure/cluster).
+#
+# With the cluster's local accounts OFF (cluster_entra_rbac) there is no client
+# certificate to present: the providers exec kubelogin, which converts the
+# caller's Azure CLI identity (`az login`, azure/login in CI) into an Entra token
+# for the AKS server application. kubelogin must be on PATH where this stack runs.
+locals {
+  # The AKS Microsoft Entra server application — the audience of every AKS Entra
+  # token, the same id in every tenant.
+  aks_entra_server_id = "6dae42f8-4368-4678-94ff-3960e28e3630"
+  kube_exec = {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "kubelogin"
+    args        = ["get-token", "--login", "azurecli", "--server-id", local.aks_entra_server_id]
+  }
+}
+
 provider "kubernetes" {
   host                   = local.kube_host
-  client_certificate     = local.kube_client_cert_b64 != null ? base64decode(local.kube_client_cert_b64) : null
-  client_key             = local.kube_client_key_b64 != null ? base64decode(local.kube_client_key_b64) : null
+  client_certificate     = !local.kube_entra_auth && local.kube_client_cert_b64 != null ? base64decode(local.kube_client_cert_b64) : null
+  client_key             = !local.kube_entra_auth && local.kube_client_key_b64 != null ? base64decode(local.kube_client_key_b64) : null
   cluster_ca_certificate = local.kube_ca_b64 != null ? base64decode(local.kube_ca_b64) : null
+
+  dynamic "exec" {
+    for_each = local.kube_entra_auth ? [local.kube_exec] : []
+    content {
+      api_version = exec.value.api_version
+      command     = exec.value.command
+      args        = exec.value.args
+    }
+  }
 }
 
 provider "helm" {
   kubernetes = {
     host                   = local.kube_host
-    client_certificate     = local.kube_client_cert_b64 != null ? base64decode(local.kube_client_cert_b64) : null
-    client_key             = local.kube_client_key_b64 != null ? base64decode(local.kube_client_key_b64) : null
+    client_certificate     = !local.kube_entra_auth && local.kube_client_cert_b64 != null ? base64decode(local.kube_client_cert_b64) : null
+    client_key             = !local.kube_entra_auth && local.kube_client_key_b64 != null ? base64decode(local.kube_client_key_b64) : null
     cluster_ca_certificate = local.kube_ca_b64 != null ? base64decode(local.kube_ca_b64) : null
+    exec                   = local.kube_entra_auth ? local.kube_exec : null
   }
 }
 
