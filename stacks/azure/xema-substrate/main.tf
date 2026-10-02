@@ -135,6 +135,11 @@ module "postgres_tenancy" {
   source = "../../../modules/postgres-tenancy"
   count  = !var.enable_managed_postgres && length(local.postgres_databases) > 0 ? 1 : 0
 
+  # The provider's username (providers.tf). On PostgreSQL 16+ the module grants
+  # it every managed role, without which the ownership and grants below cannot
+  # be applied by a non-superuser admin (modules/postgres-tenancy/README.md).
+  connecting_role = local.pg_admin_login
+
   databases    = local.postgres_databases
   roles        = toset(local.postgres_roles)
   role_options = local.postgres_role_options

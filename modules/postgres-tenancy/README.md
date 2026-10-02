@@ -34,6 +34,8 @@ provider "postgresql" {
 module "tenancy" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/postgres-tenancy?ref=v1.0.0"
 
+  connecting_role = var.pg_admin_user # the provider's username — see below
+
   # EXAMPLE roster — yours is derived from what you deploy.
   databases = ["acme_biomes", "acme_openfga", "acme_mcp_gateway"]
   roles     = ["acme_app"]
@@ -62,6 +64,34 @@ takes CREATE and TEMPORARY away from it, and an owner that cannot CREATE on its
 own database cannot create a schema or a table. Measured against PostgreSQL
 18.6, against the hand-run bootstrap SQL this module replaces: the SQL leaves
 `<role>=CTc/<role>`, and the CONNECT-only form left `<role>=c/<role>`.
+
+## PostgreSQL 16+: the connecting role is granted every managed role
+
+The module is meant to run as a NON-superuser holding CREATEROLE (the Azure
+Flexible Server admin, and what any shared server should hand out). From
+PostgreSQL 16 such a role gets, for every role it creates, only an ADMIN OPTION
+membership with SET and INHERIT both false (`createrole_self_grant` is `''` by
+default): it may grant the role, it may not act as it. Measured against
+`postgres:16` with a `CREATEROLE CREATEDB` login:
+
+| provider | without the grant |
+| --- | --- |
+| 1.22, 1.23 | apply fails: `Error creating database "…": pq: must be able to SET ROLE "<owner>"` |
+| 1.24 – 1.27 | apply is GREEN, but every database grant is a silent no-op: PUBLIC keeps `Tc`, the non-owner role never gets CONNECT, and every later plan shows the same in-place drift |
+
+So the module issues `GRANT <role> TO <connecting_role>` for every role in
+`roles` (`postgresql_grant_role`, `with_admin_option = false`) before any
+database names an owner. With it, the grants land
+(`{<owner>=CTc/<owner>,<other>=c/<owner>}`, no PUBLIC entry), a second plan is
+empty, and destroy is clean (measured on provider 1.24.0 and 1.27.0). The
+provider floor is `>= 1.24`: 1.22, even with the grant, cannot drop a role it
+created on 16 (`permission denied to reassign objects`).
+
+Not covered, by construction: a role that ALREADY exists and was created by a
+different role (a superuser running a bootstrap file) gives the connecting role
+no ADMIN OPTION on it, so it can neither alter nor grant it — the apply stops
+on `permission denied to alter role`. Adopting such a role needs its creator to
+`GRANT <role> TO <connecting_role> WITH ADMIN OPTION` once.
 
 ## Extensions, and why a failure here is the point
 
@@ -99,6 +129,7 @@ which is a rotation, so schedule it like one.
 | Input | Required | Description |
 | --- | --- | --- |
 | `databases` | **yes** | the databases to ensure (unquoted-identifier grammar) |
+| `connecting_role` | **yes** | the role the provider connects as; granted every role in `roles` (PostgreSQL 16+) |
 | `roles` | **yes** | the login roles to ensure; each gets a generated password |
 | `role_options` | no | per-role `create_database` / `connection_limit` |
 | `database_owners` | no | `database => role`; who owns it, hence who can migrate it |

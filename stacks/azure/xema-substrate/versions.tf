@@ -8,7 +8,7 @@ terraform {
     }
     postgresql = {
       source  = "cyrilgdn/postgresql"
-      version = ">= 1.22"
+      version = ">= 1.24" # modules/postgres-tenancy/versions.tf says why
     }
     random = {
       source  = "hashicorp/random"

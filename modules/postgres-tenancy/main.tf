@@ -106,11 +106,61 @@ resource "postgresql_role" "this" {
   connection_limit = try(var.role_options[each.value].connection_limit, -1)
 }
 
+# THE CONNECTING ROLE IS GRANTED EVERY MANAGED ROLE, AND ON POSTGRESQL 16+
+# NOTHING WORKS WITHOUT IT.
+#
+# This module runs as a NON-superuser that holds CREATEROLE — the Azure Flexible
+# Server admin, and the posture every shared server should have. From
+# PostgreSQL 16 such a role receives, for each role it creates, only an
+# ADMIN OPTION membership with SET and INHERIT both false
+# (`createrole_self_grant` defaults to ''). That membership lets it grant the
+# role; it does not let it act AS the role. Two things then go wrong, both
+# measured against postgres:16 with a CREATEROLE + CREATEDB login:
+#
+#   - with cyrilgdn/postgresql 1.22 / 1.23, `CREATE DATABASE … OWNER <role>`
+#     refuses: `pq: must be able to SET ROLE "<role>"`;
+#   - with 1.24 – 1.27, which work around that by granting and revoking the
+#     owner role around the CREATE, the database is created and owned — and
+#     then every database-level grant below is SILENTLY A NO-OP. GRANT and
+#     REVOKE run as this role, which holds no privilege on a database another
+#     role owns, so PostgreSQL emits a warning and changes nothing: PUBLIC
+#     keeps `Tc`, the provisioner never receives CONNECT, the apply is green,
+#     and every plan after it shows the same in-place drift forever. A tenancy
+#     boundary that is reported applied and is not there.
+#
+# A plain `GRANT <role> TO <connecting role>` — SET defaults to TRUE, and
+# INHERIT to the connecting role's own INHERIT attribute (TRUE by default) —
+# fixes both: the CREATE may name the owner,
+# and a GRANT issued by a member of the owning role is recorded as granted by
+# the owner. It widens nothing real — a CREATEROLE role holding ADMIN OPTION on
+# a role can already grant it to itself; this states that it does.
+#
+# `with_admin_option` is false and IGNORED after create, and both are forced:
+# the provider reads the membership back as admin = true (it sees the
+# bootstrap ADMIN-OPTION row as well), so without the ignore every plan
+# replaces this grant; and asking for true is refused outright — "ADMIN option
+# cannot be granted back to your own grantor".
+resource "postgresql_grant_role" "connecting_role" {
+  for_each = var.roles
+
+  role              = var.connecting_role
+  grant_role        = postgresql_role.this[each.value].name
+  with_admin_option = false
+
+  lifecycle {
+    ignore_changes = [with_admin_option]
+  }
+}
+
 resource "postgresql_database" "this" {
   for_each = var.databases
 
   name  = each.value
   owner = try(postgresql_role.this[var.database_owners[each.value]].name, null)
+
+  # Naming an owner needs SET on it (above). This is also what orders destroy:
+  # a database is dropped while its owner is still reachable.
+  depends_on = [postgresql_grant_role.connecting_role]
 
   # The server's own defaults decide encoding and collation. A module that
   # pinned them would refuse to ADOPT any existing database whose locale
@@ -123,6 +173,13 @@ resource "postgresql_database" "this" {
 # An empty privilege set on the `public` pseudo-role is this provider's spelling
 # of REVOKE ALL. It is what makes a database on a shared server a boundary
 # rather than a name.
+#
+# It is ordered AFTER the role grants, not before, and the reason is destroy:
+# this provider opens a transaction INSIDE the database to delete a grant. If
+# the owner's own grant were removed first, nobody could connect any more —
+# PUBLIC is already revoked — and destroy would stop on `permission denied for
+# database`, measured. Ordered this way, the PUBLIC revoke is undone while the
+# owner still holds CONNECT.
 resource "postgresql_grant" "revoke_public" {
   for_each = var.revoke_public_connect ? var.databases : toset([])
 
@@ -130,6 +187,8 @@ resource "postgresql_grant" "revoke_public" {
   role        = "public"
   object_type = "database"
   privileges  = []
+
+  depends_on = [postgresql_grant.connect]
 }
 
 resource "postgresql_grant" "connect" {
@@ -139,8 +198,6 @@ resource "postgresql_grant" "connect" {
   role        = postgresql_role.this[each.value.role].name
   object_type = "database"
   privileges  = each.value.privileges
-
-  depends_on = [postgresql_grant.revoke_public]
 }
 
 # The step that used to be a superuser and a shell. `vector` is not a trusted

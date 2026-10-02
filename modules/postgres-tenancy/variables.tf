@@ -16,6 +16,23 @@ variable "databases" {
   }
 }
 
+variable "connecting_role" {
+  description = <<-EOT
+    The role the root's postgresql provider connects as — its `username`. A
+    NAME, not a credential. REQUIRED, no default: on PostgreSQL 16+ a
+    non-superuser CREATEROLE identity cannot act as a role it created until it
+    is granted that role, and this module grants each managed role to exactly
+    this one (main.tf § postgresql_grant_role.connecting_role). The provider
+    exposes no way to read the connected user back, so the root states it.
+  EOT
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.connecting_role)) > 0
+    error_message = "connecting_role must name the role the postgresql provider connects as."
+  }
+}
+
 variable "roles" {
   description = <<-EOT
     The login roles to ensure, by full name. Each gets a generated 32-character
