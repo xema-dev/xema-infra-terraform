@@ -203,6 +203,17 @@ Error: error connecting to PostgreSQL server <host> (scheme: postgres): dial tcp
 That message means "not on a runner whose VNet is linked to the zone", not "the
 server is gone".
 
+### Open verification: a real Azure server
+
+The ownership model itself is proven: on PostgreSQL 16 the connecting admin is
+granted every managed role (`postgresql_grant_role`) before databases are
+owned by the `<deployment>` app role. That is shown against `postgres:16` as a
+CREATEROLE non-superuser, both for a server this stack creates and for one it
+consumes. **Still unverified:** a real `tofu plan`/apply against a
+representative Azure Database for PostgreSQL Flexible Server, whose admin role
+(`azure_pg_admin`) has its own privileges. Any fix belongs in this stack's
+Azure wiring, not in a harness.
+
 ## Extension claims
 
 `var.extensions` is a map keyed by a consumer-chosen extension id; each value

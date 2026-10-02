@@ -85,6 +85,8 @@ stack: the consumer derives them from its own distribution, and a stack
 invoked without them refuses to plan. The `examples/` pass explicit rosters,
 labelled as one deployment's example and never a default.
 
+**DigitalOcean is being retired (everything moves to owl), so its stack is left untouched: it gets no consume-mode database/role path, and its `platform_databases` stay verbatim.**
+
 ### The Azure stack
 
 [`stacks/azure/xema-substrate`](stacks/azure/xema-substrate/README.md) is the
