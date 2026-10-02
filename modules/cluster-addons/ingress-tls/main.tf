@@ -32,19 +32,6 @@ locals {
     } : {},
   ))
 
-  external_secrets_values = yamlencode({
-    serviceAccount = merge(
-      { name = var.external_secrets_service_account_name },
-      var.secret_store_backend == "azure-key-vault" && var.azure_key_vault_store != null ? {
-        annotations = {
-          "azure.workload.identity/client-id" = var.azure_key_vault_store.client_id
-          "azure.workload.identity/tenant-id" = var.azure_key_vault_store.tenant_id
-        }
-      } : {},
-    )
-    podLabels = { "azure.workload.identity/use" = "true" }
-  })
-
   cluster_config_values = yamlencode({
     clusterIssuer = {
       name             = var.cluster_issuer_name
@@ -58,18 +45,6 @@ locals {
         hostedZoneName    = var.dns01_azure.hosted_zone_name
         clientID          = var.dns01_azure.client_id
         environment       = var.dns01_azure.environment
-      } : null
-    }
-    clusterSecretStore = {
-      enabled = var.external_secrets_enabled
-      name    = var.cluster_secret_store_name
-      backend = var.secret_store_backend
-      serviceAccount = {
-        name      = var.external_secrets_service_account_name
-        namespace = var.external_secrets_namespace
-      }
-      azureKeyVault = var.azure_key_vault_store != null ? {
-        vaultUrl = var.azure_key_vault_store.vault_uri
       } : null
     }
   })
@@ -104,28 +79,8 @@ resource "helm_release" "cert_manager" {
   }
 }
 
-resource "helm_release" "external_secrets" {
-  count = var.external_secrets_enabled ? 1 : 0
-
-  name             = "external-secrets"
-  repository       = "https://charts.external-secrets.io"
-  chart            = "external-secrets"
-  version          = var.external_secrets_chart_version
-  namespace        = var.external_secrets_namespace
-  create_namespace = true
-
-  values = concat([local.external_secrets_values], var.external_secrets_values)
-
-  lifecycle {
-    precondition {
-      condition     = var.secret_store_backend != "azure-key-vault" || var.azure_key_vault_store != null
-      error_message = "secret_store_backend = \"azure-key-vault\" requires azure_key_vault_store (vault_uri, client_id, tenant_id)."
-    }
-  }
-}
-
-# The ClusterIssuer and ClusterSecretStore are custom resources whose CRDs do
-# not exist until the two releases above are installed, so they ship as a tiny
+# The ClusterIssuer is a custom resource whose CRD does not exist until
+# cert-manager is installed, so it ships as a tiny
 # LOCAL chart rather than kubernetes_manifest — which needs the CRD at PLAN
 # time and therefore cannot survive a first apply on a fresh cluster. Helm
 # validates them at install, when the CRDs and their webhooks are up.
@@ -136,5 +91,5 @@ resource "helm_release" "cluster_config" {
 
   values = [local.cluster_config_values]
 
-  depends_on = [helm_release.cert_manager, helm_release.external_secrets]
+  depends_on = [helm_release.cert_manager]
 }

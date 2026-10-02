@@ -1,0 +1,5 @@
+apiVersion: v2
+name: secret-store
+description: The ClusterSecretStore rendered from values by cluster-addons/external-secrets. Not published; installed from the module directory.
+type: application
+version: 0.1.0

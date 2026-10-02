@@ -1,5 +1,5 @@
 apiVersion: v2
 name: cluster-config
-description: ACME ClusterIssuer + ClusterSecretStore rendered from values by cluster-addons/ingress-tls. Not published; installed from the module directory.
+description: ACME ClusterIssuer rendered from values by cluster-addons/ingress-tls. Not published; installed from the module directory.
 type: application
 version: 0.1.0

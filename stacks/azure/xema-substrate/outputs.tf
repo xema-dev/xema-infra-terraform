@@ -131,8 +131,8 @@ output "cluster_issuer_name" {
 }
 
 output "cluster_secret_store_name" {
-  description = "Name of the ClusterSecretStore (every ExternalSecret's secretStoreRef.name); null when enable_ingress_tls = false or enable_secrets_backend = false."
-  value       = one(module.ingress_tls[*].cluster_secret_store_name)
+  description = "Name of the ClusterSecretStore (every ExternalSecret's secretStoreRef.name); null when enable_secrets_backend = false."
+  value       = one(module.external_secrets[*].cluster_secret_store_name)
 }
 
 output "workload_namespaces" {
@@ -207,7 +207,7 @@ output "substrate" {
     key_vault_name             = var.enable_secrets_backend ? local.key_vault_name : null
     key_vault_uri              = one(module.secrets_backend[*].vault_uri)
     external_secrets_client_id = one(module.secrets_backend[*].client_id)
-    cluster_secret_store_name  = one(module.ingress_tls[*].cluster_secret_store_name)
+    cluster_secret_store_name  = one(module.external_secrets[*].cluster_secret_store_name)
 
     redis_host = one(module.cache[*].host)
     redis_port = one(module.cache[*].port)

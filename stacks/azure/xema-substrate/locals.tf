@@ -70,7 +70,7 @@ locals {
   # ---------------------------------------------------------------------------
   # Cluster facts: from the created cluster, else the existing one read by name.
   # ---------------------------------------------------------------------------
-  needs_kube          = var.enable_rwx_storage || var.enable_workload_namespaces || var.enable_ingress_tls || var.enable_deployer_identity
+  needs_kube          = var.enable_rwx_storage || var.enable_workload_namespaces || var.enable_ingress_tls || var.enable_deployer_identity || var.enable_secrets_backend
   needs_cluster_facts = local.needs_kube || var.enable_secrets_backend || (var.enable_dns && local.dns01)
 
   kube_host = var.enable_cluster ? one(module.cluster[*].endpoint) : try(one(data.azurerm_kubernetes_cluster.existing[*].kube_config[0].host), null)

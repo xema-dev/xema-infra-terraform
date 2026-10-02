@@ -17,8 +17,3 @@ output "cluster_issuer_name" {
   description = "Name of the ACME ClusterIssuer (for the cert-manager.io/cluster-issuer annotation)."
   value       = var.cluster_issuer_name
 }
-
-output "cluster_secret_store_name" {
-  description = "Name of the ClusterSecretStore; null when external_secrets_enabled = false."
-  value       = var.external_secrets_enabled ? var.cluster_secret_store_name : null
-}

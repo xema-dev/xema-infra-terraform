@@ -345,7 +345,6 @@ module "ingress_tls" {
   acme_server                 = var.acme_server
   tls_solver                  = var.tls_solver
   cluster_issuer_name         = var.cluster_issuer_name
-  cluster_secret_store_name   = var.cluster_secret_store_name
   ingress_service_annotations = var.ingress_service_annotations
   ingress_load_balancer_ip    = var.ingress_load_balancer_ip
 
@@ -355,13 +354,20 @@ module "ingress_tls" {
     hosted_zone_name    = module.dns[0].domain
     client_id           = module.dns[0].dns01_client_id
   } : null
+}
 
-  external_secrets_enabled = var.enable_secrets_backend
-  azure_key_vault_store = var.enable_secrets_backend ? {
+# The secret store is installed with the key vault, whatever serves inbound traffic: workloads
+# need their secrets from the first one on.
+module "external_secrets" {
+  source = "../../../modules/cluster-addons/external-secrets"
+  count  = var.enable_secrets_backend ? 1 : 0
+
+  cluster_secret_store_name = var.cluster_secret_store_name
+  azure_key_vault_store = {
     vault_uri = module.secrets_backend[0].vault_uri
     client_id = module.secrets_backend[0].client_id
     tenant_id = module.secrets_backend[0].tenant_id
-  } : null
+  }
 }
 
 module "identity_realm" {

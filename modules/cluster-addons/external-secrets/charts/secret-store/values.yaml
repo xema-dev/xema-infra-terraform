@@ -1,0 +1,10 @@
+# Every value is set by cluster-addons/external-secrets from its Terraform inputs.
+# These defaults exist only so `helm lint` renders; the module always overrides them.
+clusterSecretStore:
+  enabled: false
+  name: platform
+  backend: azure-key-vault
+  serviceAccount:
+    name: external-secrets
+    namespace: external-secrets
+  azureKeyVault: null

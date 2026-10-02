@@ -52,6 +52,15 @@ Every primitive already accepted an existing `resource_group_name`.
   (`secret_names` non-empty) — the purpose its own description states; its
   propagation wait was already gated that way. A root seeding nothing no longer
   leaves a standing data-plane role behind.
+- **`cluster-addons/external-secrets` (new), split out of `cluster-addons/ingress-tls`.**
+  The External Secrets Operator and its `ClusterSecretStore` are their own add-on:
+  workloads need their secrets whatever serves inbound traffic — an ingress
+  controller from this module set, a cloud provider's managed one, or none yet.
+  `ingress-tls` keeps ingress-nginx, cert-manager and the `ClusterIssuer`, and loses
+  `external_secrets_*`, `secret_store_backend`, `azure_key_vault_store`,
+  `cluster_secret_store_name` and that output. The Azure stack installs the new
+  add-on whenever `enable_secrets_backend` is set — **behaviour change:** no longer
+  only together with `enable_ingress_tls`. Its outputs are unchanged.
 - `stacks/azure/xema-substrate` passes all of it through, each input defaulting to
   today's behaviour (the stack's cloud phase planned before and after: 38
   resources, identical attributes):

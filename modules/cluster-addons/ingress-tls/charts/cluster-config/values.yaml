@@ -7,11 +7,3 @@ clusterIssuer:
   solver: http01 # http01 | dns01-azure
   ingressClassName: nginx
   dns01Azure: null
-clusterSecretStore:
-  enabled: false
-  name: platform
-  backend: azure-key-vault
-  serviceAccount:
-    name: external-secrets
-    namespace: external-secrets
-  azureKeyVault: null

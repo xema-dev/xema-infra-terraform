@@ -148,7 +148,7 @@ variable "enable_object_storage" {
 }
 
 variable "enable_secrets_backend" {
-  description = "Create the Key Vault + the External Secrets reader identity (and, with enable_ingress_tls, the operator + ClusterSecretStore)."
+  description = "Create the Key Vault, the External Secrets reader identity, and the External Secrets Operator with its ClusterSecretStore (cluster-addons/external-secrets) — independent of enable_ingress_tls."
   type        = bool
   default     = true
 }
@@ -617,7 +617,7 @@ variable "key_vault_secrets" {
 }
 
 # ---------------------------------------------------------------------------
-# Ingress + TLS + External Secrets (modules/cluster-addons/ingress-tls)
+# Ingress + TLS (modules/cluster-addons/ingress-tls); the secret store is cluster-addons/external-secrets
 # ---------------------------------------------------------------------------
 
 variable "acme_email" {
