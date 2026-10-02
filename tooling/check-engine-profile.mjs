@@ -62,7 +62,11 @@ export const TOFU_ONLY = Object.freeze([
   { name: 'a removed { … } block (not in Terraform at the >= 1.6 floor the modules declare)', file: /\.tf$/, pattern: /^\s*removed\s*\{/m },
   { name: 'terraform.applying', file: /\.tf$/, pattern: /\bterraform\.applying\b/ },
   { name: 'a provider-defined function call (provider::…)', file: /\.tf$/, pattern: /\bprovider::[a-z0-9_]+::[a-z0-9_]+\s*\(/ },
-  { name: 'provider iteration (for_each on a provider block)', file: /\.tf$/, pattern: /^provider\s+"[^"]+"\s*\{[^}]*?^\s*for_each\s*=/ms },
+  // Provider iteration is a for_each at the provider block's TOP level. `[^{}]` stops the match at
+  // the first nested block, so a `dynamic "exec" { for_each = … }` inside a provider — plain
+  // Terraform — is not mistaken for it. Known limit: a top-level for_each written AFTER a nested
+  // block is not seen (OpenTofu's own examples put it first).
+  { name: 'provider iteration (for_each on a provider block)', file: /\.tf$/, pattern: /^provider\s+"[^"]+"\s*\{[^{}]*?^\s*for_each\s*=/ms },
   { name: 'an engine-naming required_version (tofu/opentofu)', file: /\.tf$/, pattern: /required_version\s*=\s*"[^"]*(tofu|opentofu)[^"]*"/i },
 ]);
 

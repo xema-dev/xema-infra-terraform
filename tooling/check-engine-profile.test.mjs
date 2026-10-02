@@ -101,3 +101,15 @@ test('the live corpus: every leaf under modules/ and stacks/ is terraform-portab
   assert.deepEqual(graded.filter((g) => g.profile !== Profile.TerraformPortable), []);
   assert.ok(TOFU_ONLY.length >= 7);
 });
+
+test('a dynamic block with for_each INSIDE a provider is plain Terraform, not provider iteration', () => {
+  const body = 'provider "kubernetes" {\n  host = "h"\n  dynamic "exec" {\n    for_each = var.on ? [1] : []\n    content {\n      command = "kubelogin"\n    }\n  }\n}\n';
+  const g = leaf({ 'modules/m/versions.tf': PORTABLE_VERSIONS, 'modules/m/main.tf': body });
+  assert.deepEqual(g.findings, []);
+});
+
+test('a top-level provider for_each after ordinary attributes is still refused', () => {
+  const body = 'provider "aws" {\n  region   = "x"\n  for_each = var.regions\n}\n';
+  const g = leaf({ 'modules/m/versions.tf': PORTABLE_VERSIONS, 'modules/m/main.tf': body });
+  assert.equal(g.findings.length, 1, JSON.stringify(g));
+});
