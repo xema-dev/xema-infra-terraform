@@ -175,11 +175,16 @@ variable "existing_postgres_admin_login" {
   default     = ""
 }
 
-variable "existing_postgres_admin_password" {
-  description = "Existing server admin password (consume mode)."
+variable "existing_postgres_admin_password_key_vault_id" {
+  description = "Resource id of the Key Vault holding the existing server's admin password (consume mode) — the vault of the instance that created the server. Read, never typed."
   type        = string
   default     = ""
-  sensitive   = true
+}
+
+variable "postgres_admin_password_secret_name" {
+  description = "Key Vault secret name carrying the server admin password: written by the creating instance, read by a consuming one."
+  type        = string
+  default     = "postgres-admin-password"
 }
 
 # --- provider credentials ---

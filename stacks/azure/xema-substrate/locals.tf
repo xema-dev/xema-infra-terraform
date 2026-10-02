@@ -120,8 +120,23 @@ locals {
   pg_admin_login = var.enable_managed_postgres ? "pgadmin" : var.existing_postgres_admin_login
   pg_admin_password = (var.enable_managed_postgres
     ? (var.postgres_administrator_password != "" ? var.postgres_administrator_password : one(random_password.postgres_admin[*].result))
-  : var.existing_postgres_admin_password)
-  ext_db_server_id = var.enable_managed_postgres ? one(module.postgres[*].cluster_id) : var.existing_postgres_server_id
+  : one(data.azurerm_key_vault_secret.existing_postgres_admin[*].value))
+
+  # Consume mode runs SQL against the existing server only when it has
+  # something to ensure there: this deployment's platform_databases tenancy, or
+  # an extension managed_databases claim (extensions.tf). Only then is the
+  # admin password read — absent both, nothing is read and nothing connects.
+  pg_consume_runs_sql = !var.enable_managed_postgres && (length(local.postgres_databases) > 0 || length(local.ext_databases) > 0)
+
+  # The created server's admin password is written into this stack's own vault
+  # (module.secrets_backend) under postgres_admin_password_secret_name, which is
+  # where a consume-mode instance on the same server reads it from.
+  # The NAME is derived apart from the value: it drives a for_each, and a set
+  # read off a map whose value is a credential must never pick up its marks.
+  pg_admin_password_secret_names = (var.enable_managed_postgres && var.enable_secrets_backend
+  ? [var.postgres_admin_password_secret_name] : [])
+  pg_admin_password_secret = { for name in local.pg_admin_password_secret_names : name => local.pg_admin_password }
+  ext_db_server_id         = var.enable_managed_postgres ? one(module.postgres[*].cluster_id) : var.existing_postgres_server_id
 
   # ---------------------------------------------------------------------------
   # Extension claim flattening, keyed by "<extension>/<claim>" so adding/removing

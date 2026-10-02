@@ -37,6 +37,10 @@ resource "terraform_data" "input_guards" {
       error_message = "enable_identity_realm = true requires keycloak_url."
     }
     precondition {
+      condition     = !(var.enable_managed_postgres && var.enable_secrets_backend) || !contains(keys(var.key_vault_secrets), var.postgres_admin_password_secret_name)
+      error_message = "key_vault_secrets has a key named \"${var.postgres_admin_password_secret_name}\", which is postgres_admin_password_secret_name — the secret this stack writes the created server's admin password to. Rename one of them."
+    }
+    precondition {
       condition     = !var.enable_deployer_identity || var.deployer_namespace != ""
       error_message = "enable_deployer_identity = true requires deployer_namespace: the namespace a deployment declares is a fact about the deployment, and the substrate refuses to invent one from deployment_name or from a directory."
     }
@@ -153,13 +157,25 @@ module "postgres_tenancy" {
   }
 }
 
-resource "terraform_data" "postgres_tenancy_guard" {
-  count = !var.enable_managed_postgres && length(local.postgres_databases) > 0 ? 1 : 0
+# The existing server's admin password, read from the Key Vault the creating
+# instance wrote it to (variables.tf § existing_postgres_admin_password_key_vault_id)
+# — by reference, never typed, never another root's state. The preconditions
+# run before the read, so a missing input is named instead of surfacing as an
+# Azure 404 or a provider connection error.
+data "azurerm_key_vault_secret" "existing_postgres_admin" {
+  count = local.pg_consume_runs_sql ? 1 : 0
+
+  name         = var.postgres_admin_password_secret_name
+  key_vault_id = var.existing_postgres_admin_password_key_vault_id
 
   lifecycle {
     precondition {
       condition     = var.existing_postgres_host != "" && var.existing_postgres_admin_login != ""
-      error_message = "platform_databases is non-empty with enable_managed_postgres = false, so this stack ensures this deployment's databases and roles on the EXISTING server — set existing_postgres_host and existing_postgres_admin_login (and existing_postgres_admin_password), or pass platform_databases = [] if the tenancy is managed elsewhere."
+      error_message = "enable_managed_postgres = false with something to ensure on the existing server (a non-empty platform_databases, or an extension managed_databases claim), so this stack connects to it over SQL — set existing_postgres_host and existing_postgres_admin_login, or pass platform_databases = [] if the tenancy is managed elsewhere."
+    }
+    precondition {
+      condition     = var.existing_postgres_admin_password_key_vault_id != ""
+      error_message = "enable_managed_postgres = false with something to ensure on the existing server, so its admin password is read from Key Vault — set existing_postgres_admin_password_key_vault_id to the vault the creating instance wrote it to (secret \"${var.postgres_admin_password_secret_name}\"), or pass platform_databases = [] if the tenancy is managed elsewhere."
     }
   }
 }
@@ -205,8 +221,11 @@ module "secrets_backend" {
   name   = local.key_vault_name
   region = var.region
 
-  secret_names  = keys(var.key_vault_secrets)
-  secret_values = sensitive(var.key_vault_secrets)
+  # The seeded secrets, plus the created server's admin password under
+  # postgres_admin_password_secret_name (locals.tf) — the one place a consume-
+  # mode instance on the same server reads it from.
+  secret_names  = setunion(keys(var.key_vault_secrets), local.pg_admin_password_secret_names)
+  secret_values = sensitive(merge(var.key_vault_secrets, local.pg_admin_password_secret))
 
   workload_identity = {
     enabled         = true

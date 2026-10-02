@@ -48,12 +48,13 @@ module "substrate" {
   backing_services_network_access = var.backing_services_network_access
 
   # --- consume-mode facts (existing cluster / server) ---
-  cluster_name                     = var.cluster_name
-  cluster_resource_group_name      = var.cluster_resource_group_name
-  existing_postgres_server_id      = var.existing_postgres_server_id
-  existing_postgres_host           = var.existing_postgres_host
-  existing_postgres_admin_login    = var.existing_postgres_admin_login
-  existing_postgres_admin_password = var.existing_postgres_admin_password
+  cluster_name                                  = var.cluster_name
+  cluster_resource_group_name                   = var.cluster_resource_group_name
+  existing_postgres_server_id                   = var.existing_postgres_server_id
+  existing_postgres_host                        = var.existing_postgres_host
+  existing_postgres_admin_login                 = var.existing_postgres_admin_login
+  existing_postgres_admin_password_key_vault_id = var.existing_postgres_admin_password_key_vault_id
+  postgres_admin_password_secret_name           = var.postgres_admin_password_secret_name
 
   # --- provider credentials ---
   azure_subscription_id  = var.azure_subscription_id

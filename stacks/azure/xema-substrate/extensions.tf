@@ -34,7 +34,7 @@ resource "azurerm_postgresql_flexible_server_database" "extension" {
   lifecycle {
     precondition {
       condition     = local.ext_db_server_id != ""
-      error_message = "Extension managed_databases were declared but no Postgres server is resolved. Set enable_managed_postgres = true, or provide existing_postgres_server_id (plus existing_postgres_host and admin credentials for the owner roles)."
+      error_message = "Extension managed_databases were declared but no Postgres server is resolved. Set enable_managed_postgres = true, or provide existing_postgres_server_id (plus existing_postgres_host, existing_postgres_admin_login and existing_postgres_admin_password_key_vault_id for the owner roles)."
     }
   }
 }

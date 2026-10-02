@@ -13,7 +13,7 @@ substrate cannot know — which databases and which namespaces exist — are
 | --- | --- |
 | `module.cluster` | AKS cluster + node pools + VNet (AKS subnet, Postgres-delegated subnet), workload identity on |
 | `module.postgres` | PostgreSQL Flexible Server + the `platform_databases` roster (prefixed) and the derived roles |
-| `module.postgres_tenancy` | consume mode: the same prefixed databases and derived roles, ensured inside the EXISTING server over SQL — one stack instance per environment on a shared server |
+| `module.postgres_tenancy` | consume mode: the same prefixed databases and derived roles, ensured inside the EXISTING server over SQL — one stack instance per environment on a shared server; admin password read from Key Vault |
 | `module.dns` | the `apex_domain` zone's records (+ the cert-manager DNS-01 identity when that solver is used) |
 | `module.blob` | the storage account the platform's blob adapter targets |
 | `module.secrets_backend` | Key Vault + the External Secrets reader identity |
@@ -145,7 +145,7 @@ Every area is **independently toggleable** via an `enable_*` input:
 | Input | Default | What it gates |
 | --- | --- | --- |
 | `enable_cluster` | `true` | Create AKS (in `network`). `false` ⇒ read the existing cluster by `cluster_name` / `cluster_resource_group_name`. |
-| `enable_managed_postgres` | `true` | Create the Flexible Server. `false` ⇒ extension databases target `existing_postgres_server_id` (+ `existing_postgres_host` and admin creds for owner roles). |
+| `enable_managed_postgres` | `true` | Create the Flexible Server (and, with `enable_secrets_backend`, write its admin password to this stack's Key Vault). `false` ⇒ the tenancy and extension databases go to `existing_postgres_server_id` / `existing_postgres_host`, with the admin password READ from Key Vault — see [Consume mode: the existing server](#consume-mode-the-existing-server). |
 | `enable_dns` | `true` | Manage the `apex_domain` zone. `false` ⇒ DNS owned elsewhere (extension `dns_records` and `dns01-azure` then fail fast). |
 | `enable_object_storage` | `true` | Create the blob storage account. |
 | `enable_secrets_backend` | `true` | Create the Key Vault + reader identity (and the External Secrets store when `enable_ingress_tls`). |
@@ -159,6 +159,49 @@ A disabled cloud module is `count`-gated to zero — the stack **consumes** the
 existing resource instead of creating it; it never plans a destroy. `network`
 is required in both modes whenever the stack creates something that lives in
 it (the cluster, a private PostgreSQL server, a private backing service).
+
+## Consume mode: the existing server
+
+With `enable_managed_postgres = false` and something to ensure on the existing
+server — a non-empty `platform_databases`, or an extension `managed_databases`
+claim — this stack connects to that server **over SQL**, as
+`existing_postgres_admin_login`. With neither, it reads nothing and connects to
+nothing.
+
+**The admin password is read from Key Vault, by reference.** An instance that
+CREATES a server (`enable_managed_postgres = true`, `enable_secrets_backend =
+true`) writes the server's admin password into its own vault under
+`postgres_admin_password_secret_name` (default `postgres-admin-password`). A
+consuming instance reads it with an `azurerm_key_vault_secret` data source from
+`existing_postgres_admin_password_key_vault_id` under the same name — so the
+defaults match with no coordination. There is no password input, and no
+`terraform_remote_state`: a typed password has been written somewhere before it
+reaches state, and a remote-state read couples this root to another root's
+backend. The principal running Terraform needs **Key Vault Secrets User** on
+that vault. A creating instance with `enable_secrets_backend = false` has no
+vault to write to; its admin password stays only in its state.
+
+| missing, with SQL to run | refused before the read, naming |
+| --- | --- |
+| `existing_postgres_host` / `existing_postgres_admin_login` | both inputs |
+| `existing_postgres_admin_password_key_vault_id` | the input and the secret name it would read |
+
+**Run consume mode where the server's host resolves.** Terraform connects
+straight to `existing_postgres_host`, so for a private server it must run on an
+**in-VNet runner** (the foundation's management runner) whose VNet is linked to
+the server's private DNS zone (`<server>.private.postgres.database.azure.com`)
+— and, if the vault is private too, to `privatelink.vaultcore.azure.net`.
+Nothing here checks resolution up front — the stack uses no DNS-lookup
+provider, and one is not added just for a pre-flight. The provider connects
+lazily, so `plan` passes from the wrong place and the APPLY stops at the first
+`postgresql_*` resource with:
+
+```
+Error: error connecting to PostgreSQL server <host> (scheme: postgres): dial tcp: lookup <host>: no such host
+```
+
+That message means "not on a runner whose VNet is linked to the zone", not "the
+server is gone".
 
 ## Extension claims
 
@@ -208,7 +251,8 @@ configure. The import path does not hit it either — see
   managed.
 - Postgres roles are created through the `cyrilgdn/postgresql` provider,
   configured from values the stack decides (derived host, minted admin
-  password) rather than module outputs — a provider fed by the outputs of the
+  password — or, in consume mode, the password read from Key Vault) rather
+  than module outputs — a provider fed by the outputs of the
   module that uses it is a cycle.
 - `ca_certificate` for Postgres is `""` because the chain is anchored on public
   roots; `sslmode=verify-full` works with the OS bundle.

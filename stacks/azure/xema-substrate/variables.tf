@@ -433,7 +433,7 @@ variable "existing_postgres_server_id" {
 }
 
 variable "existing_postgres_host" {
-  description = "FQDN of that existing server, for the postgresql provider (extension owner roles) when enable_managed_postgres = false."
+  description = "FQDN of that existing server, for the postgresql provider when enable_managed_postgres = false (platform_databases tenancy, extension owner roles). Terraform connects to it DIRECTLY over SQL, so it must resolve and be reachable from where Terraform runs — for a private server, an in-VNet runner whose VNet is linked to the server's privatelink zone (README § Consume mode)."
   type        = string
   default     = ""
 }
@@ -444,11 +444,51 @@ variable "existing_postgres_admin_login" {
   default     = ""
 }
 
-variable "existing_postgres_admin_password" {
-  description = "Administrator password of the existing server (consume mode)."
+variable "existing_postgres_admin_password_key_vault_id" {
+  description = <<-EOT
+    Resource id of the Key Vault holding the EXISTING server's administrator
+    password (consume mode), read by an azurerm_key_vault_secret data source
+    under postgres_admin_password_secret_name. The stack instance that CREATED
+    the server writes it there (enable_managed_postgres = true with
+    enable_secrets_backend = true), so for a server this stack created
+    elsewhere this is THAT instance's vault:
+    `az keyvault show -n <its key_vault_name> --query id -o tsv`.
+
+    There is deliberately no password input: a password typed into a tfvars
+    file or an environment variable has been written somewhere before it
+    reaches state, and a remote_state read would couple this root to another
+    root's state backend. Read only when this instance runs SQL against the
+    existing server — a non-empty platform_databases or an extension
+    managed_databases claim — and required then; otherwise nothing is read.
+    The principal running Terraform needs "Key Vault Secrets User" on it.
+  EOT
   type        = string
   default     = ""
-  sensitive   = true
+
+  validation {
+    condition     = var.existing_postgres_admin_password_key_vault_id == "" || can(regex("^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.KeyVault/vaults/[^/]+$", var.existing_postgres_admin_password_key_vault_id))
+    error_message = "existing_postgres_admin_password_key_vault_id must be a Key Vault resource id: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.KeyVault/vaults/<name>."
+  }
+}
+
+variable "postgres_admin_password_secret_name" {
+  description = <<-EOT
+    The Key Vault secret name that carries the PostgreSQL server administrator
+    password — one name for both directions. With enable_managed_postgres =
+    true AND enable_secrets_backend = true this stack WRITES the admin password
+    of the server it creates into its own vault under this name; with
+    enable_managed_postgres = false it READS the existing server's admin
+    password from existing_postgres_admin_password_key_vault_id under it. Left
+    at the default on both sides, the two match without coordination. Must not
+    also be a key of key_vault_secrets.
+  EOT
+  type        = string
+  default     = "postgres-admin-password"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.postgres_admin_password_secret_name))
+    error_message = "postgres_admin_password_secret_name must be 1-127 letters, digits or hyphens (a Key Vault secret name)."
+  }
 }
 
 # ---------------------------------------------------------------------------

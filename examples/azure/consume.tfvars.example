@@ -15,7 +15,9 @@
 #   - enable_cluster / enable_managed_postgres / enable_dns are FALSE.
 #   - cluster_name + cluster_resource_group_name name the EXISTING cluster.
 #   - existing_postgres_* describe the EXISTING server (extension databases and
-#     their owner roles land there).
+#     their owner roles land there); its admin password is read from Key Vault.
+#   - Terraform connects to that server over SQL, so run this from where its
+#     host resolves: an in-VNet runner with the privatelink zones linked.
 #   - tls_solver is http01, because dns01-azure needs this stack to own the zone.
 
 # --- identity ---
@@ -51,7 +53,10 @@ cluster_resource_group_name = "existing-shared-rg"
 existing_postgres_server_id      = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/existing-shared-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/existing-shared-pg"
 existing_postgres_host           = "existing-shared-pg.postgres.database.azure.com"
 existing_postgres_admin_login    = "pgadmin"
-existing_postgres_admin_password = "REPLACE_ME_EXISTING_PG_ADMIN_PASSWORD"
+# The admin password is NOT a value here: it is read from the Key Vault of the
+# instance that created the server (it writes it under
+# postgres_admin_password_secret_name, default "postgres-admin-password").
+existing_postgres_admin_password_key_vault_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/existing-shared-kv-rg/providers/Microsoft.KeyVault/vaults/existing-shared-kv"
 
 # --- databases + namespaces: YOUR rosters, derived from what you deploy ---
 # The stack has no default for either and refuses to plan without them. With

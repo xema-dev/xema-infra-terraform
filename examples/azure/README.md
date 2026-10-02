@@ -91,8 +91,12 @@ The Postgres roles need the operator to **reach** the server: private access
 
 With `enable_cluster = false` the cluster is **read** by name, so its facts are
 known before the providers configure: `terraform apply` in one pass. It creates
-no cluster, server or zone; extension databases land on
-`existing_postgres_server_id`.
+no cluster, server or zone; the tenancy and extension databases land on
+the existing server, whose admin password is read from the creating instance's
+Key Vault (`existing_postgres_admin_password_key_vault_id`). Terraform connects
+to that server over SQL, so run it where `existing_postgres_host` resolves — an
+in-VNet runner with the privatelink zones linked — see the stack README's
+[consume-mode section](../../stacks/azure/xema-substrate/README.md#consume-mode-the-existing-server).
 
 ## Existing infrastructure (import)
 
