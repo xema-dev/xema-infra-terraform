@@ -52,6 +52,11 @@ locals {
   postgres_role_options = {
     (local.postgres_provisioner_role) = { create_database = true }
   }
+  # ONE ownership rule, for a created server and a consumed one alike: the app
+  # role OWNS every database it is given, so a migration running as it can
+  # CREATE in schema `public` (on PostgreSQL 15+ only the owner can). The
+  # provisioner reaches them with CONNECT.
+  postgres_database_owners = { for db in local.postgres_databases : db => local.postgres_app_role }
 
   blob_containers = [for c in var.blob_containers : "${local.blob_container_prefix}-${c}"]
 

@@ -141,7 +141,6 @@ which is a rotation, so schedule it like one.
 | Input | Required | Description |
 | --- | --- | --- |
 | `databases` | **yes** | the databases to ensure (unquoted-identifier grammar) |
-| `existing_databases` | no | databases a control plane already created; granted on (PUBLIC revoke, `connect_grants`, `extensions`) but never created, altered or dropped |
 | `connecting_role` | **yes** | the role the provider connects as; granted every role in `roles` (PostgreSQL 16+) |
 | `roles` | **yes** | the login roles to ensure; each gets a generated password |
 | `role_options` | no | per-role `create_database` / `connection_limit` |

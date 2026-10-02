@@ -49,9 +49,9 @@ output "role_passwords" {
   sensitive   = true
 }
 
-output "database_ids" {
-  description = "Database resource ids keyed by database name."
-  value       = { for k, d in azurerm_postgresql_flexible_server_database.this : k => d.id }
+output "databases" {
+  description = "The databases ensured on the server (created over SQL by modules/postgres-tenancy)."
+  value       = length(module.tenancy) > 0 ? module.tenancy[0].databases : toset([])
 }
 
 output "resource_group_name" {

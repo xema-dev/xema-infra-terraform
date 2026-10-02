@@ -142,8 +142,14 @@ variable "databases" {
   default     = []
 }
 
+variable "database_owners" {
+  description = "The role that OWNS each database, as `database => role` (both must be in `databases` / `roles`). The owner may CREATE in schema `public`, which on PostgreSQL 15+ no other role may — so the role an application migrates as must own its database. A database absent from the map is owned by the administrator."
+  type        = map(string)
+  default     = {}
+}
+
 variable "roles" {
-  description = "Logical login roles to ensure exist on the server, created through the cyrilgdn/postgresql provider. Every role is granted CONNECT on every database in var.databases; CONNECT is revoked from PUBLIC on each."
+  description = "Logical login roles to ensure exist on the server, created through the cyrilgdn/postgresql provider (modules/postgres-tenancy). Every role is granted CONNECT on every database in var.databases — CONNECT, TEMPORARY, CREATE on one it owns (database_owners); CONNECT is revoked from PUBLIC on each."
   type        = set(string)
   default     = []
 }

@@ -48,16 +48,6 @@ locals {
     }
   ]...)
 
-  # Every database this module governs, and the name each is reached by: the
-  # ones it CREATES (resolved through the resource, so a grant waits for the
-  # CREATE) and the ones a control plane already created (existing_databases),
-  # which it grants on and never creates, alters or drops.
-  governed_databases = setunion(var.databases, var.existing_databases)
-  database_names = merge(
-    { for database in var.existing_databases : database => database },
-    { for database in var.databases : database => postgresql_database.this[database].name },
-  )
-
   # `database => set(extension)` flattened the same way.
   extensions = merge([
     for database, names in var.extensions : {
@@ -73,20 +63,16 @@ locals {
 resource "terraform_data" "input_guards" {
   lifecycle {
     precondition {
-      condition     = alltrue([for database in keys(var.extensions) : contains(local.governed_databases, database)])
+      condition     = alltrue([for database in keys(var.extensions) : contains(var.databases, database)])
       error_message = "extensions names a database this module does not manage. Add it to `databases`, or declare the extension where that database IS managed — creating an extension in somebody else's database is a write outside this module's stated reach."
     }
     precondition {
       condition     = alltrue([for database in keys(var.database_owners) : contains(var.databases, database)])
-      error_message = "database_owners names a database this module does not CREATE. An owner is set by the CREATE (or an adopting import); a database in existing_databases keeps the owner its control plane gave it."
+      error_message = "database_owners names a database this module does not manage."
     }
     precondition {
       condition     = alltrue([for role in values(var.database_owners) : contains(var.roles, role)])
       error_message = "database_owners names a role this module does not manage. A database owned by a role nothing here creates is a database nothing can migrate."
-    }
-    precondition {
-      condition     = length(setintersection(var.databases, var.existing_databases)) == 0
-      error_message = "A database is in both databases and existing_databases. It is either created here or created elsewhere, never both."
     }
     precondition {
       condition     = alltrue([for role in keys(var.connect_grants) : contains(var.roles, role)])
@@ -95,7 +81,7 @@ resource "terraform_data" "input_guards" {
     precondition {
       condition = alltrue([
         for _, databases in var.connect_grants : alltrue([
-          for database in databases : contains(local.governed_databases, database)
+          for database in databases : contains(var.databases, database)
         ])
       ])
       error_message = "connect_grants names a database this module does not manage."
@@ -195,9 +181,9 @@ resource "postgresql_database" "this" {
 # database`, measured. Ordered this way, the PUBLIC revoke is undone while the
 # owner still holds CONNECT.
 resource "postgresql_grant" "revoke_public" {
-  for_each = var.revoke_public_connect ? local.governed_databases : toset([])
+  for_each = var.revoke_public_connect ? var.databases : toset([])
 
-  database    = local.database_names[each.value]
+  database    = postgresql_database.this[each.value].name
   role        = "public"
   object_type = "database"
   privileges  = []
@@ -208,7 +194,7 @@ resource "postgresql_grant" "revoke_public" {
 resource "postgresql_grant" "connect" {
   for_each = local.connect_grants
 
-  database    = local.database_names[each.value.database]
+  database    = postgresql_database.this[each.value.database].name
   role        = postgresql_role.this[each.value.role].name
   object_type = "database"
   privileges  = each.value.privileges
@@ -221,7 +207,7 @@ resource "postgresql_extension" "this" {
   for_each = local.extensions
 
   name     = each.value.name
-  database = local.database_names[each.value.database]
+  database = postgresql_database.this[each.value.database].name
 
   # Dropping an extension takes the objects that depend on it — an index, a
   # column type. Removing a name from `extensions` therefore leaves the

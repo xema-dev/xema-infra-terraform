@@ -1,6 +1,6 @@
 output "databases" {
-  description = "The databases governed on the server: the ones created here and the existing_databases granted on."
-  value       = toset(values(local.database_names))
+  description = "The databases ensured on the server."
+  value       = toset([for database in postgresql_database.this : database.name])
 }
 
 output "roles" {
@@ -22,7 +22,7 @@ output "role_passwords" {
 output "extensions" {
   description = "The extensions ensured, as `database => set(extension)` — the answer to \"does this database carry what its application needs\" without a psql session."
   value = {
-    for database in local.governed_databases : database => toset([
+    for database in var.databases : database => toset([
       for entry in postgresql_extension.this : entry.name if entry.database == database
     ])
     if length(try(var.extensions[database], [])) > 0

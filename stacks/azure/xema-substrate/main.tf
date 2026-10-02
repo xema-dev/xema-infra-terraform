@@ -110,10 +110,11 @@ module "postgres" {
   administrator_password          = local.pg_admin_password
   backup_retention_days           = local.postgres_backup_retention
 
-  databases    = local.postgres_databases
-  roles        = local.postgres_roles
-  role_options = local.postgres_role_options
-  tags         = local.tags
+  databases       = local.postgres_databases
+  database_owners = local.postgres_database_owners
+  roles           = local.postgres_roles
+  role_options    = local.postgres_role_options
+  tags            = local.tags
 }
 
 # CONSUME MODE: the server already exists — another environment's, another
@@ -148,9 +149,8 @@ module "postgres_tenancy" {
   roles        = toset(local.postgres_roles)
   role_options = local.postgres_role_options
 
-  # The app role OWNS its databases (a migration must be able to CREATE in them),
-  # and reaches every one of them; the provisioner reaches them with CONNECT.
-  database_owners = { for db in local.postgres_databases : db => local.postgres_app_role }
+  # The same ownership rule as the created server (locals.tf).
+  database_owners = local.postgres_database_owners
   connect_grants = {
     (local.postgres_app_role)         = local.postgres_databases
     (local.postgres_provisioner_role) = local.postgres_databases

@@ -16,24 +16,6 @@ variable "databases" {
   }
 }
 
-variable "existing_databases" {
-  description = <<-EOT
-    Databases that ALREADY exist because something else created them — a
-    cloud control plane (providers/azure/managed-postgres creates its
-    databases through Azure's API) — and that this module governs without
-    owning: it revokes PUBLIC, grants, and creates extensions in them, and never
-    creates, alters or drops them. A database is in `databases` or here, never
-    both; `database_owners` may name only `databases`.
-  EOT
-  type        = set(string)
-  default     = []
-
-  validation {
-    condition     = alltrue([for name in var.existing_databases : can(regex("^[a-z_][a-z0-9_]{0,62}$", name))])
-    error_message = "Each existing_databases name must be lowercase alphanumerics and underscores, starting with a letter or underscore (1-63 chars)."
-  }
-}
-
 variable "connecting_role" {
   description = <<-EOT
     The role the root's postgresql provider connects as — its `username`. A

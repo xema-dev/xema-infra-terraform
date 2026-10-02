@@ -101,43 +101,56 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "this" {
   end_ip_address   = each.value.end_ip_address
 }
 
-resource "azurerm_postgresql_flexible_server_database" "this" {
-  for_each = var.databases
-
-  name      = each.value
-  server_id = azurerm_postgresql_flexible_server.this.id
-  charset   = "UTF8"
-  collation = "en_US.utf8"
-}
-
 # ---------------------------------------------------------------------------
-# Roles and grants live INSIDE the server: Azure's control plane has no logical
-# role resource, so they go through the postgresql provider, which the stack
-# configures against the admin credentials above.
+# Databases, roles and grants live INSIDE the server, and are NOT implemented
+# here: modules/postgres-tenancy is the one implementation of in-server
+# tenancy — the same module a stack uses on a server it only consumes — so a
+# created server and a consumed one get ONE rule. The postgresql provider it
+# uses is configured by the stack against the admin credentials above.
 #
-# They are NOT implemented here. modules/postgres-tenancy is the one
-# implementation of in-server tenancy — the same module a stack uses on a
-# server it only consumes — so the PostgreSQL 16 handling it carries (the
-# connecting admin granted every managed role; revoke-PUBLIC ordered for a
-# clean destroy; a measured provider floor) cannot be fixed in one copy and
-# missed in the other. The databases above stay control-plane resources and
-# are passed as existing_databases: the tenancy module grants on them and never
-# creates, alters or drops them. No owner is set, exactly as before: every role
-# gets CONNECT on every database and PUBLIC loses it.
+# The databases are created over SQL rather than through Azure's control
+# plane, because the rule includes OWNERSHIP: `database_owners` names the role
+# that owns each database, so an application migrating as that role can CREATE
+# in schema `public` — on PostgreSQL 15+ only the database owner can — with
+# Terraform alone. A control-plane database cannot be given an owner by any
+# resource this repository uses. Every role in `roles` reaches every database
+# (`CONNECT`, or `CONNECT, TEMPORARY, CREATE` for its owner); PUBLIC loses it.
 # ---------------------------------------------------------------------------
 
 module "tenancy" {
   source = "../../../postgres-tenancy"
   count  = length(var.roles) > 0 || length(var.databases) > 0 ? 1 : 0
 
-  connecting_role    = var.administrator_login
-  databases          = []
-  existing_databases = var.databases
-  roles              = var.roles
-  role_options       = var.role_options
-  connect_grants     = { for role in var.roles : role => var.databases }
+  connecting_role = var.administrator_login
+  databases       = var.databases
+  database_owners = var.database_owners
+  roles           = var.roles
+  role_options    = var.role_options
+  connect_grants  = { for role in var.roles : role => var.databases }
 
-  depends_on = [azurerm_postgresql_flexible_server_database.this]
+  depends_on = [
+    azurerm_postgresql_flexible_server.this,
+    azurerm_postgresql_flexible_server_firewall_rule.this,
+  ]
+}
+
+# RETIRED, KEPT AS A FENCE — never as a way to create anything (no instance can
+# exist: for_each is empty). Until this change the databases were these
+# control-plane resources. A state that still holds one would otherwise plan
+# its DESTROY, and destroying a Flexible Server database drops it with its
+# data. prevent_destroy turns that into a refusal ("Instance cannot be
+# destroyed"), and the README's migration — state rm, then import each
+# database into module.tenancy[0].postgresql_database.this — re-addresses the
+# same database, after which the plan is the owner change, in place.
+resource "azurerm_postgresql_flexible_server_database" "this" {
+  for_each = toset([])
+
+  name      = each.value
+  server_id = azurerm_postgresql_flexible_server.this.id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # The in-server objects moved into module.tenancy with the same keys, so an
