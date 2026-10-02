@@ -13,6 +13,7 @@ substrate cannot know — which databases and which namespaces exist — are
 | --- | --- |
 | `module.cluster` | AKS cluster + node pools + VNet (AKS subnet, Postgres-delegated subnet), workload identity on |
 | `module.postgres` | PostgreSQL Flexible Server + the `platform_databases` roster (prefixed) and the derived roles |
+| `module.postgres_tenancy` | consume mode: the same prefixed databases and derived roles, ensured inside the EXISTING server over SQL — one stack instance per environment on a shared server |
 | `module.dns` | the `apex_domain` zone's records (+ the cert-manager DNS-01 identity when that solver is used) |
 | `module.blob` | the storage account the platform's blob adapter targets |
 | `module.secrets_backend` | Key Vault + the External Secrets reader identity |
@@ -57,7 +58,7 @@ the backup retention window are `prod`-only.
 
 | Input | What it is | Rule |
 | --- | --- | --- |
-| `platform_databases` | the logical databases to ensure on the created server, UNPREFIXED (`"identity"`, `"billing"`, …) | each becomes `<deployment_name as _>_<name>`; validated `^[a-z][a-z0-9_]{0,42}$`; ignored when `enable_managed_postgres = false` |
+| `platform_databases` | the logical databases to ensure on the created server, UNPREFIXED (`"identity"`, `"billing"`, …) | each becomes `<deployment_name as _>_<name>`; validated `^[a-z][a-z0-9_]{0,42}$`; with `enable_managed_postgres = false` the same names and roles are ensured on the existing server (`module.postgres_tenancy`), or nothing when `[]` |
 | `workload_namespaces` | the namespaces to ensure exist, by FULL name | DNS-1123 labels; nothing is derived from `deployment_name`; ignored when `enable_workload_namespaces = false` |
 
 Both have **no default**: which databases and namespaces a deployment needs is

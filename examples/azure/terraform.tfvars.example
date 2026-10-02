@@ -88,20 +88,20 @@ node_pools = {
 # about the substrate. This EXAMPLE lists what one deployment of the reference
 # platform uses; yours comes from your own distribution.
 platform_databases = [ # unprefixed; the stack prefixes "acme_dev_"
-  "identity_api",
-  "secrets_api",
-  "event_hub_api",
-  "llm_gateway_api",
-  "mcp_gateway_api",
-  "org_database_pool_api",
-  "redis_pool_api",
+  # DERIVED, never typed: xema-deploy projects this list from the deployment's
+  # own declarations —
+  #   node scripts/generate-postgres-database-bootstrap.mjs \
+  #     --deployment acme-dev --terraform-roster > acme-dev.auto.tfvars.json
+  # — so these are the names its database-entitlement rule admits
+  # (`<service minus -api>`), never `mcp_gateway_api` and kin, which the
+  # services that open them would refuse.
   "biomes",
+  "mcp_gateway",
   "openfga",
+  "org_database_pool",
+  "redis_pool",
   "temporal",
   "temporal_visibility",
-  "gitea",
-  "keycloak",
-  # "billing_api",           # add it when the edition you deploy bills
 ]
 workload_namespaces = [ # full names; nothing derived
   "acme-dev",

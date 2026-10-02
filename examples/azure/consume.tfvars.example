@@ -55,24 +55,26 @@ existing_postgres_admin_password = "REPLACE_ME_EXISTING_PG_ADMIN_PASSWORD"
 
 # --- databases + namespaces: YOUR rosters, derived from what you deploy ---
 # The stack has no default for either and refuses to plan without them. With
-# enable_managed_postgres = false the database roster is NOT applied (a consumed
-# server's databases are not managed here), but it is still declared so the
-# same tfvars flips to greenfield without a second edit.
+# enable_managed_postgres = false the same roster (and the derived app and
+# provisioner roles) is ensured on the EXISTING server through
+# modules/postgres-tenancy — so dev and prod instances of this stack pointed at
+# one shared server each own exactly their own prefixed set. Pass [] when the
+# tenancy is managed elsewhere.
 platform_databases = [ # unprefixed; the stack prefixes "acme_dev_"
-  "identity_api",
-  "secrets_api",
-  "event_hub_api",
-  "llm_gateway_api",
-  "mcp_gateway_api",
-  "org_database_pool_api",
-  "redis_pool_api",
+  # DERIVED, never typed: xema-deploy projects this list from the deployment's
+  # own declarations —
+  #   node scripts/generate-postgres-database-bootstrap.mjs \
+  #     --deployment acme-dev --terraform-roster > acme-dev.auto.tfvars.json
+  # — so these are the names its database-entitlement rule admits
+  # (`<service minus -api>`), never `mcp_gateway_api` and kin, which the
+  # services that open them would refuse.
   "biomes",
+  "mcp_gateway",
   "openfga",
+  "org_database_pool",
+  "redis_pool",
   "temporal",
   "temporal_visibility",
-  "gitea",
-  "keycloak",
-  # "billing_api",           # add it when the edition you deploy bills
 ]
 workload_namespaces = [ # full names; nothing derived
   "acme-dev",

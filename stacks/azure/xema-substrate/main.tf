@@ -112,6 +112,53 @@ module "postgres" {
   tags         = local.tags
 }
 
+# CONSUME MODE: the server already exists — another environment's, another
+# team's, a server shared between this deployment's dev and prod — so it has no
+# control plane this stack owns, and the tenancy is done INSIDE it, over SQL,
+# by modules/postgres-tenancy through the postgresql provider (providers.tf,
+# which targets the existing server's admin credentials in this mode).
+#
+# The databases and roles are the SAME derivation the created server gets
+# (locals.tf): `<deployment>_<name>` for every platform_databases entry, the
+# `<deployment>` app role and its `_provisioner` sibling. So two instances of
+# this stack — one per environment — pointed at ONE server each ensure exactly
+# their own set, and neither can name the other's: every name carries its
+# deployment. Until this existed a consumed server got NO databases and NO roles
+# from here, so every environment after the first had no producer for them.
+#
+# The tenancy module creates-or-adopts what it is told and touches nothing
+# else (no drop of unnamed databases), which is what makes a shared server safe
+# to manage from N stacks. ABSENT IS THE IDENTITY: an empty platform_databases
+# in consume mode instantiates nothing — a consumer that manages its tenancy
+# elsewhere keeps exactly today's plan.
+module "postgres_tenancy" {
+  source = "../../../modules/postgres-tenancy"
+  count  = !var.enable_managed_postgres && length(local.postgres_databases) > 0 ? 1 : 0
+
+  databases    = local.postgres_databases
+  roles        = toset(local.postgres_roles)
+  role_options = local.postgres_role_options
+
+  # The app role OWNS its databases (a migration must be able to CREATE in them),
+  # and reaches every one of them; the provisioner reaches them with CONNECT.
+  database_owners = { for db in local.postgres_databases : db => local.postgres_app_role }
+  connect_grants = {
+    (local.postgres_app_role)         = local.postgres_databases
+    (local.postgres_provisioner_role) = local.postgres_databases
+  }
+}
+
+resource "terraform_data" "postgres_tenancy_guard" {
+  count = !var.enable_managed_postgres && length(local.postgres_databases) > 0 ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = var.existing_postgres_host != "" && var.existing_postgres_admin_login != ""
+      error_message = "platform_databases is non-empty with enable_managed_postgres = false, so this stack ensures this deployment's databases and roles on the EXISTING server — set existing_postgres_host and existing_postgres_admin_login (and existing_postgres_admin_password), or pass platform_databases = [] if the tenancy is managed elsewhere."
+    }
+  }
+}
+
 module "dns" {
   source = "../../../modules/providers/azure/dns"
   count  = var.enable_dns ? 1 : 0

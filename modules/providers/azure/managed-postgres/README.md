@@ -21,7 +21,7 @@ module "postgres" {
   vpc_id              = module.cluster.vpc_id
   delegated_subnet_id = module.cluster.delegated_subnet_id
 
-  databases = ["acme_dev_identity_api", "acme_dev_biomes"]
+  databases = ["acme_dev_mcp_gateway", "acme_dev_biomes"]
   roles     = ["acme_dev", "acme_dev_provisioner"]
   role_options = {
     acme_dev_provisioner = { create_database = true }

@@ -366,7 +366,8 @@ variable "backing_services_network_access" {
 
 # ---------------------------------------------------------------------------
 # Managed Postgres (modules/providers/azure/managed-postgres) — created only
-# when enable_managed_postgres. Databases and roles are DERIVED (locals.tf).
+# when enable_managed_postgres. Databases and roles are DERIVED (locals.tf),
+# and ensured on an EXISTING server too (module.postgres_tenancy) when consumed.
 # ---------------------------------------------------------------------------
 
 variable "postgres_engine_version" {
@@ -411,8 +412,11 @@ variable "platform_databases" {
     Postgres rewrite this stack applies (locals.tf): it is prefixed with the
     deployment name in identifier form, "<deployment_name with - as _>_<name>".
     Each name: lowercase letters, digits and underscores, starting with a
-    letter. Ignored when enable_managed_postgres = false (a consumed server's
-    databases are not managed here).
+    letter. With enable_managed_postgres = false the SAME names (and the
+    derived roles) are ensured on the EXISTING server through
+    modules/postgres-tenancy — one stack instance per environment, each owning
+    only its own prefixed set; pass [] there when the tenancy is managed
+    elsewhere.
   EOT
   type        = set(string)
 

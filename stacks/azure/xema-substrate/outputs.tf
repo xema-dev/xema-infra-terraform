@@ -44,19 +44,19 @@ output "postgres_uri" {
 }
 
 output "postgres_role_passwords" {
-  description = "Generated passwords for the derived roles (app + provisioner), keyed by role; null when consumed."
-  value       = one(module.postgres[*].role_passwords)
+  description = "Generated passwords for the derived roles (app + provisioner), keyed by role — on the created server, or on the consumed one when this stack ensures its tenancy there; null otherwise."
+  value       = var.enable_managed_postgres ? one(module.postgres[*].role_passwords) : one(module.postgres_tenancy[*].role_passwords)
   sensitive   = true
 }
 
 output "postgres_databases" {
-  description = "The databases ensured on the created server — var.platform_databases after the deployment-name prefix; null when consumed."
-  value       = var.enable_managed_postgres ? local.postgres_databases : null
+  description = "The databases ensured — var.platform_databases after the deployment-name prefix — on the created server, or on the consumed one when this stack ensures its tenancy there; null otherwise."
+  value       = var.enable_managed_postgres || length(module.postgres_tenancy) > 0 ? local.postgres_databases : null
 }
 
 output "postgres_roles" {
-  description = "The derived roles ensured on the created server; null when consumed."
-  value       = var.enable_managed_postgres ? local.postgres_roles : null
+  description = "The derived roles ensured on the created server, or on the consumed one when this stack ensures its tenancy there; null otherwise."
+  value       = var.enable_managed_postgres || length(module.postgres_tenancy) > 0 ? local.postgres_roles : null
 }
 
 output "dns_domain" {
@@ -196,9 +196,9 @@ output "substrate" {
 
     postgres_host             = one(module.postgres[*].host)
     postgres_port             = one(module.postgres[*].port)
-    postgres_app_role         = var.enable_managed_postgres ? local.postgres_app_role : null
-    postgres_provisioner_role = var.enable_managed_postgres ? local.postgres_provisioner_role : null
-    postgres_databases        = var.enable_managed_postgres ? local.postgres_databases : null
+    postgres_app_role         = var.enable_managed_postgres || length(module.postgres_tenancy) > 0 ? local.postgres_app_role : null
+    postgres_provisioner_role = var.enable_managed_postgres || length(module.postgres_tenancy) > 0 ? local.postgres_provisioner_role : null
+    postgres_databases        = var.enable_managed_postgres || length(module.postgres_tenancy) > 0 ? local.postgres_databases : null
 
     blob_account          = one(module.blob[*].bucket)
     blob_endpoint         = one(module.blob[*].endpoint)
