@@ -45,7 +45,7 @@ output "administrator_password" {
 
 output "role_passwords" {
   description = "Generated passwords keyed by role name. Treat as credentials."
-  value       = { for r in var.roles : r => random_password.role[r].result }
+  value       = length(module.tenancy) > 0 ? module.tenancy[0].role_passwords : {}
   sensitive   = true
 }
 

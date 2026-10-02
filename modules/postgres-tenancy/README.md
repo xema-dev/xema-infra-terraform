@@ -90,8 +90,20 @@ created on 16 (`permission denied to reassign objects`).
 Not covered, by construction: a role that ALREADY exists and was created by a
 different role (a superuser running a bootstrap file) gives the connecting role
 no ADMIN OPTION on it, so it can neither alter nor grant it — the apply stops
-on `permission denied to alter role`. Adopting such a role needs its creator to
-`GRANT <role> TO <connecting_role> WITH ADMIN OPTION` once.
+on `permission denied to alter role` (measured, on 16 with provider 1.27.0).
+Adopting such a role needs its creator to run, once:
+
+```sql
+GRANT <role> TO <connecting_role> WITH ADMIN OPTION;
+```
+
+This is NOT detected before the apply, and cannot be with this provider: its
+only data sources are `postgresql_schemas`, `postgresql_sequences` and
+`postgresql_tables` (1.27.0 schema), none of which reads `pg_auth_members` or
+any other catalog row, and no provider is added just to ask. Check by hand
+before importing such a role:
+`SELECT admin_option FROM pg_auth_members WHERE roleid = '<role>'::regrole AND member = '<connecting_role>'::regrole;`
+— no row, or `f`, means the grant above is needed first.
 
 ## Extensions, and why a failure here is the point
 
@@ -129,6 +141,7 @@ which is a rotation, so schedule it like one.
 | Input | Required | Description |
 | --- | --- | --- |
 | `databases` | **yes** | the databases to ensure (unquoted-identifier grammar) |
+| `existing_databases` | no | databases a control plane already created; granted on (PUBLIC revoke, `connect_grants`, `extensions`) but never created, altered or dropped |
 | `connecting_role` | **yes** | the role the provider connects as; granted every role in `roles` (PostgreSQL 16+) |
 | `roles` | **yes** | the login roles to ensure; each gets a generated password |
 | `role_options` | no | per-role `create_database` / `connection_limit` |

@@ -39,6 +39,15 @@ module "postgres" {
   provider from this module's `host` / `administrator_login` /
   `administrator_password` outputs, with `superuser = false` (the Azure admin is
   not a superuser) and `sslmode = "require"`.
+- **The in-server tenancy is [`postgres-tenancy`](../../../postgres-tenancy/README.md).**
+  This module creates the databases through Azure and hands them to that
+  module as `existing_databases`; the roles, the PUBLIC revoke and the CONNECT
+  grants are applied there — one implementation for a created server and a
+  consumed one, including its PostgreSQL 16 handling (the admin is granted
+  every managed role) and the provider floor `>= 1.24`. `moved` blocks
+  re-address an existing state's roles and grants into `module.tenancy[0]`
+  without recreating them (measured: the plan shows only moves plus three new
+  objects — the two role grants and the input guard).
 - **Reachability.** A `private` server answers only inside the linked VNet, so
   the machine running `terraform apply` must reach it (VPN, bastion, or a runner
   in the VNet). `network_access = "public"` with explicit `public_firewall_rules`

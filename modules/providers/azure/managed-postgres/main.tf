@@ -6,12 +6,6 @@ locals {
   private_dns_zone_name = var.private_dns_zone_name != "" ? var.private_dns_zone_name : "${var.name}.private.postgres.database.azure.com"
 
   administrator_password = var.generate_administrator_password ? random_password.administrator[0].result : var.administrator_password
-
-  # Every (role, database) pair gets CONNECT.
-  connect_grants = {
-    for pair in setproduct(sort(var.roles), sort(var.databases)) :
-    "${pair[0]}/${pair[1]}" => { role = pair[0], database = pair[1] }
-  }
 }
 
 resource "azurerm_resource_group" "this" {
@@ -118,45 +112,53 @@ resource "azurerm_postgresql_flexible_server_database" "this" {
 
 # ---------------------------------------------------------------------------
 # Roles and grants live INSIDE the server: Azure's control plane has no logical
-# role resource, so these go through the postgresql provider, which the stack
+# role resource, so they go through the postgresql provider, which the stack
 # configures against the admin credentials above.
+#
+# They are NOT implemented here. modules/postgres-tenancy is the one
+# implementation of in-server tenancy — the same module a stack uses on a
+# server it only consumes — so the PostgreSQL 16 handling it carries (the
+# connecting admin granted every managed role; revoke-PUBLIC ordered for a
+# clean destroy; a measured provider floor) cannot be fixed in one copy and
+# missed in the other. The databases above stay control-plane resources and
+# are passed as existing_databases: the tenancy module grants on them and never
+# creates, alters or drops them. No owner is set, exactly as before: every role
+# gets CONNECT on every database and PUBLIC loses it.
 # ---------------------------------------------------------------------------
 
-resource "random_password" "role" {
-  for_each = var.roles
+module "tenancy" {
+  source = "../../../postgres-tenancy"
+  count  = length(var.roles) > 0 || length(var.databases) > 0 ? 1 : 0
 
-  length  = 32
-  special = false
+  connecting_role    = var.administrator_login
+  databases          = []
+  existing_databases = var.databases
+  roles              = var.roles
+  role_options       = var.role_options
+  connect_grants     = { for role in var.roles : role => var.databases }
+
+  depends_on = [azurerm_postgresql_flexible_server_database.this]
 }
 
-resource "postgresql_role" "this" {
-  for_each = var.roles
-
-  name             = each.value
-  login            = true
-  password         = random_password.role[each.value].result
-  create_database  = try(var.role_options[each.value].create_database, false)
-  connection_limit = try(var.role_options[each.value].connection_limit, -1)
-
-  depends_on = [azurerm_postgresql_flexible_server.this]
+# The in-server objects moved into module.tenancy with the same keys, so an
+# existing state re-addresses them instead of destroying and re-creating roles
+# (and rotating their passwords).
+moved {
+  from = random_password.role
+  to   = module.tenancy[0].random_password.role
 }
 
-# CONNECT is revoked from PUBLIC on every database: an empty privilege set on
-# the "public" pseudo-role is the postgresql provider's spelling of REVOKE ALL.
-resource "postgresql_grant" "revoke_public" {
-  for_each = var.databases
-
-  database    = azurerm_postgresql_flexible_server_database.this[each.value].name
-  role        = "public"
-  object_type = "database"
-  privileges  = []
+moved {
+  from = postgresql_role.this
+  to   = module.tenancy[0].postgresql_role.this
 }
 
-resource "postgresql_grant" "connect" {
-  for_each = local.connect_grants
+moved {
+  from = postgresql_grant.revoke_public
+  to   = module.tenancy[0].postgresql_grant.revoke_public
+}
 
-  database    = azurerm_postgresql_flexible_server_database.this[each.value.database].name
-  role        = postgresql_role.this[each.value.role].name
-  object_type = "database"
-  privileges  = ["CONNECT"]
+moved {
+  from = postgresql_grant.connect
+  to   = module.tenancy[0].postgresql_grant.connect
 }
