@@ -27,3 +27,8 @@ output "network_security_group_name" {
   description = "Name of the runner's NIC network security group."
   value       = azurerm_network_security_group.this.name
 }
+
+output "vm_id" {
+  description = "Resource id of the runner's Linux virtual machine, for consumers that attach extensions, run commands or role assignments scoped to the VM."
+  value       = azurerm_linux_virtual_machine.this.id
+}

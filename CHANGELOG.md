@@ -4,6 +4,11 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.14.1 — `vm_id` output on the management runner (Azure)
+
+No consumer change is required. `providers/azure/management-runner` gains the `vm_id` output (resource id of the
+runner VM), and `stacks/azure/xema-foundation` includes it as `vm_id` in its `management_runner` output object.
+
 ## v0.14.0 — management runner denies VNet-wide inbound (Azure)
 
 Behaviour change. `providers/azure/management-runner` now always adds an inbound DenyAll NSG rule (priority 4096)

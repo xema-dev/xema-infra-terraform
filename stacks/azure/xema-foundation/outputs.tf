@@ -17,5 +17,6 @@ output "management_runner" {
     private_ip_address = one(module.management_runner[*].private_ip_address)
     admin_username     = one(module.management_runner[*].admin_username)
     principal_id       = one(module.management_runner[*].principal_id)
+    vm_id              = one(module.management_runner[*].vm_id)
   }
 }

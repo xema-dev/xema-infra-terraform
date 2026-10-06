@@ -40,4 +40,4 @@ lands somewhere unwanted. The resource SKUs API shows it
 Outputs: `public_ip_address` (the SSH target and the runner's egress address —
 add it to the cluster's `authorized_ip_ranges`), `private_ip_address`,
 `principal_id`, `admin_username`, `network_security_group_id`,
-`network_security_group_name`.
+`network_security_group_name`, `vm_id` (resource id of the runner VM).
