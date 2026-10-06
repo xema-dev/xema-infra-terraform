@@ -404,3 +404,15 @@ module "identity_realm" {
   realm_roles           = var.realm_roles
   protocol_mappers      = var.realm_protocol_mappers
 }
+
+# The Azure role definition names this stack's enabled modules assign: the one list a bootstrap's
+# RBAC-Administrator ABAC condition needs. The bootstrap calls modules/assigned-roles itself before
+# any state exists; the stack exposes the same answer as the `assigned_role_names` output.
+module "assigned_roles" {
+  source = "../../../modules/assigned-roles"
+
+  enable_cluster            = var.enable_cluster
+  enable_container_registry = var.enable_container_registry
+  enable_dns                = var.enable_dns
+  enable_secrets_backend    = var.enable_secrets_backend
+}

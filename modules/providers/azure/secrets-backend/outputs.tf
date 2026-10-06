@@ -27,3 +27,8 @@ output "resource_group_name" {
   description = "Resource group holding the vault (created or supplied)."
   value       = local.resource_group_name
 }
+
+output "assigned_role_names" {
+  description = "Azure role definition names this module assigns. Static: the names this module can assign, whatever the inputs, so a bootstrap's ABAC condition on the role-assignment writer can be derived before any state exists (see modules/assigned-roles)."
+  value       = ["Key Vault Secrets Officer", "Key Vault Secrets User"]
+}

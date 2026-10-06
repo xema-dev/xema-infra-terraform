@@ -248,3 +248,8 @@ output "substrate" {
     realm_name   = var.enable_identity_realm ? local.realm_name : null
   }
 }
+
+output "assigned_role_names" {
+  description = "Sorted, de-duplicated Azure role definition names the enabled modules assign (modules/assigned-roles). Derive the RBAC-Administrator ABAC condition of the identity that applies this stack from it."
+  value       = module.assigned_roles.assigned_role_names
+}

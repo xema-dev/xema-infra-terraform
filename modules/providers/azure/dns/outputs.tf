@@ -37,3 +37,8 @@ output "dns01_client_id" {
   description = "Client id of the DNS-01 solver identity; \"\" when dns01_workload_identity.enabled = false."
   value       = var.dns01_workload_identity.enabled ? azurerm_user_assigned_identity.dns01[0].client_id : ""
 }
+
+output "assigned_role_names" {
+  description = "Azure role definition names this module assigns. Static: the names this module can assign, whatever the inputs, so a bootstrap's ABAC condition on the role-assignment writer can be derived before any state exists (see modules/assigned-roles)."
+  value       = ["DNS Zone Contributor"]
+}

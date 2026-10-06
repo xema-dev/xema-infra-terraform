@@ -72,6 +72,14 @@ jobs:
         with:
           node-version-file: .node-version
 
+      - name: tofu/terraform test (modules with tests/)
+        run: |
+          set -euo pipefail
+          for dir in $(find modules -type d -name tests -exec dirname {} \;); do
+            ${{ matrix.bin }} -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
+            ${{ matrix.bin }} -chdir="$dir" test -no-color
+          done
+
       - name: validate (every module, stack, example)
         run: |
           set -euo pipefail
@@ -148,5 +156,9 @@ jobs:
 
       # BIND: the outputs → secret-inputs/externals mapping runs its own suite
       # over one fixture document per stack (tooling/bind/README.md).
+      # Every role_definition_name in modules/ and stacks/ is published by modules/assigned-roles.
+      - name: assigned role names (node --test)
+        run: node --test tooling/check-assigned-roles.test.mjs && node tooling/check-assigned-roles.mjs
+
       - name: bind-outputs (node --test)
         run: node --test 'tooling/bind/*.test.mjs'

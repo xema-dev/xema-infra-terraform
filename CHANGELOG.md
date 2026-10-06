@@ -4,6 +4,17 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — `assigned_role_names`: the stack publishes the roles it assigns
+
+A bootstrap no longer hand-copies the role list into its RBAC-Administrator ABAC condition (v0.10.0's
+registry module assigned `AcrPull` and no copy had it). New `modules/assigned-roles` (no providers, no
+resources) returns a static, sorted, de-duplicated `assigned_role_names` from `enable_cluster`,
+`enable_container_registry`, `enable_dns`, `enable_secrets_backend`; the azure substrate stack outputs the
+same list. The cluster, container-registry, dns and secrets-backend modules each output
+`assigned_role_names`. CI (`tooling/check-assigned-roles.mjs`, `tofu test`) fails when any
+`role_definition_name` is missing from the list. A bootstrap should derive its ABAC condition from
+the module (modules/assigned-roles/README.md) and drop its copy.
+
 ## Unreleased — deployer-identity on the `_v1` kubernetes resources
 
 No consumer change: `moved {}` blocks migrate existing state (`kubernetes_namespace`,

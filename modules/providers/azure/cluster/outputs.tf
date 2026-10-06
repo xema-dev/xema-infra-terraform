@@ -75,3 +75,8 @@ output "log_analytics_workspace_id" {
   description = "Log Analytics workspace id; null when enable_log_analytics = false."
   value       = one(azurerm_log_analytics_workspace.this[*].id)
 }
+
+output "assigned_role_names" {
+  description = "Azure role definition names this module assigns (the VNet and the optional route table). Static: the names this module can assign, whatever the inputs, so a bootstrap's ABAC condition on the role-assignment writer can be derived before any state exists (see modules/assigned-roles)."
+  value       = ["Network Contributor"]
+}
