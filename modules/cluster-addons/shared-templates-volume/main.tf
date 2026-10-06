@@ -17,7 +17,7 @@ locals {
   pv_owner = "${var.name_prefix}-owner"
 }
 
-resource "kubernetes_persistent_volume" "owner" {
+resource "kubernetes_persistent_volume_v1" "owner" {
   metadata {
     name   = local.pv_owner
     labels = var.labels
@@ -41,7 +41,7 @@ resource "kubernetes_persistent_volume" "owner" {
   }
 }
 
-resource "kubernetes_persistent_volume" "consumer" {
+resource "kubernetes_persistent_volume_v1" "consumer" {
   for_each = var.consumer_mounts
 
   metadata {
@@ -67,7 +67,7 @@ resource "kubernetes_persistent_volume" "consumer" {
   }
 }
 
-resource "kubernetes_persistent_volume_claim" "owner" {
+resource "kubernetes_persistent_volume_claim_v1" "owner" {
   metadata {
     name      = var.owner_pvc_name
     namespace = var.owner_namespace
@@ -76,7 +76,7 @@ resource "kubernetes_persistent_volume_claim" "owner" {
   spec {
     access_modes       = ["ReadWriteMany"]
     storage_class_name = ""
-    volume_name        = kubernetes_persistent_volume.owner.metadata[0].name
+    volume_name        = kubernetes_persistent_volume_v1.owner.metadata[0].name
     resources {
       requests = { storage = var.capacity }
     }
@@ -93,7 +93,7 @@ resource "kubernetes_persistent_volume_claim" "owner" {
   }
 }
 
-resource "kubernetes_persistent_volume_claim" "consumer" {
+resource "kubernetes_persistent_volume_claim_v1" "consumer" {
   for_each = var.consumer_mounts
 
   metadata {
@@ -104,9 +104,29 @@ resource "kubernetes_persistent_volume_claim" "consumer" {
   spec {
     access_modes       = ["ReadWriteMany"]
     storage_class_name = ""
-    volume_name        = kubernetes_persistent_volume.consumer[each.key].metadata[0].name
+    volume_name        = kubernetes_persistent_volume_v1.consumer[each.key].metadata[0].name
     resources {
       requests = { storage = var.capacity }
     }
   }
+}
+
+moved {
+  from = kubernetes_persistent_volume.owner
+  to   = kubernetes_persistent_volume_v1.owner
+}
+
+moved {
+  from = kubernetes_persistent_volume.consumer
+  to   = kubernetes_persistent_volume_v1.consumer
+}
+
+moved {
+  from = kubernetes_persistent_volume_claim.owner
+  to   = kubernetes_persistent_volume_claim_v1.owner
+}
+
+moved {
+  from = kubernetes_persistent_volume_claim.consumer
+  to   = kubernetes_persistent_volume_claim_v1.consumer
 }

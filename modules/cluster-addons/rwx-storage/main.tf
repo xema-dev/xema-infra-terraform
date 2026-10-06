@@ -16,7 +16,7 @@ resource "helm_release" "this" {
   }]
 }
 
-resource "kubernetes_storage_class" "this" {
+resource "kubernetes_storage_class_v1" "this" {
   metadata {
     name   = var.storage_class_name
     labels = var.storage_class_labels
@@ -41,4 +41,9 @@ resource "kubernetes_storage_class" "this" {
   lifecycle {
     ignore_changes = [metadata[0].labels, metadata[0].annotations]
   }
+}
+
+moved {
+  from = kubernetes_storage_class.this
+  to   = kubernetes_storage_class_v1.this
 }

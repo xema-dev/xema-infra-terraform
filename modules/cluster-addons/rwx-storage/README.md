@@ -58,7 +58,7 @@ module "rwx_storage" {
 
 - **StorageClass** — the import id is the StorageClass **name**:
   ```
-  terraform import module.rwx_storage.kubernetes_storage_class.this nfs-rwx-storage
+  terraform import module.rwx_storage.kubernetes_storage_class_v1.this nfs-rwx-storage
   ```
 - **Helm release** — the import id is `"<namespace>/<release>"`:
   ```

@@ -62,7 +62,7 @@ any extension databases/buckets already created on the shared cluster.
    | DNS domain / record | `doctl compute domain list` / `doctl compute domain records list <domain>` → `<domain>,<record-id>` |
    | Spaces bucket | bucket name |
 
-   For in-cluster addons (`kubernetes_storage_class`, `kubernetes_namespace`) the id
+   For in-cluster addons (`kubernetes_storage_class_v1`, `kubernetes_namespace_v1`) the id
    is the object name. For a `helm_release`, the id is `<namespace>/<release>`. For
    the Keycloak realm the id is the realm name; clients/roles/mappers follow the
    `terraform-provider-keycloak` import syntax.

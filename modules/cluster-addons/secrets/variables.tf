@@ -26,7 +26,7 @@ variable "secrets" {
   # NOTE: not marked `sensitive` at the variable level — Terraform forbids
   # for_each over a sensitive value (keys would leak into resource addresses).
   # The credential payload is protected where it matters: `data` is wrapped in
-  # `sensitive()` in main.tf and the kubernetes_secret `data` attribute is
+  # `sensitive()` in main.tf and the kubernetes_secret_v1 `data` attribute is
   # sensitive in the provider schema, so values are redacted in plan output.
   # Supply real values via TF_VAR_* / a sops-decrypted tfvars, never committed.
 }

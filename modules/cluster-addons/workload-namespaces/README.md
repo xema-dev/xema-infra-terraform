@@ -40,7 +40,7 @@ The import id for each namespace is the namespace **name**. Because the resource
 is a `for_each` over the set, address it by key:
 
 ```
-terraform import 'module.workload_namespaces.kubernetes_namespace.this["acme-prod"]' acme-prod
+terraform import 'module.workload_namespaces.kubernetes_namespace_v1.this["acme-prod"]' acme-prod
 ```
 
 | Input | Required | Description |

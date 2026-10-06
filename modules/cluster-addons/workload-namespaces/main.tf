@@ -1,4 +1,4 @@
-resource "kubernetes_namespace" "this" {
+resource "kubernetes_namespace_v1" "this" {
   for_each = var.namespaces
 
   metadata {
@@ -14,4 +14,9 @@ resource "kubernetes_namespace" "this" {
   lifecycle {
     ignore_changes = [metadata[0].labels, metadata[0].annotations]
   }
+}
+
+moved {
+  from = kubernetes_namespace.this
+  to   = kubernetes_namespace_v1.this
 }
