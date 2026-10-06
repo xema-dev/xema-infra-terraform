@@ -237,7 +237,7 @@ Each substrate area is independently toggleable via an `enable_*` stack input
 `enable_workload_namespaces`, `enable_identity_realm`; all default `true`). A
 stack that implements the optional primitives below adds a toggle per primitive
 with the same shape (`enable_object_storage`, `enable_secrets_backend`,
-`enable_cache`, `enable_gateway_tls`). This splits the **cloud-infra** plane from
+`enable_cache`, `enable_container_registry`, `enable_gateway_tls`). This splits the **cloud-infra** plane from
 the **in-cluster + identity** plane:
 
 - **Greenfield (default):** everything enabled → the stack CREATES the cluster,
@@ -296,7 +296,9 @@ Provisions the managed Kubernetes cluster and its node pools.
   with two subnets — one for AKS, one **delegated** to
   `Microsoft.DBforPostgreSQL/flexibleServers` — and exposes the extras
   `delegated_subnet_id`, `resource_group_name`, `oidc_issuer_url`
-  (workload identity is always ON) and `kubelet_identity_id`.
+  (workload identity is always ON) and `kubelet_identity_id` (the kubelet
+  identity's **object id**; the substrate stack surfaces it as the output and
+  `substrate` key `kubelet_identity_object_id`).
 - `node_pools` keys are also the AKS **agent pool names**, so they must match
   `^[a-z][a-z0-9]{0,11}$`. The default pool cannot carry taints (an AKS rule);
   put tainted pools in additional pools.
@@ -533,6 +535,30 @@ managed offering instead. Today only Azure (Azure Cache for Redis).
 
 ---
 
+## `container-registry` (optional)
+
+A private container registry the cluster pulls images from. Optional: use it
+only when a deployment wants a registry of its own. Today only Azure (Azure
+Container Registry, `providers/azure/container-registry`).
+
+**Azure specifics**
+
+- Premium SKU (required for a private endpoint), `admin_enabled = false`,
+  `public_network_access_enabled = false`. The stack composes the private
+  endpoint with `providers/azure/private-endpoint` (`service = "acr"`); the
+  foundation's `private_link_services` must include `acr` (it is in the default),
+  which creates and links `privatelink.azurecr.io`.
+- `pull_principal_ids` (`map(string)`) grants `AcrPull`; the stack passes the
+  kubelet identity. **The CI identity that pushes images is not created**: the
+  consumer grants `AcrPush` to its own CI principal on `container_registry_id`.
+
+| Name | Type | Meaning |
+| --- | --- | --- |
+| `id` | `string` | Registry resource id (module output; stack: `container_registry_id`). |
+| `login_server` | `string` | `<name>.azurecr.io` (stack: `container_registry_login_server`). |
+
+---
+
 ## Cloud-agnostic modules (no per-cloud implementation needed)
 
 These work against any conformant Kubernetes cluster / Keycloak and are reused by
@@ -625,6 +651,8 @@ that cloud; a consumer branches on `null`, never on which cloud it is on.
 | `key_vault_name` / `key_vault_uri` / `external_secrets_client_id` | `string` | the secrets backend and the identity that reads it | secrets backend | `null` |
 | `cluster_secret_store_name` | `string` | the `ClusterSecretStore` every `ExternalSecret` names | secrets backend | `null` |
 | `redis_host` / `redis_port` | `string` / `number` | the managed cache (TLS port) | cache | `null` |
+| `kubelet_identity_object_id` | `string` | object id of the cluster's kubelet identity, for role assignments (e.g. a registry pull grant) | cluster (created or read) | `null` |
+| `container_registry_login_server` / `container_registry_id` | `string` | the container registry's host and resource id (the scope a consumer grants `AcrPush` to its own CI principal on) | container registry | `null` |
 | `dns_zone` | `string` | the managed zone apex | dns | dns |
 | `dns_name_servers` | `list(string)` | delegate the apex to these | dns | `null` (DigitalOcean's are fixed) |
 | `gateway` | `object({ parent_ref = { name, namespace, section_name }, cluster_issuer_name })` | the Gateway the consumer's `HTTPRoute` objects attach to (`parent_ref`) and the issuer its listener certificate comes from | gateway addon | `null` |

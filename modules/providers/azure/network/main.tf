@@ -10,6 +10,7 @@ locals {
     redis    = "privatelink.redis.cache.windows.net"
     vault    = "privatelink.vaultcore.azure.net"
     postgres = "privatelink.postgres.database.azure.com"
+    acr      = "privatelink.azurecr.io"
   }
 }
 

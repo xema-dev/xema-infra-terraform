@@ -267,9 +267,24 @@ module "cache" {
   tags                          = local.tags
 }
 
+# Optional container registry: Premium, private only, AcrPull for the cluster's
+# kubelet identity. The identity that PUSHES images is the consumer's own CI
+# principal, granted AcrPush by the consumer — never created here.
+module "container_registry" {
+  source = "../../../modules/providers/azure/container-registry"
+  count  = var.enable_container_registry ? 1 : 0
+
+  name                = local.registry_name
+  region              = var.region
+  resource_group_name = var.resource_group_name
+  tags                = local.tags
+
+  pull_principal_ids = { kubelet = local.kubelet_identity_object_id }
+}
+
 # ---------------------------------------------------------------------------
 # Private endpoints — one per created backing service when
-# backing_services_network_access = "private". Each service module only turns
+# backing_services_network_access = "private", and always one for the registry. Each service module only turns
 # its public endpoint off; the network side is composed here, in the network
 # the foundation owns.
 # ---------------------------------------------------------------------------
@@ -280,6 +295,7 @@ locals {
     redis    = one(module.cache[*].id)
     vault    = one(module.secrets_backend[*].key_vault_id)
     postgres = one(module.postgres[*].cluster_id)
+    acr      = one(module.container_registry[*].id)
   }
 }
 

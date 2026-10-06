@@ -20,11 +20,12 @@ locals {
   cluster_resource_group_name = (var.cluster_resource_group_name != "" ? var.cluster_resource_group_name
     : var.resource_group_name != "" ? var.resource_group_name
   : (var.network != null ? var.network.resource_group_name : "${local.dep}-rg"))
-  # The four GLOBALLY-unique names: derived unless overridden (variables.tf).
+  # The GLOBALLY-unique names: derived unless overridden (variables.tf).
   postgres_name         = var.postgres_server_name != "" ? var.postgres_server_name : "${local.dep}-pg"
   key_vault_name        = var.key_vault_name != "" ? var.key_vault_name : "${local.dep}-kv"
   blob_account_name     = var.storage_account_name != "" ? var.storage_account_name : "${local.compact}blob"
   redis_name            = var.redis_cache_name != "" ? var.redis_cache_name : "${local.dep}-redis"
+  registry_name         = var.container_registry_name != "" ? var.container_registry_name : "${local.compact}acr"
   realm_name            = local.dep
   realm_display_name    = var.realm_display_name != "" ? var.realm_display_name : local.dep
   blob_container_prefix = var.blob_container_prefix != "" ? var.blob_container_prefix : local.dep
@@ -71,7 +72,7 @@ locals {
   # Cluster facts: from the created cluster, else the existing one read by name.
   # ---------------------------------------------------------------------------
   needs_kube          = var.enable_rwx_storage || var.enable_workload_namespaces || var.enable_gateway_tls || var.enable_deployer_identity || var.enable_secrets_backend
-  needs_cluster_facts = local.needs_kube || var.enable_secrets_backend || (var.enable_dns && local.dns01)
+  needs_cluster_facts = local.needs_kube || var.enable_secrets_backend || var.enable_container_registry || (var.enable_dns && local.dns01)
 
   kube_host = var.enable_cluster ? one(module.cluster[*].endpoint) : try(one(data.azurerm_kubernetes_cluster.existing[*].kube_config[0].host), null)
   kube_client_cert_b64 = (var.enable_cluster
@@ -83,6 +84,13 @@ locals {
   kube_ca_b64 = (var.enable_cluster
     ? one(module.cluster[*].cluster_ca_certificate)
   : try(one(data.azurerm_kubernetes_cluster.existing[*].kube_config[0].cluster_ca_certificate), null))
+
+  # The kubelet identity's OBJECT id (what a role assignment's principal_id
+  # takes), from the created cluster, else the existing one; null when no
+  # cluster facts were needed.
+  kubelet_identity_object_id = (var.enable_cluster
+    ? one(module.cluster[*].kubelet_identity_id)
+  : try(one(data.azurerm_kubernetes_cluster.existing[*].kubelet_identity[0].object_id), null))
 
   # Never null: "" when no cluster facts are needed, so the modules that take it
   # can be given it unconditionally (coalesce(null, "") is an error, not "").
@@ -109,6 +117,9 @@ locals {
     var.enable_cache ? "redis" : "",
     var.enable_secrets_backend ? "vault" : "",
     ] : [], [
+    # The registry has no public endpoint at all, so its endpoint does not
+    # follow backing_services_network_access.
+    var.enable_container_registry ? "acr" : "",
     var.enable_managed_postgres && var.postgres_network_access == "private_endpoint" ? "postgres" : "",
   ]))
   private_endpoint_services = var.network == null ? [] : local.private_endpoint_services_wanted

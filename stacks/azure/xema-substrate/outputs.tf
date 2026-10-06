@@ -17,6 +17,21 @@ output "kubeconfig_raw" {
   sensitive   = true
 }
 
+output "kubelet_identity_object_id" {
+  description = "Object (principal) id of the cluster's kubelet identity — what a role assignment's principal_id takes (e.g. AcrPull on a registry this stack does not own). From the created or the consumed cluster; null when no cluster facts were needed."
+  value       = local.kubelet_identity_object_id
+}
+
+output "container_registry_login_server" {
+  description = "Container registry login server (<name>.azurecr.io); null when enable_container_registry = false."
+  value       = one(module.container_registry[*].login_server)
+}
+
+output "container_registry_id" {
+  description = "Container registry resource id — the scope a consumer grants AcrPush to its own CI principal on; null when enable_container_registry = false."
+  value       = one(module.container_registry[*].id)
+}
+
 output "vpc_id" {
   description = "Virtual network id this deployment lives in (the foundation's); null when no network was given."
   value       = var.network == null ? null : var.network.vnet_id
@@ -188,6 +203,7 @@ output "substrate" {
     cluster_name                = local.cluster_name
     cluster_resource_group_name = var.enable_cluster ? one(module.cluster[*].resource_group_name) : local.cluster_resource_group_name
     oidc_issuer_url             = local.oidc_issuer_url
+    kubelet_identity_object_id  = local.kubelet_identity_object_id
     storage_class_name          = one(module.rwx_storage[*].storage_class_name)
     # The roster the consumer supplied, as ensured on the cluster. It carries no
     # roles: which namespace plays which part is the consumer's own knowledge.
@@ -216,6 +232,9 @@ output "substrate" {
 
     redis_host = one(module.cache[*].host)
     redis_port = one(module.cache[*].port)
+
+    container_registry_login_server = one(module.container_registry[*].login_server)
+    container_registry_id           = one(module.container_registry[*].id)
 
     dns_zone         = one(module.dns[*].domain)
     dns_name_servers = one(module.dns[*].name_servers)

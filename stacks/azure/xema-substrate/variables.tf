@@ -159,6 +159,23 @@ variable "enable_cache" {
   default     = false
 }
 
+variable "enable_container_registry" {
+  description = "Create an Azure Container Registry (Premium, admin user off, public endpoint off) behind a private endpoint in var.network, with AcrPull granted to the cluster's kubelet identity. Off by default: images come from a registry the deployment already has. Needs the foundation's private_link_services to include \"acr\". The CI identity that pushes images is NOT created: the consumer grants AcrPush to its own CI principal on the container_registry_id output."
+  type        = bool
+  default     = false
+}
+
+variable "container_registry_name" {
+  description = "Container registry name (enable_container_registry only). Empty derives \"<deployment_name without hyphens>acr\". Globally unique across Azure as <name>.azurecr.io (5-50 lowercase letters and digits)."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.container_registry_name == "" || can(regex("^[a-z0-9]{5,50}$", var.container_registry_name))
+    error_message = "container_registry_name must be empty (derive it) or 5-50 lowercase letters and digits."
+  }
+}
+
 variable "enable_rwx_storage" {
   description = "Create the ReadWriteMany StorageClass (Azure Files CSI, NFS) on the (created or existing) cluster."
   type        = bool

@@ -150,6 +150,7 @@ Every area is **independently toggleable** via an `enable_*` input:
 | `enable_object_storage` | `true` | Create the blob storage account. |
 | `enable_secrets_backend` | `true` | Create the Key Vault + reader identity (and, with it, the External Secrets store). |
 | `enable_cache` | `false` | Create a managed Redis. Off: the platform runs valkey in-cluster. |
+| `enable_container_registry` | `false` | Create a Premium, private-only container registry with `AcrPull` for the kubelet identity (needs `acr` in the foundation's `private_link_services`, in its default). The CI identity that pushes is **not** created: grant `AcrPush` to your own CI principal on `container_registry_id`. |
 | `enable_rwx_storage` | `true` | Create the RWX `StorageClass` on the (created or consumed) cluster. |
 | `enable_workload_namespaces` | `true` | Ensure the `workload_namespaces` roster exists. |
 | `enable_gateway_tls` | `true` | Install the Gateway API edge (needs `acme_email`; `gateway_hostname` and non-empty `workload_namespaces` with `nginx-gateway-fabric`). The stack output `gateway_parent_ref` is the parentRef every HTTPRoute attaches to. |

@@ -4,6 +4,21 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — optional container registry and the kubelet identity (Azure)
+
+Adopting it needs nothing of a consumer root except one thing: the foundation's
+`private_link_services` default now includes `acr`, so a re-plan of the foundation adds the
+`privatelink.azurecr.io` zone and its VNet link (a root that sets the list itself must add `acr`
+before enabling the registry). Everything else defaults to the previous behaviour.
+
+- `stacks/azure/xema-substrate`: `enable_container_registry` (default `false`) and
+  `container_registry_name` create a Premium, admin-off, public-endpoint-off registry
+  (`modules/providers/azure/container-registry`) behind a private endpoint, with `AcrPull` for the
+  kubelet identity. New outputs `container_registry_login_server`, `container_registry_id`,
+  `kubelet_identity_object_id`, and the same three keys in `substrate`. The CI identity that pushes
+  images is not created: grant `AcrPush` to your own CI principal.
+- `providers/azure/network` and `providers/azure/private-endpoint`: `acr` joins the closed service set.
+
 ## Unreleased — settable PostgreSQL extensions (Azure)
 
 No consumer change: the new input defaults to the previous behaviour. `managed-postgres`

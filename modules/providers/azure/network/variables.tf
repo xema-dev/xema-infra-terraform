@@ -50,13 +50,13 @@ variable "management_subnet_prefix" {
 }
 
 variable "private_link_services" {
-  description = "Private-link services this network hosts private endpoints for; one private DNS zone is created and linked per entry. Closed set: blob, redis, vault, postgres. Empty = no zones (every backing service public)."
+  description = "Private-link services this network hosts private endpoints for; one private DNS zone is created and linked per entry. Closed set: blob, redis, vault, postgres, acr. Empty = no zones (every backing service public)."
   type        = list(string)
   default     = []
 
   validation {
-    condition     = alltrue([for s in var.private_link_services : contains(["blob", "redis", "vault", "postgres"], s)])
-    error_message = "private_link_services admits only blob, redis, vault, postgres."
+    condition     = alltrue([for s in var.private_link_services : contains(["blob", "redis", "vault", "postgres", "acr"], s)])
+    error_message = "private_link_services admits only blob, redis, vault, postgres, acr."
   }
 }
 

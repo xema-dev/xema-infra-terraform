@@ -6,6 +6,7 @@ locals {
     redis    = "redisCache"
     vault    = "vault"
     postgres = "postgresqlServer"
+    acr      = "registry"
   }
 }
 

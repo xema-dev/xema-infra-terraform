@@ -29,6 +29,6 @@ output "management_subnet_id" {
 }
 
 output "private_dns_zone_ids" {
-  description = "Private DNS zone id per private-link service, keyed by service (blob, redis, vault). Only the services in private_link_services appear."
+  description = "Private DNS zone id per private-link service, keyed by service (blob, redis, vault, postgres, acr). Only the services in private_link_services appear."
   value       = { for k, z in azurerm_private_dns_zone.this : k => z.id }
 }

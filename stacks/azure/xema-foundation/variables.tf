@@ -50,9 +50,9 @@ variable "management_subnet_prefix" {
 }
 
 variable "private_link_services" {
-  description = "Backing services reached through private endpoints — one private DNS zone each. Must cover every service the substrate makes private (backing_services_network_access = \"private\"). Closed set: blob, redis, vault."
+  description = "Backing services reached through private endpoints — one private DNS zone each. Must cover every service the substrate makes private (backing_services_network_access = \"private\"). The container registry is always private, so \"acr\" must be listed whenever the substrate sets enable_container_registry. Closed set: blob, redis, vault, postgres, acr."
   type        = list(string)
-  default     = ["blob", "redis", "vault"]
+  default     = ["blob", "redis", "vault", "acr"]
 }
 
 variable "management_runner" {

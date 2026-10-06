@@ -14,17 +14,17 @@ variable "resource_group_name" {
 }
 
 variable "service" {
-  description = "Which private-link service the endpoint reaches. Closed set: blob, redis, vault, postgres."
+  description = "Which private-link service the endpoint reaches. Closed set: blob, redis, vault, postgres, acr."
   type        = string
 
   validation {
-    condition     = contains(["blob", "redis", "vault", "postgres"], var.service)
-    error_message = "service must be one of blob, redis, vault, postgres."
+    condition     = contains(["blob", "redis", "vault", "postgres", "acr"], var.service)
+    error_message = "service must be one of blob, redis, vault, postgres, acr."
   }
 }
 
 variable "target_resource_id" {
-  description = "Resource id of the storage account, cache, key vault or PostgreSQL flexible server."
+  description = "Resource id of the storage account, cache, key vault, PostgreSQL flexible server or container registry."
   type        = string
 }
 

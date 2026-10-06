@@ -165,6 +165,7 @@ modules/
       state-bucket/       #   storage account + container for Terraform state (bootstrap)
       secrets-backend/    #   RBAC Key Vault + External Secrets reader identity
       cache/              #   Azure Cache for Redis (optional)
+      container-registry/ #   Azure Container Registry, Premium, private only (optional)
     cloudflare/           # Cloudflare edge settings long-lived connections depend on
       edge/               #   WebSocket proxying held on for the consumer's declared paths; Argo pinned off
 stacks/
