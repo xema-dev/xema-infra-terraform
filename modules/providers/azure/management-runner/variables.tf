@@ -24,6 +24,17 @@ variable "vm_size" {
   default     = "Standard_B2als_v2"
 }
 
+variable "zone" {
+  description = "Availability zone for the VM (\"1\", \"2\", \"3\"). Empty (default) lets Azure choose. Pin it when the subscription marks a zone NotAvailableForSubscription for the VM family (see the README)."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = contains(["", "1", "2", "3"], var.zone)
+    error_message = "zone must be one of 1, 2, 3, or empty."
+  }
+}
+
 variable "admin_username" {
   description = "Login name on the VM."
   type        = string

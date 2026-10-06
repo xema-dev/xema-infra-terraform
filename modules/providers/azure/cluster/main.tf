@@ -133,6 +133,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     min_count            = local.default_pool.min_nodes
     max_count            = local.default_pool.max_nodes
     node_labels          = local.default_pool.labels
+    zones                = local.default_pool.zones
     # AKS needs a second pool name to rotate the default pool in place when an
     # immutable attribute (vm_size, subnet) changes; without it such a change
     # forces a whole-cluster replacement.
@@ -212,6 +213,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "additional" {
   min_count             = each.value.min_nodes
   max_count             = each.value.max_nodes
   node_labels           = each.value.labels
+  zones                 = each.value.zones
   node_taints           = local.taint_strings[each.key]
   tags                  = var.tags
 

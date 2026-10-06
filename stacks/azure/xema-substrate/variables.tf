@@ -315,6 +315,7 @@ variable "node_pools" {
       - min_nodes  : enable autoscaling when set (with max_nodes)
       - max_nodes  : autoscaling upper bound
       - labels     : kubernetes node labels
+      - zones      : availability zones to pin the pool to (each "1", "2" or "3"); unset leaves it to Azure
       - taints     : node taints { key, value, effect } (not on the default pool)
   EOT
   type = map(object({
@@ -323,6 +324,7 @@ variable "node_pools" {
     min_nodes  = optional(number)
     max_nodes  = optional(number)
     labels     = optional(map(string), {})
+    zones      = optional(list(string))
     taints = optional(list(object({
       key    = string
       value  = string

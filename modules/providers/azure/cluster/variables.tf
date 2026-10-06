@@ -29,6 +29,8 @@ variable "node_pools" {
       - min_nodes  : enable autoscaling when set (with max_nodes)
       - max_nodes  : autoscaling upper bound
       - labels     : kubernetes node labels
+      - zones      : availability zones to pin the pool to, each "1", "2" or
+                     "3". Unset leaves the choice to Azure.
       - taints     : node taints { key, value, effect } — NOT allowed on the
                      default pool (an AKS rule); put tainted pools elsewhere.
   EOT
@@ -38,12 +40,18 @@ variable "node_pools" {
     min_nodes  = optional(number)
     max_nodes  = optional(number)
     labels     = optional(map(string), {})
+    zones      = optional(list(string))
     taints = optional(list(object({
       key    = string
       value  = string
       effect = string
     })), [])
   }))
+
+  validation {
+    condition     = alltrue([for p in values(var.node_pools) : p.zones == null ? true : alltrue([for z in p.zones : contains(["1", "2", "3"], z)])])
+    error_message = "Every node pool zones entry must be \"1\", \"2\" or \"3\"."
+  }
 
   validation {
     condition     = length(var.node_pools) >= 1

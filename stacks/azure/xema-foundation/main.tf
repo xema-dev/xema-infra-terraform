@@ -49,6 +49,7 @@ module "management_runner" {
   subnet_id           = module.network.management_subnet_id
 
   vm_size           = var.management_runner.vm_size
+  zone              = var.management_runner.zone
   ssh_public_keys   = var.management_runner.ssh_public_keys
   allowed_ssh_cidrs = var.management_runner.allowed_ssh_cidrs
 

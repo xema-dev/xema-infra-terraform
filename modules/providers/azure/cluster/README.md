@@ -70,6 +70,13 @@ module "cluster" {
 | `sku_tier`, `automatic_upgrade_channel`, `authorized_ip_ranges` | no | control-plane tier, upgrades, API allow-list |
 | `enable_log_analytics`, `log_analytics_retention_days`, `tags` | no | monitoring + tagging |
 
+**Zone pinning.** Each node pool takes an optional `zones` list (each "1", "2" or
+"3"); unset leaves the choice to Azure, which is the unchanged behaviour. Pin it
+when the subscription marks a zone `NotAvailableForSubscription` for the pool's
+VM family, which the resource SKUs API shows
+(`az vm list-skus --location <region> --size <size> --zone`, read the
+`restrictions`). Changing `zones` on an existing pool replaces it.
+
 Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw` (sensitive),
 `cluster_ca_certificate` (sensitive), `token` (sensitive, always `""`),
 `client_certificate` / `client_key` (sensitive),

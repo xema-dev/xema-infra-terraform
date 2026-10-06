@@ -25,6 +25,13 @@ One small Linux VM inside the deployment's network: the deployment's
 The default size, `Standard_B2als_v2` (2 vCPU / 4 GiB, burstable), is one of the
 cheapest sizes that runs Terraform and the engine comfortably.
 
+**Zone pinning.** `zone` ("1", "2" or "3") is optional; empty lets Azure choose,
+which is the unchanged behaviour. Pin it when the subscription marks a zone
+`NotAvailableForSubscription` for the VM family: the placement then fails or
+lands somewhere unwanted. The resource SKUs API shows it
+(`az vm list-skus --location <region> --size <vm_size> --zone` and read the
+`restrictions`).
+
 Outputs: `public_ip_address` (the SSH target and the runner's egress address —
 add it to the cluster's `authorized_ip_ranges`), `private_ip_address`,
 `principal_id`, `admin_username`.

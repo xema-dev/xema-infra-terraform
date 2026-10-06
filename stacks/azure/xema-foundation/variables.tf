@@ -64,11 +64,13 @@ variable "management_runner" {
       - ssh_public_keys   : required, non-empty — password login is disabled
       - allowed_ssh_cidrs : required, non-empty — the whole internet is refused
       - vm_size           : optional, default Standard_B2als_v2
+      - zone              : optional availability zone "1", "2" or "3"; empty lets Azure choose
   EOT
   type = object({
     ssh_public_keys   = list(string)
     allowed_ssh_cidrs = list(string)
     vm_size           = optional(string, "Standard_B2als_v2")
+    zone              = optional(string, "")
   })
 }
 

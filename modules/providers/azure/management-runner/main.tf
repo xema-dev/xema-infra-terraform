@@ -76,6 +76,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   location              = var.region
   resource_group_name   = var.resource_group_name
   size                  = var.vm_size
+  zone                  = var.zone != "" ? var.zone : null
   admin_username        = var.admin_username
   network_interface_ids = [azurerm_network_interface.this.id]
   tags                  = var.tags
