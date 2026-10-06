@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.13.0 — optional node pool OS disk (Azure)
+
+No consumer change is required: the new inputs are optional and unset (`null`) keeps today's behaviour.
+
+- `providers/azure/cluster`: optional `os_disk_size_gb` and `os_disk_type` ("Managed" or "Ephemeral") on every
+  node pool, system and user. `Ephemeral` requires `os_disk_size_gb` (the disk must fit the VM cache); other
+  values fail validation. Changing either on an existing pool replaces it.
+- `stacks/azure/xema-substrate` (`node_pools[*].os_disk_size_gb`, `os_disk_type`) passes them through. Module
+  README refs read `?ref=v0.13.0`.
+
 ## v0.12.1 — optional `postgres_zone` (Azure substrate)
 
 No consumer change is required: the new input is optional and unset (`null`) keeps today's regional placement.

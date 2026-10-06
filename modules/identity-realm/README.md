@@ -57,7 +57,7 @@ that `identity-api` does not reconcile.
 
 ```hcl
 module "identity_realm" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/identity-realm?ref=v0.12.1"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/identity-realm?ref=v0.13.0"
 
   realm_name   = "acme-prod"
   display_name = "Acme"

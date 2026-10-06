@@ -8,7 +8,7 @@ Manages a DO DNS zone (`digitalocean_domain`) and its records
 
 ```hcl
 module "dns" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/dns?ref=v0.12.1"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/dns?ref=v0.13.0"
 
   domain = "example.com"
 

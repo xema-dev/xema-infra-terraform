@@ -10,7 +10,7 @@ credential anywhere.
 
 ```hcl
 module "secrets" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/secrets-backend?ref=v0.12.1"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/secrets-backend?ref=v0.13.0"
 
   name   = "acme-dev-kv"
   region = "westeurope"

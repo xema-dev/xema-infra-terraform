@@ -11,7 +11,7 @@ can attach privately. OIDC issuer + **workload identity** are always on.
 
 ```hcl
 module "cluster" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/cluster?ref=v0.12.1"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/cluster?ref=v0.13.0"
 
   name               = "acme-dev-aks"
   region             = "westeurope"
@@ -76,6 +76,12 @@ when the subscription marks a zone `NotAvailableForSubscription` for the pool's
 VM family, which the resource SKUs API shows
 (`az vm list-skus --location <region> --size <size> --zone`, read the
 `restrictions`). Changing `zones` on an existing pool replaces it.
+
+**OS disk.** Each node pool takes optional `os_disk_size_gb` and `os_disk_type`
+(`"Managed"` or `"Ephemeral"`); unset (`null`) keeps the provider and VM-size
+defaults, which is the unchanged behaviour. `Ephemeral` requires `os_disk_size_gb`
+(the disk must fit the VM cache or temp disk). Changing either on an existing
+pool replaces it.
 
 Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw` (sensitive),
 `cluster_ca_certificate` (sensitive), `token` (sensitive, always `""`),

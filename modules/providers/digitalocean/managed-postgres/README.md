@@ -8,7 +8,7 @@ logical databases and roles.
 
 ```hcl
 module "postgres" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/managed-postgres?ref=v0.12.1"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/managed-postgres?ref=v0.13.0"
 
   name           = "do-fra1-xema-pg"
   region         = "fra1"

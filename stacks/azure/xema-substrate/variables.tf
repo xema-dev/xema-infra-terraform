@@ -316,15 +316,20 @@ variable "node_pools" {
       - max_nodes  : autoscaling upper bound
       - labels     : kubernetes node labels
       - zones      : availability zones to pin the pool to (each "1", "2" or "3"); unset leaves it to Azure
+      - os_disk_size_gb : OS disk size in GB; unset keeps the VM size's default.
+                     REQUIRED when os_disk_type is "Ephemeral" (the disk must fit the VM cache).
+      - os_disk_type : "Managed" or "Ephemeral"; unset keeps the provider default (Managed).
       - taints     : node taints { key, value, effect } (not on the default pool)
   EOT
   type = map(object({
-    size       = string
-    node_count = number
-    min_nodes  = optional(number)
-    max_nodes  = optional(number)
-    labels     = optional(map(string), {})
-    zones      = optional(list(string))
+    size            = string
+    node_count      = number
+    min_nodes       = optional(number)
+    max_nodes       = optional(number)
+    labels          = optional(map(string), {})
+    zones           = optional(list(string))
+    os_disk_size_gb = optional(number)
+    os_disk_type    = optional(string)
     taints = optional(list(object({
       key    = string
       value  = string

@@ -31,22 +31,37 @@ variable "node_pools" {
       - labels     : kubernetes node labels
       - zones      : availability zones to pin the pool to, each "1", "2" or
                      "3". Unset leaves the choice to Azure.
+      - os_disk_size_gb : OS disk size in GB; unset keeps the VM size's default.
+                     REQUIRED when os_disk_type is "Ephemeral" (the disk must fit the VM cache).
+      - os_disk_type : "Managed" or "Ephemeral"; unset keeps the provider default (Managed).
       - taints     : node taints { key, value, effect } — NOT allowed on the
                      default pool (an AKS rule); put tainted pools elsewhere.
   EOT
   type = map(object({
-    size       = string
-    node_count = number
-    min_nodes  = optional(number)
-    max_nodes  = optional(number)
-    labels     = optional(map(string), {})
-    zones      = optional(list(string))
+    size            = string
+    node_count      = number
+    min_nodes       = optional(number)
+    max_nodes       = optional(number)
+    labels          = optional(map(string), {})
+    zones           = optional(list(string))
+    os_disk_size_gb = optional(number)
+    os_disk_type    = optional(string)
     taints = optional(list(object({
       key    = string
       value  = string
       effect = string
     })), [])
   }))
+
+  validation {
+    condition     = alltrue([for p in values(var.node_pools) : p.os_disk_type == null ? true : contains(["Managed", "Ephemeral"], p.os_disk_type)])
+    error_message = "Every node pool os_disk_type must be \"Managed\" or \"Ephemeral\"."
+  }
+
+  validation {
+    condition     = alltrue([for p in values(var.node_pools) : p.os_disk_type == "Ephemeral" ? p.os_disk_size_gb != null : true])
+    error_message = "A node pool with os_disk_type \"Ephemeral\" must set os_disk_size_gb (the disk must fit the VM cache)."
+  }
 
   validation {
     condition     = alltrue([for p in values(var.node_pools) : p.zones == null ? true : alltrue([for z in p.zones : contains(["1", "2", "3"], z)])])
