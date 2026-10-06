@@ -104,6 +104,17 @@ resource "azurerm_postgresql_flexible_server" "this" {
   }
 }
 
+# The extension allow-list. Azure refuses CREATE EXTENSION for anything not in
+# azure.extensions, so a consumer that needs an extension names it here. Absent
+# is the identity: an empty list creates no resource and keeps Azure's default.
+resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
+  count = length(var.extensions) > 0 ? 1 : 0
+
+  name      = "azure.extensions"
+  server_id = azurerm_postgresql_flexible_server.this.id
+  value     = join(",", sort(distinct(var.extensions)))
+}
+
 resource "azurerm_postgresql_flexible_server_firewall_rule" "this" {
   for_each = var.network_access == "public" ? var.public_firewall_rules : {}
 

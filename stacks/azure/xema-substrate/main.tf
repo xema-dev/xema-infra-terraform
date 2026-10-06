@@ -121,6 +121,7 @@ module "postgres" {
   generate_administrator_password = false # minted by the stack (random_password.postgres_admin) or supplied
   administrator_password          = local.pg_admin_password
   backup_retention_days           = local.postgres_backup_retention
+  extensions                      = var.postgres_extensions
 
   databases       = local.postgres_databases
   database_owners = local.postgres_database_owners

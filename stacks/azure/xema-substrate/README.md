@@ -155,6 +155,10 @@ Every area is **independently toggleable** via an `enable_*` input:
 | `enable_gateway_tls` | `true` | Install the Gateway API edge (needs `acme_email`; `gateway_hostname` and non-empty `workload_namespaces` with `nginx-gateway-fabric`). The stack output `gateway_parent_ref` is the parentRef every HTTPRoute attaches to. |
 | `enable_identity_realm` | `true` | Manage the Keycloak realm (needs a reachable `keycloak_url`). |
 
+`postgres_extensions` (default `[]`) allow-lists PostgreSQL extensions on the
+created server (`azure.extensions`, lowercase identifiers); empty writes no
+parameter, so Azure's default stands.
+
 A disabled cloud module is `count`-gated to zero — the stack **consumes** the
 existing resource instead of creating it; it never plans a destroy. `network`
 is required in both modes whenever the stack creates something that lives in

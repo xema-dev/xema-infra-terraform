@@ -4,6 +4,13 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — settable PostgreSQL extensions (Azure)
+
+No consumer change: the new input defaults to the previous behaviour. `managed-postgres`
+gains `extensions` (`list(string)`, default `[]`, entries `^[a-z][a-z0-9_]*$`); non-empty
+writes the `azure.extensions` server parameter as the sorted, distinct, comma-joined list,
+empty creates no parameter. `stacks/azure/xema-substrate` threads it as `postgres_extensions`.
+
 ## Unreleased — Gateway API replaces ingress-nginx (BREAKING)
 
 **Breaking, no compatibility alias.** `cluster-addons/ingress-tls` is deleted; its

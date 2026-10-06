@@ -447,6 +447,17 @@ variable "postgres_network_access" {
   }
 }
 
+variable "postgres_extensions" {
+  description = "PostgreSQL extensions to allow-list on the CREATED server (its azure.extensions parameter), lowercase identifiers such as \"pg_trgm\". Empty (default) leaves Azure's default allow-list untouched. Not the `extensions` input, which is the platform's extension claims; ignored when enable_managed_postgres = false (a consumed server's parameters are its owner's)."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for e in var.postgres_extensions : can(regex("^[a-z][a-z0-9_]*$", e))])
+    error_message = "postgres_extensions entries must be lowercase identifiers matching ^[a-z][a-z0-9_]*$."
+  }
+}
+
 variable "postgres_public_firewall_rules" {
   description = "Firewall rules for a PUBLIC server, keyed by a stable id: { start_ip_address, end_ip_address }. Ignored when private."
   type = map(object({

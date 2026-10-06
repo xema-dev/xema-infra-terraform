@@ -169,6 +169,17 @@ variable "role_options" {
   default = {}
 }
 
+variable "extensions" {
+  description = "PostgreSQL extensions to allow-list on the server (the azure.extensions server parameter, which CREATE EXTENSION is refused without). Lowercase identifiers; the parameter is written as the sorted, distinct, comma-joined list. Empty (default) writes no parameter and leaves Azure's own default untouched."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for e in var.extensions : can(regex("^[a-z][a-z0-9_]*$", e))])
+    error_message = "extensions entries must be lowercase identifiers matching ^[a-z][a-z0-9_]*$ (e.g. \"pg_trgm\", \"uuid_ossp\")."
+  }
+}
+
 variable "resource_group_name" {
   description = "Existing resource group to create the server in. Empty string creates a dedicated resource group named \"<name>-rg\"."
   type        = string

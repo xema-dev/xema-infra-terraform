@@ -341,6 +341,13 @@ Provisions a managed Postgres instance/cluster plus logical databases and roles.
   access additionally needs the extra `delegated_subnet_id` (the cluster
   module's `delegated_subnet_id` output). Access mode is the closed set
   `network_access = private | public` — never inferred.
+- `extensions` (optional `list(string)`, default `[]`) allow-lists PostgreSQL
+  extensions through the `azure.extensions` server parameter, which Azure
+  requires before `CREATE EXTENSION`. Entries are lowercase identifiers
+  (`^[a-z][a-z0-9_]*$`); the parameter is written as the sorted, distinct,
+  comma-joined list. Empty writes no parameter, so Azure's default is unchanged.
+  The substrate stack threads it as `postgres_extensions` (`extensions` there is
+  the platform's extension claims).
 - `ca_certificate` is always `""`, and that is **not** a gap the way it is on
   DigitalOcean: Azure Database for PostgreSQL Flexible Server serves a
   certificate chain anchored on **public root CAs** (DigiCert Global Root G2 /
