@@ -110,6 +110,11 @@ output "key_vault_name" {
   value       = var.enable_secrets_backend ? local.key_vault_name : null
 }
 
+output "key_vault_id" {
+  description = "Key Vault resource id; null when disabled. Reference the vault by this id rather than building it from key_vault_name: the id depends on the vault resource, so consumers order after its creation (a name-built id raced vault creation on a fresh apply)."
+  value       = one(module.secrets_backend[*].key_vault_id)
+}
+
 output "key_vault_uri" {
   description = "Key Vault URI; null when disabled."
   value       = one(module.secrets_backend[*].vault_uri)

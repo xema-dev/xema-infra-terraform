@@ -105,6 +105,12 @@ manifests should read them from the stack, never restate the defaults. Both
 outputs are `null` exactly when the object does not exist — `enable_gateway_tls
 = false`, or for the store also `enable_secrets_backend = false`.
 
+### Outputs: Key Vault
+
+| Output | Value |
+|---|---|
+| `key_vault_id` | Key Vault resource id; `null` when `enable_secrets_backend = false`. Reference the vault by this id, never a constructed one built from `key_vault_name`, so the consumer depends on vault creation. |
+
 ## The `substrate` output — the binding contract
 
 One non-secret map a consumer binds to, with the key shape every cloud's stack

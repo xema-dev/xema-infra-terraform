@@ -4,6 +4,12 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.13.1 — `key_vault_id` output (Azure substrate)
+
+No consumer change is required. `stacks/azure/xema-substrate` gains the `key_vault_id` output (`null` when
+`enable_secrets_backend = false`). Reference the vault by it instead of constructing the id from `key_vault_name`:
+the output carries a real dependency on vault creation, which a name-built id lacked and raced on a fresh apply.
+
 ## v0.13.0 — optional node pool OS disk (Azure)
 
 No consumer change is required: the new inputs are optional and unset (`null`) keeps today's behaviour.
