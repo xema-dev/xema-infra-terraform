@@ -109,6 +109,7 @@ module "postgres" {
   size           = var.azure_sizing.postgres_sku_name
   storage_mb     = var.azure_sizing.postgres_storage_mb
   node_count     = var.azure_sizing.postgres_ha ? 2 : 1
+  zone           = var.postgres_zone == null ? "" : var.postgres_zone
 
   network_access        = var.postgres_network_access
   vpc_id                = local.vpc_id

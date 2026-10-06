@@ -12,7 +12,7 @@ setup so an existing cluster imports as a no-op.
 
 ```hcl
 module "rwx_storage" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/rwx-storage?ref=v0.12.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/rwx-storage?ref=v0.12.1"
 
   # Defaults already target the canonical OpenEBS dynamic NFS provisioner.
   storage_class_name        = "nfs-rwx-storage"
@@ -34,7 +34,7 @@ into Terraform state — you import just the StorageClass:
 
 ```hcl
 module "rwx_storage" {
-  source                    = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/rwx-storage?ref=v0.12.0"
+  source                    = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/rwx-storage?ref=v0.12.1"
   manage_provisioner_chart  = false           # consume the existing provisioner
   storage_class_provisioner = "openebs.io/nfsrwx"
   allow_volume_expansion    = false           # match the live class

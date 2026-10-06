@@ -4,6 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.12.1 — optional `postgres_zone` (Azure substrate)
+
+No consumer change is required: the new input is optional and unset (`null`) keeps today's regional placement.
+
+- `stacks/azure/xema-substrate`: optional `postgres_zone` ("1", "2" or "3"; `null` by default), passed to
+  `providers/azure/managed-postgres` as `zone`. Set it before the first apply: changing it later replaces
+  the server. Other values fail validation. Module README refs read `?ref=v0.12.1`.
+
 ## v0.12.0 — zone pinning (Azure) and the last `_v1` kubernetes moves
 
 No consumer change is required: every new input is optional and unset keeps Azure's own zone choice,

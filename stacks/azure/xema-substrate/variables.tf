@@ -477,6 +477,17 @@ variable "postgres_extensions" {
   }
 }
 
+variable "postgres_zone" {
+  description = "Availability zone for the managed PostgreSQL server; null keeps the regional placement. Set it before the first apply: changing it later replaces the server."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.postgres_zone == null || contains(["1", "2", "3"], coalesce(var.postgres_zone, "x"))
+    error_message = "postgres_zone must be null, \"1\", \"2\" or \"3\"."
+  }
+}
+
 variable "postgres_public_firewall_rules" {
   description = "Firewall rules for a PUBLIC server, keyed by a stable id: { start_ip_address, end_ip_address }. Ignored when private."
   type = map(object({

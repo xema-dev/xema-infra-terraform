@@ -8,7 +8,7 @@ node pools (autoscaling and taints supported — e.g. a tainted `workers` pool).
 
 ```hcl
 module "cluster" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/cluster?ref=v0.12.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/cluster?ref=v0.12.1"
 
   name               = "do-fra1-xema"
   region             = "fra1"

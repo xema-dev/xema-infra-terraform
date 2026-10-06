@@ -160,6 +160,9 @@ Every area is **independently toggleable** via an `enable_*` input:
 created server (`azure.extensions`, lowercase identifiers); empty writes no
 parameter, so Azure's default stands.
 
+`postgres_zone` (default `null`) pins the managed PostgreSQL server to zone "1", "2" or "3"; null keeps
+the regional placement. Set it before the first apply: changing it later replaces the server.
+
 A disabled cloud module is `count`-gated to zero — the stack **consumes** the
 existing resource instead of creating it; it never plans a destroy. `network`
 is required in both modes whenever the stack creates something that lives in

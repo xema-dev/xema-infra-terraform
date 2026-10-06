@@ -6,7 +6,7 @@ no data sources, so a bootstrap can call it before any state or cloud credential
 
 ```hcl
 module "assigned_roles" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/assigned-roles?ref=v0.12.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/assigned-roles?ref=v0.12.1"
 
   enable_cluster            = true
   enable_container_registry = true
