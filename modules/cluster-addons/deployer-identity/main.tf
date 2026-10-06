@@ -156,7 +156,7 @@ resource "terraform_data" "input_guards" {
   }
 }
 
-resource "kubernetes_namespace" "this" {
+resource "kubernetes_namespace_v1" "this" {
   for_each = local.managed_namespaces
 
   metadata {
@@ -173,25 +173,25 @@ resource "kubernetes_namespace" "this" {
   }
 }
 
-resource "kubernetes_service_account" "deployer" {
+resource "kubernetes_service_account_v1" "deployer" {
   metadata {
     name      = var.service_account_name
     namespace = var.namespace
   }
 
-  depends_on = [kubernetes_namespace.this]
+  depends_on = [kubernetes_namespace_v1.this]
 }
 
 # A long-lived token. Kubernetes 1.24+ stopped minting one per ServiceAccount,
 # so the Secret is explicit; the token controller fills it, and
 # `wait_for_service_account_token` is what makes the value available to this
 # run rather than on the next apply.
-resource "kubernetes_secret" "deployer_token" {
+resource "kubernetes_secret_v1" "deployer_token" {
   metadata {
     name      = "${var.service_account_name}-token"
     namespace = var.namespace
     annotations = {
-      "kubernetes.io/service-account.name" = kubernetes_service_account.deployer.metadata[0].name
+      "kubernetes.io/service-account.name" = kubernetes_service_account_v1.deployer.metadata[0].name
     }
   }
 
@@ -199,7 +199,7 @@ resource "kubernetes_secret" "deployer_token" {
   wait_for_service_account_token = true
 }
 
-resource "kubernetes_role" "deployer" {
+resource "kubernetes_role_v1" "deployer" {
   for_each = local.namespaces
 
   metadata {
@@ -217,10 +217,10 @@ resource "kubernetes_role" "deployer" {
     }
   }
 
-  depends_on = [kubernetes_namespace.this]
+  depends_on = [kubernetes_namespace_v1.this]
 }
 
-resource "kubernetes_role_binding" "deployer" {
+resource "kubernetes_role_binding_v1" "deployer" {
   for_each = local.namespaces
 
   metadata {
@@ -231,17 +231,17 @@ resource "kubernetes_role_binding" "deployer" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "Role"
-    name      = kubernetes_role.deployer[each.value].metadata[0].name
+    name      = kubernetes_role_v1.deployer[each.value].metadata[0].name
   }
 
   subject {
     kind      = "ServiceAccount"
-    name      = kubernetes_service_account.deployer.metadata[0].name
+    name      = kubernetes_service_account_v1.deployer.metadata[0].name
     namespace = var.namespace
   }
 }
 
-resource "kubernetes_cluster_role" "cluster_identity" {
+resource "kubernetes_cluster_role_v1" "cluster_identity" {
   count = var.manage_cluster_identity_reader ? 1 : 0
 
   metadata {
@@ -256,7 +256,7 @@ resource "kubernetes_cluster_role" "cluster_identity" {
   }
 }
 
-resource "kubernetes_cluster_role_binding" "cluster_identity" {
+resource "kubernetes_cluster_role_binding_v1" "cluster_identity" {
   count = var.manage_cluster_identity_reader ? 1 : 0
 
   metadata {
@@ -266,12 +266,12 @@ resource "kubernetes_cluster_role_binding" "cluster_identity" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
-    name      = kubernetes_cluster_role.cluster_identity[0].metadata[0].name
+    name      = kubernetes_cluster_role_v1.cluster_identity[0].metadata[0].name
   }
 
   subject {
     kind      = "ServiceAccount"
-    name      = kubernetes_service_account.deployer.metadata[0].name
+    name      = kubernetes_service_account_v1.deployer.metadata[0].name
     namespace = var.namespace
   }
 }
@@ -279,8 +279,45 @@ resource "kubernetes_cluster_role_binding" "cluster_identity" {
 # The cluster's own identity, read live. A UID cannot be guessed, renamed or
 # aliased, which is what makes it the anchor: `kube-system` is created once, by
 # the cluster itself, and its UID dies with the cluster.
-data "kubernetes_namespace" "kube_system" {
+data "kubernetes_namespace_v1" "kube_system" {
   metadata {
     name = "kube-system"
   }
+}
+
+# The kubernetes provider deprecated the unversioned resources in favour of their `_v1`
+# equivalents (same schema). These blocks move existing state across with no destroy.
+moved {
+  from = kubernetes_namespace.this
+  to   = kubernetes_namespace_v1.this
+}
+
+moved {
+  from = kubernetes_service_account.deployer
+  to   = kubernetes_service_account_v1.deployer
+}
+
+moved {
+  from = kubernetes_secret.deployer_token
+  to   = kubernetes_secret_v1.deployer_token
+}
+
+moved {
+  from = kubernetes_role.deployer
+  to   = kubernetes_role_v1.deployer
+}
+
+moved {
+  from = kubernetes_role_binding.deployer
+  to   = kubernetes_role_binding_v1.deployer
+}
+
+moved {
+  from = kubernetes_cluster_role.cluster_identity
+  to   = kubernetes_cluster_role_v1.cluster_identity
+}
+
+moved {
+  from = kubernetes_cluster_role_binding.cluster_identity
+  to   = kubernetes_cluster_role_binding_v1.cluster_identity
 }

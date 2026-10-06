@@ -4,6 +4,13 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — deployer-identity on the `_v1` kubernetes resources
+
+No consumer change: `moved {}` blocks migrate existing state (`kubernetes_namespace`,
+`_service_account`, `_secret`, `_role`, `_role_binding`, `_cluster_role`, `_cluster_role_binding` to
+their `_v1` forms, and the `kube-system` data source) with no destroy, and `tofu validate` is free
+of deprecation warnings. Imports now name the `_v1` addresses.
+
 ## Unreleased — optional container registry and the kubelet identity (Azure)
 
 Adopting it needs nothing of a consumer root except one thing: the foundation's

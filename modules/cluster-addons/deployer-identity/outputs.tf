@@ -5,17 +5,17 @@ output "namespaces" {
 
 output "service_account_name" {
   description = "Name of the deployer ServiceAccount."
-  value       = kubernetes_service_account.deployer.metadata[0].name
+  value       = kubernetes_service_account_v1.deployer.metadata[0].name
 }
 
 output "token_secret_name" {
   description = "Name of the Secret holding the ServiceAccount token, in the deployment's namespace."
-  value       = kubernetes_secret.deployer_token.metadata[0].name
+  value       = kubernetes_secret_v1.deployer_token.metadata[0].name
 }
 
 output "deployer_token" {
   description = "The ServiceAccount bearer token. A credential: route it to a secret store, never into a repository."
-  value       = kubernetes_secret.deployer_token.data["token"]
+  value       = kubernetes_secret_v1.deployer_token.data["token"]
   sensitive   = true
 }
 
@@ -41,7 +41,7 @@ output "deployer_kubeconfig" {
     }]
     users = [{
       name = var.service_account_name
-      user = { token = kubernetes_secret.deployer_token.data["token"] }
+      user = { token = kubernetes_secret_v1.deployer_token.data["token"] }
     }]
     contexts = [{
       name = var.context_name
@@ -74,6 +74,6 @@ output "cluster_identity" {
   value = {
     server                    = var.cluster_endpoint != "" ? var.cluster_endpoint : null
     ca_certificate_sha256     = local.ca_certificate_sha256
-    kube_system_namespace_uid = data.kubernetes_namespace.kube_system.metadata[0].uid
+    kube_system_namespace_uid = data.kubernetes_namespace_v1.kube_system.metadata[0].uid
   }
 }

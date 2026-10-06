@@ -22,11 +22,11 @@ changes. That is the step this module removes.
 
 | | |
 | --- | --- |
-| `kubernetes_namespace` × N | the deployment's namespace + `additional_namespaces` (skippable: `manage_namespaces = false`) |
-| `kubernetes_service_account` | one, in the deployment's namespace |
-| `kubernetes_secret` | its `kubernetes.io/service-account-token`, waited for so the token is available in the same run |
-| `kubernetes_role` + `kubernetes_role_binding` × N | the same least-privileged rule set in every namespace, all bound to the one account |
-| `kubernetes_cluster_role` + binding | read-only `get` on exactly `kube-system` and the deployment's namespace (`manage_cluster_identity_reader`) |
+| `kubernetes_namespace_v1` × N | the deployment's namespace + `additional_namespaces` (skippable: `manage_namespaces = false`) |
+| `kubernetes_service_account_v1` | one, in the deployment's namespace |
+| `kubernetes_secret_v1` | its `kubernetes.io/service-account-token`, waited for so the token is available in the same run |
+| `kubernetes_role_v1` + `kubernetes_role_binding_v1` × N | the same least-privileged rule set in every namespace, all bound to the one account |
+| `kubernetes_cluster_role_v1` + binding | read-only `get` on exactly `kube-system` and the deployment's namespace (`manage_cluster_identity_reader`) |
 
 **The authority is namespaced.** No ClusterRoleBinding for workloads, no
 cluster-scoped write. A chart rendering a cluster-scoped resource fails
@@ -91,13 +91,13 @@ Every object is adoptable, which is how a cluster that was bootstrapped by hand
 moves under Terraform without a re-apply. Namespaced ids are `<namespace>/<name>`:
 
 ```
-tofu import 'module.deployer_identity.kubernetes_namespace.this["acme-prod"]'        acme-prod
-tofu import  module.deployer_identity.kubernetes_service_account.deployer            acme-prod/github-deployer
-tofu import  module.deployer_identity.kubernetes_secret.deployer_token               acme-prod/github-deployer-token
-tofu import 'module.deployer_identity.kubernetes_role.deployer["acme-prod"]'         acme-prod/github-deployer
-tofu import 'module.deployer_identity.kubernetes_role_binding.deployer["acme-prod"]' acme-prod/github-deployer
-tofu import 'module.deployer_identity.kubernetes_cluster_role.cluster_identity[0]'         acme-prod-github-deployer-cluster-identity
-tofu import 'module.deployer_identity.kubernetes_cluster_role_binding.cluster_identity[0]' acme-prod-github-deployer-cluster-identity
+tofu import 'module.deployer_identity.kubernetes_namespace_v1.this["acme-prod"]'        acme-prod
+tofu import  module.deployer_identity.kubernetes_service_account_v1.deployer            acme-prod/github-deployer
+tofu import  module.deployer_identity.kubernetes_secret_v1.deployer_token               acme-prod/github-deployer-token
+tofu import 'module.deployer_identity.kubernetes_role_v1.deployer["acme-prod"]'         acme-prod/github-deployer
+tofu import 'module.deployer_identity.kubernetes_role_binding_v1.deployer["acme-prod"]' acme-prod/github-deployer
+tofu import 'module.deployer_identity.kubernetes_cluster_role_v1.cluster_identity[0]'         acme-prod-github-deployer-cluster-identity
+tofu import 'module.deployer_identity.kubernetes_cluster_role_binding_v1.cluster_identity[0]' acme-prod-github-deployer-cluster-identity
 ```
 
 `manage_namespaces = false` is the other half: it leaves namespaces to whoever
