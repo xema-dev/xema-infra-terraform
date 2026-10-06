@@ -4,6 +4,15 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.14.0 — management runner denies VNet-wide inbound (Azure)
+
+Behaviour change. `providers/azure/management-runner` now always adds an inbound DenyAll NSG rule (priority 4096)
+above Azure's default `AllowVnetInBound`, and keeps only `AzureLoadBalancer` (110) and the `allowed_ssh_cidrs` SSH
+rule (100) as allows. Inbound from the VNet and any routed customer network is denied by default, so add
+`allowed_ssh_cidrs` for any SSH you need (including from inside the network). There is no input to disable it. The
+module gains outputs `network_security_group_id` and `network_security_group_name` for attaching further rules
+(use priorities 120-4095). Applying updates the NSG in place.
+
 ## v0.13.1 — `key_vault_id` output (Azure substrate)
 
 No consumer change is required. `stacks/azure/xema-substrate` gains the `key_vault_id` output (`null` when

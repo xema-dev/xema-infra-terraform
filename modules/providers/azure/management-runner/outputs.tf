@@ -17,3 +17,13 @@ output "admin_username" {
   description = "Login name on the VM."
   value       = var.admin_username
 }
+
+output "network_security_group_id" {
+  description = "Id of the runner's NIC network security group, so consumers can attach further inbound rules (priorities 120-4095; 100, 110 and 4096 are taken)."
+  value       = azurerm_network_security_group.this.id
+}
+
+output "network_security_group_name" {
+  description = "Name of the runner's NIC network security group."
+  value       = azurerm_network_security_group.this.name
+}

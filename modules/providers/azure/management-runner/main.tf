@@ -33,8 +33,12 @@ resource "azurerm_network_security_group" "this" {
   resource_group_name = var.resource_group_name
   tags                = var.tags
 
-  # SSH from the declared sources only. Everything else inbound from the
-  # internet falls to Azure's default DenyAllInBound.
+  # Safe default, never opt-in: inbound is SSH from the declared sources and
+  # the Azure load balancer probe, then an explicit DenyAll. Azure's default
+  # AllowVnetInBound (65000) would otherwise let the whole routed network reach
+  # the VM on any port. Priorities: ssh 100, load balancer 110, deny 4096 (the
+  # highest a custom rule may take). Further rules attached through the
+  # network_security_group_id output use 120-4095.
   dynamic "security_rule" {
     for_each = length(var.allowed_ssh_cidrs) > 0 ? [1] : []
     content {
@@ -50,6 +54,29 @@ resource "azurerm_network_security_group" "this" {
     }
   }
 
+  security_rule {
+    name                       = "allow-azure-load-balancer"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "AzureLoadBalancer"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "deny-all-inbound"
+    priority                   = 4096
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
 }
 
 resource "azurerm_network_interface" "this" {

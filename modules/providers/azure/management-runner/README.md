@@ -9,8 +9,13 @@ One small Linux VM inside the deployment's network: the deployment's
   run from inside the network. This is that place, and it is also restricted SSH
   access for a human.
 - **Access.** SSH public keys only (password login disabled). Inbound SSH only
-  from `allowed_ssh_cidrs`, which is required and may not be the whole internet;
-  every other inbound connection falls to Azure's default deny.
+  from `allowed_ssh_cidrs`, which is required and may not be the whole internet.
+  The NSG always carries an explicit inbound DenyAll (priority 4096) above
+  Azure's default AllowVnetInBound, so the VNet and any routed customer network
+  cannot reach the VM on any other port; only `AzureLoadBalancer` (110) and the
+  SSH allowlist (100) are allowed. There is no input to loosen this; add rules
+  through the `network_security_group_id` output (priorities 120-4095). Run
+  command needs no inbound.
 - **Identity.** A system-assigned managed identity, so Terraform and the engine
   need no stored credential. What it may do is granted by the deployment
   (`principal_id` output), never by this module.
@@ -34,4 +39,5 @@ lands somewhere unwanted. The resource SKUs API shows it
 
 Outputs: `public_ip_address` (the SSH target and the runner's egress address —
 add it to the cluster's `authorized_ip_ranges`), `private_ip_address`,
-`principal_id`, `admin_username`.
+`principal_id`, `admin_username`, `network_security_group_id`,
+`network_security_group_name`.
