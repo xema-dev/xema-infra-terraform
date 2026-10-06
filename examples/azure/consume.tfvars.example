@@ -7,7 +7,7 @@
 # This file demonstrates CONSUME mode: a SEPARATE "cloud substrate" Terraform
 # (owned by another team/agent) already owns the cluster, the Flexible Server
 # and the DNS zone. This root then manages ONLY the in-cluster and identity
-# resources — RWX storage, workload namespaces, the ingress edge, the Key
+# resources — RWX storage, workload namespaces, the gateway edge, the Key
 # Vault, the Keycloak realm, and extension claims — and CONSUMES the existing
 # cluster by name.
 #
@@ -34,7 +34,7 @@ enable_secrets_backend     = true
 enable_cache               = false
 enable_rwx_storage         = true
 enable_workload_namespaces = true
-enable_ingress_tls         = true
+enable_gateway_tls         = true
 enable_identity_realm      = true
 
 # --- provider credentials (FAKE placeholders) ---
@@ -89,9 +89,10 @@ workload_namespaces = [ # full names; nothing derived
   "acme-dev-biome-sidecars",
 ]
 
-# --- ingress + tls (applied to the consumed cluster) ---
+# --- gateway + tls (applied to the consumed cluster) ---
 acme_email = "ops@example.com"
 tls_solver = "http01" # dns01-azure needs enable_dns
+gateway_hostname = "acme-dev.example.com" # a wildcard needs dns01-azure
 
 # --- secrets backend ---
 key_vault_secrets = {} # seed via TF_VAR_key_vault_secrets

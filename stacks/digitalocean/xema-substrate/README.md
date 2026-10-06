@@ -85,7 +85,7 @@ shares — documented once in
 [`docs/CONTRACTS.md` § Binding contract](../../../docs/CONTRACTS.md#binding-contract).
 On DigitalOcean the keys this stack does not model (a derived
 `deployment_name`, `environment`, the secrets backend, the cache, platform
-object storage, the ingress addon, `dns_name_servers`) are always `null`; a
+object storage, the gateway addon, `dns_name_servers`) are always `null`; a
 consumer branches on `null`, never on the cloud. Credentials are the separate
 **sensitive** outputs (`postgres_uri`, `realm_client_secrets`,
 `kubeconfig_raw`), on purpose.

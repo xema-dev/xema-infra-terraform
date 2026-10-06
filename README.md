@@ -93,8 +93,8 @@ labelled as one deployment's example and never a default.
 second full implementation of the substrate, and it adds three optional
 primitives the DigitalOcean stack does not have — a **secrets backend**
 (Key Vault + External Secrets), an optional **managed cache**, and the
-cloud-agnostic **`ingress-tls`** addon (ingress-nginx, cert-manager +
-`ClusterIssuer`, External Secrets + `ClusterSecretStore`). Three properties
+cloud-agnostic **`gateway-tls`** addon (Gateway API CRDs, NGINX Gateway
+Fabric + a `Gateway`, cert-manager + `ClusterIssuer`). Three properties
 decide its shape:
 
 - **One input names everything the substrate owns.** `deployment_name`
@@ -148,7 +148,7 @@ modules/
     workload-namespaces/  # a roster of prerequisite namespaces (any cluster)
     shared-templates-volume/ # one RWX NFS export shared across N namespaces (any cluster)
     secrets/              # operator-provided credentials as Kubernetes Secrets (any cluster)
-    ingress-tls/          # ingress-nginx + cert-manager/ClusterIssuer + External Secrets/ClusterSecretStore (any cluster)
+    gateway-tls/          # Gateway API CRDs + NGINX Gateway Fabric + Gateway + cert-manager/ClusterIssuer (any cluster; or a customer-managed Gateway)
   identity-realm/         # full Keycloak realm config (any Keycloak)
   providers/
     digitalocean/         # DigitalOcean implementations of the substrate contracts

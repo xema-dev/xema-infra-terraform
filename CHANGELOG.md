@@ -4,6 +4,31 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — Gateway API replaces ingress-nginx (BREAKING)
+
+**Breaking, no compatibility alias.** `cluster-addons/ingress-tls` is deleted; its
+replacement is `cluster-addons/gateway-tls`. A consumer root on the previous tag must:
+
+- Swap the module source `.../cluster-addons/ingress-tls` for `.../cluster-addons/gateway-tls`.
+  Gone: `ingress_nginx_*`, `ingress_class_name`, `ingress_default_class`, `ingress_replica_count`,
+  `ingress_service_annotations`, `ingress_load_balancer_ip`, and the outputs
+  `ingress_service_name`, `ingress_namespace`, `ingress_class_name`. New: `gateway_implementation`
+  (`nginx-gateway-fabric` | `customer-managed`), `customer_gateway`, `gateway_hostname`,
+  `route_namespaces`, `gateway_infrastructure_annotations`, `data_plane_*`, `ngf_*`, and
+  `max_request_body_mib` (default 256, the `ClientSettingsPolicy` body ceiling); output
+  `gateway_parent_ref` (`{ name, namespace, section_name }`). Pinned: Gateway API CRDs v1.6.1
+  (standard channel, vendored), NGINX Gateway Fabric chart 2.7.2, cert-manager v1.21.2 with
+  `enableGatewayAPI`. The HTTP-01 solver is now a Gateway `HTTPRoute`; `dns01-azure` is unchanged.
+- In `stacks/azure/xema-substrate` and `examples/azure`: `enable_ingress_tls` is `enable_gateway_tls`,
+  `ingress_service_annotations` is `gateway_infrastructure_annotations`, `ingress_load_balancer_ip`
+  is `gateway_load_balancer_ip`; `gateway_hostname` is required with `nginx-gateway-fabric` and
+  `workload_namespaces` become the namespaces whose `HTTPRoute`s may attach. New output
+  `gateway_parent_ref`. The `substrate.ingress` key is `substrate.gateway`
+  (`{ parent_ref, cluster_issuer_name }`); the DigitalOcean stack's is `null`.
+- `tooling/bind/bind-outputs.mjs` reports `substrate.gateway` as an operator step (the
+  `gateway.parentRef` block for `deployments/<d>/values.yaml`); it is never written to
+  `secret-inputs.yaml`.
+
 ## Unreleased — Azure modules can live inside an existing landing zone
 
 No consumer change: every new input defaults to the previous behaviour. Proven by

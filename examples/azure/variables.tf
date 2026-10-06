@@ -112,8 +112,8 @@ variable "enable_workload_namespaces" {
   default     = true
 }
 
-variable "enable_ingress_tls" {
-  description = "Install ingress-nginx + cert-manager + External Secrets."
+variable "enable_gateway_tls" {
+  description = "Install the Gateway API edge (NGINX Gateway Fabric + Gateway) + cert-manager."
   type        = bool
   default     = true
 }
@@ -320,10 +320,10 @@ variable "key_vault_secrets" {
   default     = {}
 }
 
-# --- ingress + tls ---
+# --- gateway + tls ---
 
 variable "acme_email" {
-  description = "ACME account contact (required when enable_ingress_tls)."
+  description = "ACME account contact (required when enable_gateway_tls)."
   type        = string
   default     = ""
 }
@@ -340,10 +340,45 @@ variable "tls_solver" {
   default     = "http01"
 }
 
-variable "ingress_service_annotations" {
-  description = "Annotations on the ingress LoadBalancer Service."
+variable "gateway_infrastructure_annotations" {
+  description = "Annotations on the Gateway's data-plane LoadBalancer Service."
   type        = map(string)
   default     = {}
+}
+
+variable "gateway_implementation" {
+  description = "\"nginx-gateway-fabric\" (installed here) or \"customer-managed\" (set customer_gateway)."
+  type        = string
+  default     = "nginx-gateway-fabric"
+}
+
+variable "customer_gateway" {
+  description = "The customer's existing Gateway when gateway_implementation = \"customer-managed\"."
+  type = object({
+    name               = string
+    namespace          = string
+    http_section_name  = string
+    https_section_name = string
+  })
+  default = null
+}
+
+variable "gateway_hostname" {
+  description = "Hostname of the Gateway listeners; cert-manager issues its certificate (a wildcard needs dns01-azure). Required with nginx-gateway-fabric."
+  type        = string
+  default     = ""
+}
+
+variable "max_request_body_mib" {
+  description = "Request-body ceiling in MiB for every route on the Gateway."
+  type        = number
+  default     = 256
+}
+
+variable "gateway_load_balancer_ip" {
+  description = "Pin the Gateway's LoadBalancer to a pre-allocated static IP."
+  type        = string
+  default     = ""
 }
 
 variable "cluster_issuer_name" {

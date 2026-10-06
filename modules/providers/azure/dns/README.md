@@ -42,7 +42,7 @@ module "dns" {
   Contributor on this zone only**, federated (`api://AzureADTokenExchange`) to
   `system:serviceaccount:<ns>:<sa>` through the cluster's OIDC issuer. Feed
   `dns01_client_id`, `subscription_id` and `resource_group_name` to the
-  [`ingress-tls`](../../../cluster-addons/ingress-tls/README.md) addon's
+  [`gateway-tls`](../../../cluster-addons/gateway-tls/README.md) addon's
   `dns01-azure` solver.
 - The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
   here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).

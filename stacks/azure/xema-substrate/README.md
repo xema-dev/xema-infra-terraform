@@ -20,7 +20,7 @@ substrate cannot know — which databases and which namespaces exist — are
 | `module.cache` | (optional, off by default) Azure Cache for Redis |
 | `module.rwx_storage` | a ReadWriteMany `StorageClass` over the built-in Azure Files CSI driver (NFS) |
 | `module.workload_namespaces` | the `workload_namespaces` roster the consumer supplies |
-| `module.ingress_tls` | ingress-nginx + cert-manager/ClusterIssuer + External Secrets/ClusterSecretStore |
+| `module.gateway_tls` | Gateway API CRDs + NGINX Gateway Fabric + Gateway (or a customer-managed Gateway) + cert-manager/ClusterIssuer |
 | `module.identity_realm` | the Keycloak realm **container** (+ optional base clients/roles/mappers) |
 | `module.extension_bucket` | dedicated storage accounts claimed by extensions (see below) |
 
@@ -96,13 +96,13 @@ storage accounts carry their own explicit `name`.
 ### The in-cluster names a consumer's manifests reference
 
 `cluster_issuer_name` (default `letsencrypt`) and `cluster_secret_store_name`
-(default `platform`) are threaded to the `ingress-tls` addon, validated as
+(default `platform`) are threaded to the `gateway-tls` addon, validated as
 DNS-1123 subdomain names, and **read back** as the stack outputs of the same
-name (and in the `substrate` map: `substrate.ingress.cluster_issuer_name`,
-`substrate.cluster_secret_store_name`). A consumer's `Ingress`
+name (and in the `substrate` map: `substrate.gateway.cluster_issuer_name`,
+`substrate.cluster_secret_store_name`). A consumer's `Gateway`
 (`cert-manager.io/cluster-issuer`) and `ExternalSecret` (`secretStoreRef.name`)
 manifests should read them from the stack, never restate the defaults. Both
-outputs are `null` exactly when the object does not exist — `enable_ingress_tls
+outputs are `null` exactly when the object does not exist — `enable_gateway_tls
 = false`, or for the store also `enable_secrets_backend = false`.
 
 ## The `substrate` output — the binding contract
@@ -148,11 +148,11 @@ Every area is **independently toggleable** via an `enable_*` input:
 | `enable_managed_postgres` | `true` | Create the Flexible Server (and, with `enable_secrets_backend`, write its admin password to this stack's Key Vault). `false` ⇒ the tenancy and extension databases go to `existing_postgres_server_id` / `existing_postgres_host`, with the admin password READ from Key Vault — see [Consume mode: the existing server](#consume-mode-the-existing-server). |
 | `enable_dns` | `true` | Manage the `apex_domain` zone. `false` ⇒ DNS owned elsewhere (extension `dns_records` and `dns01-azure` then fail fast). |
 | `enable_object_storage` | `true` | Create the blob storage account. |
-| `enable_secrets_backend` | `true` | Create the Key Vault + reader identity (and the External Secrets store when `enable_ingress_tls`). |
+| `enable_secrets_backend` | `true` | Create the Key Vault + reader identity (and, with it, the External Secrets store). |
 | `enable_cache` | `false` | Create a managed Redis. Off: the platform runs valkey in-cluster. |
 | `enable_rwx_storage` | `true` | Create the RWX `StorageClass` on the (created or consumed) cluster. |
 | `enable_workload_namespaces` | `true` | Ensure the `workload_namespaces` roster exists. |
-| `enable_ingress_tls` | `true` | Install the ingress edge (needs `acme_email`). |
+| `enable_gateway_tls` | `true` | Install the Gateway API edge (needs `acme_email`; `gateway_hostname` and non-empty `workload_namespaces` with `nginx-gateway-fabric`). The stack output `gateway_parent_ref` is the parentRef every HTTPRoute attaches to. |
 | `enable_identity_realm` | `true` | Manage the Keycloak realm (needs a reachable `keycloak_url`). |
 
 A disabled cloud module is `count`-gated to zero — the stack **consumes** the
@@ -233,7 +233,7 @@ apply, so a fresh deployment is applied in **phases**:
 terraform apply -target=module.cluster -target=module.postgres \
                 -target=module.dns -target=module.blob -target=module.secrets_backend
 
-# Phase 2 — everything in-cluster (RWX class, namespaces, ingress edge, roles).
+# Phase 2 — everything in-cluster (RWX class, namespaces, gateway edge, roles).
 terraform apply
 
 # Phase 3 — once the Helm bring-up has Keycloak answering at keycloak_url:

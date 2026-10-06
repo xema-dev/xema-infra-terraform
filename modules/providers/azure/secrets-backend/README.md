@@ -40,7 +40,7 @@ module "secrets" {
   consistent, so this is a wait on an external system's documented lag — the
   alternative is a failed first apply and a manual retry.
 - Feed `vault_uri`, `client_id` and `tenant_id` to the
-  [`ingress-tls`](../../../cluster-addons/ingress-tls/README.md) addon's
+  [`external-secrets`](../../../cluster-addons/external-secrets/README.md) addon's
   `azure-key-vault` ClusterSecretStore.
 - `purge_protection_enabled` defaults **off** because it is irreversible and
   reserves the vault name after deletion; enable it for production.

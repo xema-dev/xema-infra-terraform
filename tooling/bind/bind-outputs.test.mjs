@@ -327,4 +327,17 @@ for (const cloud of ['digitalocean', 'azure']) {
     );
     assert.equal(fragment.clusterIdentity, undefined, 'the identity is not a secret input');
   });
+
+  test(`${cloud}: the gateway parentRef is an operator step, never a secret input`, () => {
+    const doc = fixture(cloud);
+    const { fragment, report } = bind(doc);
+    assert.equal(fragment.gateway, undefined, 'the parentRef is not a secret input');
+    const reported = report.operator.some((line) => line.startsWith('substrate.gateway:'));
+    if (cloud === 'azure') {
+      assert.deepEqual(Object.keys(doc.substrate.value.gateway.parent_ref).sort(), ['name', 'namespace', 'section_name']);
+      assert.ok(reported, 'substrate.gateway is reported as an operator step');
+    } else {
+      assert.ok(!reported, 'a null gateway has nothing to report');
+    }
+  });
 }

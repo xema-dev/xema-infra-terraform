@@ -89,7 +89,7 @@ output "extension_databases" {
 # § Binding contract) so a consumer binds the same way on every cloud; a key
 # is null when its area is disabled, consumed elsewhere, or not modelled on
 # this cloud (this stack derives no deployment_name, has no environment axis,
-# no platform object storage, no secrets backend, no cache and no ingress
+# no platform object storage, no secrets backend, no cache and no gateway
 # addon, so those keys are always null here). Only non-secret facts live here
 # — the credentials are the sensitive outputs above, read separately on
 # purpose.
@@ -142,7 +142,7 @@ output "substrate" {
     dns_zone         = one(module.dns[*].domain)
     dns_name_servers = null
 
-    ingress = null
+    gateway = null
 
     keycloak_url = var.enable_identity_realm ? var.keycloak_url : null
     realm_name   = var.enable_identity_realm ? var.realm_name : null

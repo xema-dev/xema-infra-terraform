@@ -41,7 +41,7 @@ enable_secrets_backend     = true
 enable_cache               = false # valkey runs in-cluster by default
 enable_rwx_storage         = true
 enable_workload_namespaces = true
-enable_ingress_tls         = true
+enable_gateway_tls         = true
 enable_identity_realm      = false # flip to true once Keycloak answers at keycloak_url (phase 3)
 
 # --- provider credentials (FAKE placeholders) ---
@@ -118,7 +118,7 @@ postgres_network_access = "private"
 
 # --- dns ---
 dns_records = {
-  ingress  = { name = "@", type = "A", value = "192.0.2.10" } # RFC-5737 TEST-NET-1: the ingress LB address, once known
+  ingress  = { name = "@", type = "A", value = "192.0.2.10" } # RFC-5737 TEST-NET-1: the Gateway LB address, once known
   wildcard = { name = "*", type = "A", value = "192.0.2.10" }
 }
 
@@ -127,14 +127,16 @@ dns_records = {
 #   export TF_VAR_key_vault_secrets='{"postgres-app-password":"..."}'
 key_vault_secrets = {}
 
-# --- ingress + tls ---
+# --- gateway + tls ---
 acme_email = "ops@example.com"
 acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory" # staging while testing; switch to production after
 tls_solver  = "dns01-azure"                                             # wildcard certificates need DNS-01
-ingress_service_annotations = {
-  "service.beta.kubernetes.io/azure-dns-label-name" = "acme-dev-ingress"
+gateway_hostname = "*.acme.example.com"                                      # the Gateway listeners' hostname; the wildcard certificate is issued for it
+max_request_body_mib = 256                                              # finite request-body ceiling per route; configuration tightens it
+gateway_infrastructure_annotations = {
+  "service.beta.kubernetes.io/azure-dns-label-name" = "acme-dev-gateway"
 }
-# The two in-cluster names your Ingress / ExternalSecret manifests reference.
+# The two in-cluster names your Gateway / ExternalSecret manifests reference.
 # Defaults shown; whatever you set, READ them back from the stack outputs
 # (cluster_issuer_name, cluster_secret_store_name) instead of restating them.
 cluster_issuer_name       = "letsencrypt"

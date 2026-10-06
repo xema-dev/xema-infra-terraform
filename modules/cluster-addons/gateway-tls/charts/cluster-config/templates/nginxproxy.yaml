@@ -1,0 +1,19 @@
+{{- with .Values.gateway }}
+apiVersion: gateway.nginx.org/v1alpha2
+kind: NginxProxy
+metadata:
+  name: {{ .name | quote }}
+  namespace: {{ .namespace | quote }}
+spec:
+  kubernetes:
+    service:
+      type: {{ required "gateway.dataPlane.serviceType is required" .dataPlane.serviceType | quote }}
+      externalTrafficPolicy: {{ required "gateway.dataPlane.externalTrafficPolicy is required" .dataPlane.externalTrafficPolicy | quote }}
+{{- if .dataPlane.loadBalancerIP }}
+      loadBalancerIP: {{ .dataPlane.loadBalancerIP | quote }}
+{{- end }}
+{{- if .dataPlane.nodePorts }}
+      nodePorts:
+        {{- toYaml .dataPlane.nodePorts | nindent 8 }}
+{{- end }}
+{{- end }}

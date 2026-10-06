@@ -11,8 +11,13 @@ spec:
     solvers:
 {{- if eq .Values.clusterIssuer.solver "http01" }}
       - http01:
-          ingress:
-            ingressClassName: {{ .Values.clusterIssuer.ingressClassName | quote }}
+          gatewayHTTPRoute:
+            parentRefs:
+              - group: gateway.networking.k8s.io
+                kind: Gateway
+                name: {{ required "clusterIssuer.httpParentRef.name is required" .Values.clusterIssuer.httpParentRef.name | quote }}
+                namespace: {{ required "clusterIssuer.httpParentRef.namespace is required" .Values.clusterIssuer.httpParentRef.namespace | quote }}
+                sectionName: {{ required "clusterIssuer.httpParentRef.sectionName is required" .Values.clusterIssuer.httpParentRef.sectionName | quote }}
 {{- else if eq .Values.clusterIssuer.solver "dns01-azure" }}
       - dns01:
           azureDNS:

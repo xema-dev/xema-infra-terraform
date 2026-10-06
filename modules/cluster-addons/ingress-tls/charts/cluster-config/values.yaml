@@ -1,9 +1,0 @@
-# Every value is set by cluster-addons/ingress-tls from its Terraform inputs.
-# These defaults exist only so `helm lint` renders; the module always overrides them.
-clusterIssuer:
-  name: letsencrypt
-  email: ""
-  server: https://acme-v02.api.letsencrypt.org/directory
-  solver: http01 # http01 | dns01-azure
-  ingressClassName: nginx
-  dns01Azure: null

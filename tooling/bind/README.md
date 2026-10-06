@@ -73,9 +73,10 @@ top-level outputs that duplicate a map key are ignored as duplicates.
 | `redis_primary_key` (Azure) | externals | `redis-password` | omitted — absent or null on a cloud without a managed cache |
 | `postgres_uri` | **operator** — never written | the ADMIN credential the deployment root's database bootstrap runs under: `psql "$(terraform output -raw postgres_uri)" -f deployments/<d>/bootstrap/postgres-databases.sql` | — |
 | `kubeconfig_raw` | **operator** — never written | the kube-context the deployment root deploys through | — |
+| `substrate.gateway` (Azure) | **operator** — never written | `deployments/<d>/values.yaml#gateway.parentRef` `{ name, namespace, sectionName }`: a nested mapping the two-level merge cannot write — print it with the `jq` on stderr and paste it once | — |
 | `postgres_role_passwords` (Azure) | **ignored**, with a reason on stderr | see below — role passwords are declared and reconciled, not bound | — |
 | `blob_primary_access_key` (Azure) | **operator** — never written | see below | — |
-| everything else (`cluster_id`, `vpc_id`, `dns_*`, `storage_class_name`, `workload_namespaces`, `postgres_databases`, `realm_id`, `extension_*`, `key_vault_*`, `cluster_issuer_name`, `cluster_secret_store_name`, `blob_account`/`blob_endpoint`, and every other `substrate.*` key) | **ignored**, each with a reason on stderr | nothing in the two files consumes it | — |
+| everything else (`cluster_id`, `vpc_id`, `dns_*`, `storage_class_name`, `workload_namespaces`, `postgres_databases`, `realm_id`, `extension_*`, `key_vault_*`, `gateway_parent_ref`, `cluster_issuer_name`, `cluster_secret_store_name`, `blob_account`/`blob_endpoint`, and every other `substrate.*` key) | **ignored**, each with a reason on stderr | nothing in the two files consumes it | — |
 
 Two properties are enforced at runtime, not only by the table: an output the
 table does not know is REFUSED by name (nothing is dropped silently), and an

@@ -1,0 +1,15 @@
+{{- with .Values.gateway }}
+# Request-body ceiling for every route on the Gateway (nginx client_max_body_size). Never unbounded.
+apiVersion: gateway.nginx.org/v1alpha1
+kind: ClientSettingsPolicy
+metadata:
+  name: {{ printf "%s-body" .name | quote }}
+  namespace: {{ .namespace | quote }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ .name | quote }}
+  body:
+    maxSize: {{ required "gateway.maxRequestBody is required" .maxRequestBody | quote }}
+{{- end }}

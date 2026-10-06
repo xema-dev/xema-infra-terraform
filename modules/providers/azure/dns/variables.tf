@@ -46,7 +46,7 @@ variable "dns01_workload_identity" {
     Optionally mint a user-assigned identity that may edit THIS zone (DNS Zone
     Contributor) and federate it to a Kubernetes service account through the
     cluster's OIDC issuer — what cert-manager's ACME DNS-01 azureDNS solver uses
-    with workload identity (see cluster-addons/ingress-tls).
+    with workload identity (see cluster-addons/gateway-tls).
       - enabled                   : create the identity + federated credential
       - oidc_issuer_url           : the cluster's OIDC issuer (providers/azure/cluster output)
       - service_account_namespace : namespace of the solver's service account (default "cert-manager")

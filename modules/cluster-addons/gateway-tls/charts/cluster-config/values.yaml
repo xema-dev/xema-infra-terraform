@@ -1,0 +1,32 @@
+# Every value is set by cluster-addons/gateway-tls from its Terraform inputs.
+# These defaults exist only so `helm lint` renders; the module always overrides them.
+clusterIssuer:
+  name: letsencrypt
+  email: ""
+  server: https://acme-v02.api.letsencrypt.org/directory
+  solver: http01 # http01 | dns01-azure
+  # The Gateway listener the HTTP-01 solver's HTTPRoute attaches to (port 80, same namespace as the Certificate).
+  httpParentRef:
+    name: gateway
+    namespace: gateway-system
+    sectionName: http
+  dns01Azure: null
+
+# null when the Gateway is customer-managed: the module then installs no Gateway.
+gateway: null
+# gateway:
+#   name: gateway
+#   namespace: gateway-system
+#   className: nginx
+#   hostname: "*.example.com"
+#   httpSectionName: http
+#   httpsSectionName: https
+#   tlsSecretName: gateway-tls
+#   routeNamespaces: [apps]
+#   infrastructureAnnotations: {}
+#   maxRequestBody: 256m
+#   dataPlane:
+#     serviceType: LoadBalancer # LoadBalancer | NodePort | ClusterIP
+#     externalTrafficPolicy: Local
+#     loadBalancerIP: ""
+#     nodePorts: [] # [{port: 30445, listenerPort: 443}]

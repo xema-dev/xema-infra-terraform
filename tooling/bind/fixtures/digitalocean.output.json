@@ -22,7 +22,7 @@
       "blob_account": null, "blob_container_prefix": null, "blob_endpoint": null,
       "cluster_name": "acme-prod", "cluster_resource_group_name": null, "cluster_secret_store_name": null,
       "deployment_name": null, "dns_name_servers": null, "dns_zone": "acme.example", "environment": null,
-      "external_secrets_client_id": null, "ingress": null, "key_vault_name": null, "key_vault_uri": null,
+      "external_secrets_client_id": null, "gateway": null, "key_vault_name": null, "key_vault_uri": null,
       "keycloak_url": "https://id.acme.example", "namespaces": ["acme-prod", "acme-infra"], "oidc_issuer_url": null,
       "postgres_app_role": null, "postgres_databases": ["acme_platform"], "postgres_host": "private-acme-pg-do-user-1-0.b.db.ondigitalocean.com",
       "postgres_port": 25060, "postgres_provisioner_role": null, "realm_name": "acme-prod", "redis_host": null, "redis_port": null,

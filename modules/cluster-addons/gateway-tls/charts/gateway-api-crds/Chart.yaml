@@ -1,0 +1,7 @@
+apiVersion: v2
+name: gateway-api-crds
+description: Gateway API standard-channel CRDs (upstream standard-install.yaml, unmodified). Not published; installed from the module directory by cluster-addons/gateway-tls.
+type: application
+version: 0.1.0
+# The upstream bundle vendored in templates/standard-install.yaml.
+appVersion: v1.6.1

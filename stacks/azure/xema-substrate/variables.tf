@@ -148,7 +148,7 @@ variable "enable_object_storage" {
 }
 
 variable "enable_secrets_backend" {
-  description = "Create the Key Vault, the External Secrets reader identity, and the External Secrets Operator with its ClusterSecretStore (cluster-addons/external-secrets) — independent of enable_ingress_tls."
+  description = "Create the Key Vault, the External Secrets reader identity, and the External Secrets Operator with its ClusterSecretStore (cluster-addons/external-secrets) — independent of enable_gateway_tls."
   type        = bool
   default     = true
 }
@@ -171,8 +171,8 @@ variable "enable_workload_namespaces" {
   default     = true
 }
 
-variable "enable_ingress_tls" {
-  description = "Install ingress-nginx, cert-manager + ClusterIssuer and External Secrets + ClusterSecretStore on the (created or existing) cluster."
+variable "enable_gateway_tls" {
+  description = "Install the Gateway API edge (NGINX Gateway Fabric + Gateway, or a customer-managed Gateway) and cert-manager + ClusterIssuer on the (created or existing) cluster."
   type        = bool
   default     = true
 }
@@ -617,11 +617,11 @@ variable "key_vault_secrets" {
 }
 
 # ---------------------------------------------------------------------------
-# Ingress + TLS (modules/cluster-addons/ingress-tls); the secret store is cluster-addons/external-secrets
+# Gateway + TLS (modules/cluster-addons/gateway-tls); the secret store is cluster-addons/external-secrets
 # ---------------------------------------------------------------------------
 
 variable "acme_email" {
-  description = "ACME account contact e-mail. Required when enable_ingress_tls."
+  description = "ACME account contact e-mail. Required when enable_gateway_tls."
   type        = string
   default     = ""
 }
@@ -643,14 +643,48 @@ variable "tls_solver" {
   }
 }
 
-variable "ingress_service_annotations" {
-  description = "Annotations on the ingress controller's LoadBalancer Service (e.g. \"service.beta.kubernetes.io/azure-dns-label-name\")."
+variable "gateway_implementation" {
+  description = "\"nginx-gateway-fabric\" (the stack installs the Gateway API CRDs, NGINX Gateway Fabric and the Gateway) or \"customer-managed\" (the customer provides the Gateway; set customer_gateway)."
+  type        = string
+  default     = "nginx-gateway-fabric"
+
+  validation {
+    condition     = contains(["nginx-gateway-fabric", "customer-managed"], var.gateway_implementation)
+    error_message = "gateway_implementation must be one of nginx-gateway-fabric, customer-managed."
+  }
+}
+
+variable "customer_gateway" {
+  description = "The customer's existing Gateway ({ name, namespace, http_section_name, https_section_name }) when gateway_implementation = \"customer-managed\"; null otherwise."
+  type = object({
+    name               = string
+    namespace          = string
+    http_section_name  = string
+    https_section_name = string
+  })
+  default = null
+}
+
+variable "gateway_hostname" {
+  description = "Hostname of the Gateway listeners, which cert-manager issues the certificate for (a wildcard needs tls_solver = \"dns01-azure\"). Required with nginx-gateway-fabric."
+  type        = string
+  default     = ""
+}
+
+variable "max_request_body_mib" {
+  description = "Request-body ceiling in MiB for every route on the Gateway (a finite default; configuration tightens it)."
+  type        = number
+  default     = 256
+}
+
+variable "gateway_infrastructure_annotations" {
+  description = "Annotations on the Gateway's data-plane LoadBalancer Service (e.g. \"service.beta.kubernetes.io/azure-dns-label-name\")."
   type        = map(string)
   default     = {}
 }
 
-variable "ingress_load_balancer_ip" {
-  description = "Pin the ingress LoadBalancer to a pre-allocated static IP. Empty lets Azure assign one."
+variable "gateway_load_balancer_ip" {
+  description = "Pin the Gateway's LoadBalancer to a pre-allocated static IP. Empty lets Azure assign one."
   type        = string
   default     = ""
 }
@@ -661,7 +695,7 @@ variable "ingress_load_balancer_ip" {
 # consumer reads them from the stack instead of restating today's defaults.
 
 variable "cluster_issuer_name" {
-  description = "Name of the ACME ClusterIssuer the addon creates (what Ingress resources reference in cert-manager.io/cluster-issuer). A DNS-1123 subdomain name."
+  description = "Name of the ACME ClusterIssuer the addon creates (what the Gateway references in cert-manager.io/cluster-issuer). A DNS-1123 subdomain name."
   type        = string
   default     = "letsencrypt"
 

@@ -123,11 +123,16 @@ output "storage_class_name" {
 
 # The two in-cluster resource names a consumer's manifests reference. Read from
 # the addon's outputs — never from the input — so they are null exactly when
-# the resource does not exist (ingress disabled; or, for the store, the secrets
+# the resource does not exist (gateway disabled; or, for the store, the secrets
 # backend disabled).
+output "gateway_parent_ref" {
+  description = "The parentRef every HTTPRoute attaches to ({ name, namespace, section_name }); null when enable_gateway_tls = false."
+  value       = one(module.gateway_tls[*].gateway_parent_ref)
+}
+
 output "cluster_issuer_name" {
-  description = "Name of the ACME ClusterIssuer (the cert-manager.io/cluster-issuer annotation value); null when enable_ingress_tls = false."
-  value       = one(module.ingress_tls[*].cluster_issuer_name)
+  description = "Name of the ACME ClusterIssuer (the cert-manager.io/cluster-issuer annotation value); null when enable_gateway_tls = false."
+  value       = one(module.gateway_tls[*].cluster_issuer_name)
 }
 
 output "cluster_secret_store_name" {
@@ -215,11 +220,9 @@ output "substrate" {
     dns_zone         = one(module.dns[*].domain)
     dns_name_servers = one(module.dns[*].name_servers)
 
-    ingress = var.enable_ingress_tls ? {
-      service_name        = one(module.ingress_tls[*].ingress_service_name)
-      namespace           = one(module.ingress_tls[*].ingress_namespace)
-      class_name          = one(module.ingress_tls[*].ingress_class_name)
-      cluster_issuer_name = one(module.ingress_tls[*].cluster_issuer_name)
+    gateway = var.enable_gateway_tls ? {
+      parent_ref          = one(module.gateway_tls[*].gateway_parent_ref)
+      cluster_issuer_name = one(module.gateway_tls[*].cluster_issuer_name)
     } : null
 
     keycloak_url = var.enable_identity_realm ? var.keycloak_url : null

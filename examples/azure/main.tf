@@ -40,7 +40,7 @@ module "substrate" {
   enable_cache               = var.enable_cache
   enable_rwx_storage         = var.enable_rwx_storage
   enable_workload_namespaces = var.enable_workload_namespaces
-  enable_ingress_tls         = var.enable_ingress_tls
+  enable_gateway_tls         = var.enable_gateway_tls
   enable_identity_realm      = var.enable_identity_realm
 
   # --- the network, from stacks/azure/xema-foundation (applied first) ---
@@ -86,13 +86,18 @@ module "substrate" {
   # --- secrets backend ---
   key_vault_secrets = var.key_vault_secrets
 
-  # --- ingress + tls ---
-  acme_email                  = var.acme_email
-  acme_server                 = var.acme_server
-  tls_solver                  = var.tls_solver
-  cluster_issuer_name         = var.cluster_issuer_name
-  cluster_secret_store_name   = var.cluster_secret_store_name
-  ingress_service_annotations = var.ingress_service_annotations
+  # --- gateway + tls ---
+  acme_email                         = var.acme_email
+  acme_server                        = var.acme_server
+  tls_solver                         = var.tls_solver
+  cluster_issuer_name                = var.cluster_issuer_name
+  cluster_secret_store_name          = var.cluster_secret_store_name
+  gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
+  gateway_implementation             = var.gateway_implementation
+  customer_gateway                   = var.customer_gateway
+  gateway_hostname                   = var.gateway_hostname
+  max_request_body_mib               = var.max_request_body_mib
+  gateway_load_balancer_ip           = var.gateway_load_balancer_ip
 
   # --- identity realm ---
   realm_display_name     = var.realm_display_name
@@ -127,15 +132,20 @@ output "postgres_role_passwords" {
 }
 
 # The two in-cluster names the consumer's own manifests reference — read from
-# the stack (also in substrate.ingress.cluster_issuer_name /
+# the stack (also in substrate.gateway.cluster_issuer_name /
 # substrate.cluster_secret_store_name), never restated.
+output "gateway_parent_ref" {
+  description = "The parentRef every HTTPRoute attaches to ({ name, namespace, section_name }); null when the gateway is disabled."
+  value       = module.substrate.gateway_parent_ref
+}
+
 output "cluster_issuer_name" {
-  description = "The ACME ClusterIssuer name for cert-manager.io/cluster-issuer; null when ingress is disabled."
+  description = "The ACME ClusterIssuer name for cert-manager.io/cluster-issuer; null when the gateway is disabled."
   value       = module.substrate.cluster_issuer_name
 }
 
 output "cluster_secret_store_name" {
-  description = "The ClusterSecretStore name for ExternalSecret secretStoreRef.name; null when ingress or the secrets backend is disabled."
+  description = "The ClusterSecretStore name for ExternalSecret secretStoreRef.name; null when the secrets backend is disabled."
   value       = module.substrate.cluster_secret_store_name
 }
 

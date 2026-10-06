@@ -1,0 +1,54 @@
+{{- with .Values.gateway }}
+# The Gateway carries cert-manager.io/cluster-issuer, so cert-manager's gateway-shim issues the
+# HTTPS listener's certificate into the listener's certificateRefs Secret.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ required "gateway.name is required" .name | quote }}
+  namespace: {{ required "gateway.namespace is required" .namespace | quote }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ $.Values.clusterIssuer.name | quote }}
+spec:
+  gatewayClassName: {{ required "gateway.className is required" .className | quote }}
+  infrastructure:
+    parametersRef:
+      group: gateway.nginx.org
+      kind: NginxProxy
+      name: {{ .name | quote }}
+{{- if .infrastructureAnnotations }}
+    annotations:
+      {{- toYaml .infrastructureAnnotations | nindent 6 }}
+{{- end }}
+  listeners:
+    # Port 80 carries only cert-manager's HTTP-01 solver route (same namespace); no application route may attach.
+    - name: {{ .httpSectionName | quote }}
+      port: 80
+      protocol: HTTP
+      hostname: {{ required "gateway.hostname is required" .hostname | quote }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: HTTPRoute
+    - name: {{ .httpsSectionName | quote }}
+      port: 443
+      protocol: HTTPS
+      hostname: {{ .hostname | quote }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: {{ required "gateway.tlsSecretName is required" .tlsSecretName | quote }}
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  {{- toYaml (required "gateway.routeNamespaces is required" .routeNamespaces) | nindent 18 }}
+        kinds:
+          - kind: HTTPRoute
+{{- end }}

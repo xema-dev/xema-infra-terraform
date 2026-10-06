@@ -64,8 +64,8 @@ state is a DECLARATION the consumer makes, never something inferred:
 | object-store | `infra.yaml#minio.provider: external` | `providers/<cloud>/object-bucket` — per EXTENSION claim on DigitalOcean, the platform account + extension claims on Azure | `minio.provider: self-hosted` chart | never |
 | etcd | `infra.yaml#etcd.provider: external` (scoped by an etcd namespace per deployment) | **no module** — no cloud here offers it managed | `etcd.provider: self-hosted` chart — the normal answer | never |
 | temporal | `infra.yaml#temporal.provider: external` | **no module** | `temporal.provider: self-hosted` chart | `temporal.provider: disabled` — every workflow service fails fast |
-| dns / ingress | `enable_dns = false` (DNS at your registrar or another zone owner); ingress edge already present in the cluster | `providers/<cloud>/dns` for the zone; `cluster-addons/ingress-tls` for the edge (ingress-nginx + cert-manager + External Secrets; wired by the Azure stack today) | — | never |
-| secret-authority | the deployment root's own generator + an operator-held externals file (the DigitalOcean shape today) | `providers/azure/secrets-backend` (Key Vault + External Secrets reader identity) with `ingress-tls`'s `ClusterSecretStore`; `cluster-addons/secrets` for operator-provided values as plain Secrets | — | never |
+| dns / gateway | `enable_dns = false` (DNS at your registrar or another zone owner); ingress edge already present in the cluster | `providers/<cloud>/dns` for the zone; `cluster-addons/gateway-tls` for the edge (Gateway API CRDs + NGINX Gateway Fabric + Gateway + cert-manager; or a customer-managed Gateway; wired by the Azure stack today) | — | never |
+| secret-authority | the deployment root's own generator + an operator-held externals file (the DigitalOcean shape today) | `providers/azure/secrets-backend` (Key Vault + External Secrets reader identity) with `cluster-addons/external-secrets`'s `ClusterSecretStore`; `cluster-addons/secrets` for operator-provided values as plain Secrets | — | never |
 | identity-realm | `enable_identity_realm = false`; `infra.yaml#keycloak.provider: external` | `identity-realm` — the REALM inside a Keycloak the consumer already runs (`keycloak_url`); this module set does not install Keycloak | `keycloak.provider: self-hosted` chart installs the server | never |
 
 Two things the table says that are easy to read past:
@@ -237,7 +237,7 @@ Each substrate area is independently toggleable via an `enable_*` stack input
 `enable_workload_namespaces`, `enable_identity_realm`; all default `true`). A
 stack that implements the optional primitives below adds a toggle per primitive
 with the same shape (`enable_object_storage`, `enable_secrets_backend`,
-`enable_cache`, `enable_ingress_tls`). This splits the **cloud-infra** plane from
+`enable_cache`, `enable_gateway_tls`). This splits the **cloud-infra** plane from
 the **in-cluster + identity** plane:
 
 - **Greenfield (default):** everything enabled → the stack CREATES the cluster,
@@ -393,7 +393,7 @@ Manages a DNS zone's records.
   `zone_id`, `resource_group_name`, `subscription_id`, and — when the optional
   `dns01_workload_identity` input is enabled — `dns01_client_id`, the
   user-assigned identity cert-manager's ACME DNS-01 solver uses through workload
-  identity (see the `ingress-tls` addon).
+  identity (see the `gateway-tls` addon).
 
 ---
 
@@ -458,7 +458,7 @@ account name (`^[a-z0-9]{3,24}$`) that the bootstrap caller supplies explicitly
 
 A cloud secret store the cluster reads at runtime through the
 [External Secrets Operator](https://external-secrets.io) — the source that the
-`ingress-tls` addon's `ClusterSecretStore` points at. Optional: a deployment may
+`cluster-addons/external-secrets` add-on's `ClusterSecretStore` points at. Optional: a deployment may
 instead materialize secrets with `cluster-addons/secrets`. Not every cloud has
 an implementation; today only Azure (Key Vault).
 
@@ -561,11 +561,18 @@ every cloud's stack:
   comes out as an OUTPUT — not a manifest somebody applies by hand once per
   deployment. The namespace is a required input: it is what the deployment
   DECLARES, never something derived from a directory name.
-- **`cluster-addons/ingress-tls`** — the ingress edge every hostname on the
-  deployment sits behind: `ingress-nginx` (a cloud `LoadBalancer`, annotations passed through),
-  `cert-manager` plus one ACME `ClusterIssuer` (closed-set solver:
-  `http01 | dns01-azure`), and the External Secrets Operator plus one
-  `ClusterSecretStore` (closed-set backend: `azure-key-vault`). Chart versions are
+- **`cluster-addons/gateway-tls`** — the Gateway API edge every hostname on the
+  deployment sits behind (no `Ingress` anywhere): the vendored Gateway API
+  standard-channel CRDs, NGINX Gateway Fabric with one `Gateway` (an HTTPS listener
+  admitting `HTTPRoute`s only from the declared namespaces, a data-plane Service
+  whose type and annotations pass through, a finite request-body ceiling, default
+  256 MiB), and `cert-manager` with Gateway API integration plus one ACME
+  `ClusterIssuer` (closed-set solver: `http01 | dns01-azure`; HTTP-01 is a
+  Gateway `HTTPRoute`). `gateway_implementation = "customer-managed"` installs
+  none of the Gateway-side parts and attaches to the customer's Gateway. Its
+  output `gateway_parent_ref` (`{ name, namespace, section_name }`) is the
+  parentRef every `HTTPRoute` carries. The External Secrets Operator and its
+  `ClusterSecretStore` are the separate `cluster-addons/external-secrets`. Chart versions are
   pinned inputs with defaults. Cloud-specific facts (a DNS zone, a vault URI, the
   identities that may touch them) arrive as plain string inputs from the
   provider primitives, so the addon itself installs against any conformant
@@ -609,11 +616,11 @@ that cloud; a consumer branches on `null`, never on which cloud it is on.
 | `postgres_databases` | `set(string)` | the databases ensured on the created server — `platform_databases` after that stack's naming rule (Azure prefixes `<deployment_name>_`; DigitalOcean uses the names verbatim) | managed postgres | managed postgres |
 | `blob_account` / `blob_endpoint` / `blob_container_prefix` | `string` | the platform object-storage account, its endpoint, the container prefix | object storage | `null` (no platform bucket; extension buckets are the separate `extension_buckets` output) |
 | `key_vault_name` / `key_vault_uri` / `external_secrets_client_id` | `string` | the secrets backend and the identity that reads it | secrets backend | `null` |
-| `cluster_secret_store_name` | `string` | the `ClusterSecretStore` every `ExternalSecret` names | ingress addon + secrets backend | `null` |
+| `cluster_secret_store_name` | `string` | the `ClusterSecretStore` every `ExternalSecret` names | secrets backend | `null` |
 | `redis_host` / `redis_port` | `string` / `number` | the managed cache (TLS port) | cache | `null` |
 | `dns_zone` | `string` | the managed zone apex | dns | dns |
 | `dns_name_servers` | `list(string)` | delegate the apex to these | dns | `null` (DigitalOcean's are fixed) |
-| `ingress` | `object({ service_name, namespace, class_name, cluster_issuer_name })` | the ingress edge the consumer's `Ingress` objects target | ingress addon | `null` |
+| `gateway` | `object({ parent_ref = { name, namespace, section_name }, cluster_issuer_name })` | the Gateway the consumer's `HTTPRoute` objects attach to (`parent_ref`) and the issuer its listener certificate comes from | gateway addon | `null` |
 | `keycloak_url` / `realm_name` | `string` | the identity realm and where it lives | identity realm | identity realm |
 
 Adding a key is a change to BOTH stacks in the same commit — a consumer must be

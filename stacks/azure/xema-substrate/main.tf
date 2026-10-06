@@ -25,11 +25,11 @@ resource "terraform_data" "input_guards" {
       error_message = "enable_dns = true requires apex_domain."
     }
     precondition {
-      condition     = !var.enable_ingress_tls || var.acme_email != ""
-      error_message = "enable_ingress_tls = true requires acme_email (the ACME account contact)."
+      condition     = !var.enable_gateway_tls || var.acme_email != ""
+      error_message = "enable_gateway_tls = true requires acme_email (the ACME account contact)."
     }
     precondition {
-      condition     = !(var.enable_ingress_tls && local.dns01) || var.enable_dns
+      condition     = !(var.enable_gateway_tls && local.dns01) || var.enable_dns
       error_message = "tls_solver = \"dns01-azure\" requires enable_dns = true (the solver edits this stack's zone through workload identity)."
     }
     precondition {
@@ -205,7 +205,7 @@ module "dns" {
 
   # The cert-manager DNS-01 identity, only when that solver is in use.
   dns01_workload_identity = {
-    enabled         = var.enable_ingress_tls && local.dns01
+    enabled         = var.enable_gateway_tls && local.dns01
     oidc_issuer_url = local.oidc_issuer_url
   }
 
@@ -337,16 +337,22 @@ module "deployer_identity" {
   cluster_ca_certificate_b64 = local.kube_ca_b64 != null ? local.kube_ca_b64 : ""
 }
 
-module "ingress_tls" {
-  source = "../../../modules/cluster-addons/ingress-tls"
-  count  = var.enable_ingress_tls ? 1 : 0
+module "gateway_tls" {
+  source = "../../../modules/cluster-addons/gateway-tls"
+  count  = var.enable_gateway_tls ? 1 : 0
 
-  acme_email                  = var.acme_email
-  acme_server                 = var.acme_server
-  tls_solver                  = var.tls_solver
-  cluster_issuer_name         = var.cluster_issuer_name
-  ingress_service_annotations = var.ingress_service_annotations
-  ingress_load_balancer_ip    = var.ingress_load_balancer_ip
+  acme_email          = var.acme_email
+  acme_server         = var.acme_server
+  tls_solver          = var.tls_solver
+  cluster_issuer_name = var.cluster_issuer_name
+
+  gateway_implementation             = var.gateway_implementation
+  customer_gateway                   = var.customer_gateway
+  gateway_hostname                   = var.gateway_hostname
+  route_namespaces                   = var.workload_namespaces
+  max_request_body_mib               = var.max_request_body_mib
+  gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
+  data_plane_load_balancer_ip        = var.gateway_load_balancer_ip
 
   dns01_azure = local.dns01 && var.enable_dns ? {
     subscription_id     = module.dns[0].subscription_id
