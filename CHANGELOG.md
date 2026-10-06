@@ -4,6 +4,23 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.12.0 — zone pinning (Azure) and the last `_v1` kubernetes moves
+
+No consumer change is required: every new input is optional and unset keeps Azure's own zone choice,
+so configuration only tightens. Pin a zone when the subscription marks one `NotAvailableForSubscription`
+for a VM family (the resource SKUs API shows it).
+
+- `providers/azure/management-runner`: optional `zone` ("1", "2" or "3"; empty by default).
+- `providers/azure/cluster`: optional `zones` on every node pool, system and user (each "1", "2" or "3";
+  unset by default). Changing `zones` on an existing pool replaces it.
+- `stacks/azure/xema-foundation` (`management_runner.zone`) and `stacks/azure/xema-substrate`
+  (`node_pools[*].zones`) pass them through. Values outside 1|2|3 fail validation.
+- `cluster-addons/rwx-storage`, `secrets`, `workload-namespaces` and `shared-templates-volume` move to
+  `kubernetes_storage_class_v1`, `_secret_v1`, `_namespace_v1`, `_persistent_volume_v1` and
+  `_persistent_volume_claim_v1`. `moved {}` blocks migrate state with no destroy and no state surgery;
+  `tofu validate` is free of deprecation warnings. Imports (module READMEs, `docs/import-runbook.md`) now
+  name the `_v1` addresses, and module README refs read `?ref=v0.12.0`.
+
 ## Unreleased — `assigned_role_names`: the stack publishes the roles it assigns
 
 A bootstrap no longer hand-copies the role list into its RBAC-Administrator ABAC condition (v0.10.0's
