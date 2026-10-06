@@ -14,7 +14,7 @@ primitives, so this module has no cloud provider dependency of its own.
 
 ```hcl
 module "gateway_tls" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/gateway-tls?ref=v0.1.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/gateway-tls?ref=v0.11.0"
 
   acme_email       = "ops@example.com"
   gateway_hostname = "*.acme.example.com"
@@ -51,8 +51,10 @@ The first two exist only with `gateway_implementation = "nginx-gateway-fabric"`
 
 - the `ClusterIssuer`: HTTP-01 through `gatewayHTTPRoute.parentRefs` (the Gateway's
   port-80 listener) or `dns01-azure`;
-- the `Gateway` (NGF only): an `http` listener on 80 that admits only cert-manager's
-  solver route (`allowedRoutes: Same`), and an `https` listener on 443 that admits
+- the `Gateway` (NGF only): an `http` listener on 80 that admits only same-namespace
+  routes (`allowedRoutes: Same`) - cert-manager's solver route and the module's own
+  `<gateway_name>-http-redirect` `HTTPRoute`, which answers `301` to `https` for every
+  host the listener serves (the solver's longer path match still wins for challenges) - and an `https` listener on 443 that admits
   `HTTPRoute`s only from `route_namespaces`. The Gateway carries
   `cert-manager.io/cluster-issuer`, so cert-manager's gateway-shim issues the
   listener certificate into `gateway_tls_secret_name`;

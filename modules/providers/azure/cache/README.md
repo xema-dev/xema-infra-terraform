@@ -9,7 +9,7 @@ Helm; reach for this only when a deployment wants the managed offering.
 
 ```hcl
 module "cache" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/cache?ref=v0.1.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/cache?ref=v0.11.0"
 
   name     = "acme-dev-redis"
   region   = "westeurope"

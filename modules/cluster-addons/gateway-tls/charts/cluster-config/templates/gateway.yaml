@@ -20,7 +20,7 @@ spec:
       {{- toYaml .infrastructureAnnotations | nindent 6 }}
 {{- end }}
   listeners:
-    # Port 80 carries only cert-manager's HTTP-01 solver route (same namespace); no application route may attach.
+    # Port 80 carries cert-manager's HTTP-01 solver route and the https redirect route (same namespace); no application route may attach.
     - name: {{ .httpSectionName | quote }}
       port: 80
       protocol: HTTP
@@ -51,4 +51,30 @@ spec:
                   {{- toYaml (required "gateway.routeNamespaces is required" .routeNamespaces) | nindent 18 }}
         kinds:
           - kind: HTTPRoute
+---
+# Plain HTTP answers 301 to https for every host the HTTP listener serves (the route sets no
+# hostnames, so it inherits the listener's). cert-manager's HTTP-01 solver route matches a longer
+# path prefix (/.well-known/acme-challenge/<token>), which Gateway API ranks above this "/" match,
+# so challenges still reach the solver.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ printf "%s-http-redirect" .name | quote }}
+  namespace: {{ .namespace | quote }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .name | quote }}
+      sectionName: {{ .httpSectionName | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
 {{- end }}

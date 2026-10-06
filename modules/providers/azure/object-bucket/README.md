@@ -10,7 +10,7 @@ containers — **not** for Terraform state (use
 
 ```hcl
 module "bucket" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/object-bucket?ref=v0.1.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/object-bucket?ref=v0.11.0"
 
   name        = "acmedevblob"
   region      = "westeurope"
