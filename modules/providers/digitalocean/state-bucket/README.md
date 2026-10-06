@@ -10,7 +10,7 @@ policy differ (it holds state, so it must be private + versioned).
 
 ```hcl
 module "state_bucket" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/state-bucket?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/state-bucket?ref=v0.12.0"
 
   name   = "acme-prod-tfstate"
   region = "fra1"

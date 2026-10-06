@@ -18,7 +18,7 @@ create them first).
 
 ```hcl
 module "secrets" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/secrets?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/secrets?ref=v0.12.0"
 
   secrets = {
     registry_mirror = {

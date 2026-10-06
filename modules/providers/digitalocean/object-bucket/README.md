@@ -9,7 +9,7 @@ object storage — **not** for Terraform state (use
 
 ```hcl
 module "bucket" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/object-bucket?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/digitalocean/object-bucket?ref=v0.12.0"
 
   name       = "acme-prod-artifacts"
   region     = "fra1"

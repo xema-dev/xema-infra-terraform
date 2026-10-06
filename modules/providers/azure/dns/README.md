@@ -9,7 +9,7 @@ workload identity cert-manager's ACME DNS-01 solver uses to edit the zone.
 
 ```hcl
 module "dns" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/dns?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/dns?ref=v0.12.0"
 
   domain = "example.com"
   region = "westeurope" # only for the resource group / identity; the zone is global

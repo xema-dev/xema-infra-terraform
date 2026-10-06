@@ -9,7 +9,7 @@ not need it.
 
 ```hcl
 module "container_registry" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/container-registry?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/container-registry?ref=v0.12.0"
 
   name   = "acmedevacr"
   region = "westeurope"

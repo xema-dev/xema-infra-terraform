@@ -9,7 +9,7 @@ every database and revoked from `PUBLIC`.
 
 ```hcl
 module "postgres" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/managed-postgres?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/managed-postgres?ref=v0.12.0"
 
   name           = "acme-dev-pg"
   region         = "westeurope"

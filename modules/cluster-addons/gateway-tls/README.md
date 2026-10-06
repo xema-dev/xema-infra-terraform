@@ -14,7 +14,7 @@ primitives, so this module has no cloud provider dependency of its own.
 
 ```hcl
 module "gateway_tls" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/gateway-tls?ref=v0.11.0"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/gateway-tls?ref=v0.12.0"
 
   acme_email       = "ops@example.com"
   gateway_hostname = "*.acme.example.com"
