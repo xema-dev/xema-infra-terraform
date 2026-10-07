@@ -4,6 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.14.2 — BIND binds per-deployment credential custody
+
+No consumer change is required. `tooling/bind/bind-outputs.mjs` classifies `custody_vault_urls` and
+`custody_broker_client_ids` (maps keyed by deployment name: the custody vault endpoint URL and the workload-identity
+client id the credential broker runs as) into secret-inputs `credentialCustody.vaultUrl` / `credentialCustody.brokerClientId`,
+selecting the entry by `--deployment <name>` (default: the root's `deployment_name` output). Absent or null maps are omitted
+loudly. `deployment_name` is classified `ignore`: it is a key, not a binding.
+
 ## v0.14.1 — `vm_id` output on the management runner (Azure)
 
 No consumer change is required. `providers/azure/management-runner` gains the `vm_id` output (resource id of the

@@ -96,7 +96,7 @@
 // USAGE
 //   terraform output -json | node tooling/bind/bind-outputs.mjs --secret-inputs F --externals X
 //   node tooling/bind/bind-outputs.mjs --from outputs.json --secret-inputs F --externals X \
-//        [--identity-client <realm_clients key>] [--consumed <output>[,<output>]]
+//        [--identity-client <realm_clients key>] [--deployment <name>] [--consumed <output>[,<output>]]
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { execFileSync } from 'node:child_process';
@@ -124,6 +124,10 @@ export const WhenNull = Object.freeze({
 export const DEFAULT_IDENTITY_CLIENT = 'identity-api';
 
 const f = (target, whenNull = WhenNull.Refuse, note = null) => ({ disposition: Disposition.Fragment, target, whenNull, note });
+// A fragment row whose output is a MAP keyed by deployment name: the entry for
+// the deployment being bound (--deployment, else the stack's own
+// `deployment_name` output) is the value.
+const fd = (target, note = null) => ({ disposition: Disposition.Fragment, target, whenNull: WhenNull.Omit, note, perDeployment: true });
 const x = (name, whenNull = WhenNull.Refuse, note = null) => ({ disposition: Disposition.External, name, whenNull, note });
 const op = (reason) => ({ disposition: Disposition.Operator, reason });
 const ign = (reason) => ({ disposition: Disposition.Ignore, reason });
@@ -172,6 +176,16 @@ export const DISPOSITIONS = Object.freeze({
   'substrate.gateway': op(
     'the Gateway every HTTPRoute attaches to, for deployments/<d>/values.yaml#gateway.parentRef. NOT merged: that is a nested mapping in the values file, not a two-level secret-inputs scalar, and a parentRef is no secret input. Print the block and paste it once: `terraform output -json substrate | jq -r \'"gateway:", "  parentRef:", "    name: \\(.gateway.parent_ref.name)", "    namespace: \\(.gateway.parent_ref.namespace)", "    sectionName: \\(.gateway.parent_ref.section_name)"\'`. Null when enable_gateway_tls = false',
   ),
+
+  // ── per-deployment credential custody ────────────────────────────────────
+  // Where a deployment's credential custody lives: the endpoint of the vault
+  // that holds its credentials, and the workload-identity client id (AKS
+  // workload identity, EKS IRSA, GKE) the credential broker runs as. Both are
+  // non-secret and keyed by deployment name. Null/absent map = custody not
+  // provisioned for the stack: omitted loudly.
+  custody_vault_urls: fd('credentialCustody.vaultUrl', 'credential custody is not provisioned by this stack'),
+  custody_broker_client_ids: fd('credentialCustody.brokerClientId', 'credential custody is not provisioned by this stack'),
+  deployment_name: ign('the name that keys the per-deployment maps (custody_*) and the default for --deployment; not itself a binding — the deployment root has its own deployment.yaml#name'),
 
   // ── top-level outputs ────────────────────────────────────────────────────
   cluster_id: ign('a provider id for imports'),
@@ -381,7 +395,7 @@ export function assertOutsideWorkTree(p, runGit = execFileSync) {
  * Bind a `terraform output -json` document. Pure: returns what would be
  * written plus the stderr report, throws BindError on any refusal.
  */
-export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed = [] } = {}) {
+export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed = [], deployment = null } = {}) {
   if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
     throw new BindError('expected the object `terraform output -json` prints (output name → { sensitive, type, value })');
   }
@@ -435,6 +449,10 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
         break;
       }
       case Disposition.Fragment: {
+        if (!entry && row.perDeployment && row.whenNull === WhenNull.Omit) {
+          report.omitted.push(`${row.target} ← ${name} is absent from the document (${row.note})`);
+          break;
+        }
         if (!entry) {
           if (name.startsWith('substrate.')) throw new BindError(`the binding contract lacks '${name}' — this document was not produced by a stack of this module set (docs/CONTRACTS.md § Binding contract)`);
           throw new BindError(`required stack output '${name}' is absent from the document — add it to the consumer root's outputs`);
@@ -446,6 +464,16 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
             break;
           }
           throw new BindError(`stack output '${name}' is null, and secret-inputs ${row.target} needs it. Either the area is disabled/consumed elsewhere — then declare it with --consumed ${name} and supply ${row.target} yourself — or the apply has not happened yet`);
+        }
+        if (row.perDeployment) {
+          const key = deployment ?? entries.get('deployment_name')?.value ?? entries.get('substrate.deployment_name')?.value;
+          if (typeof entry.value !== 'object' || Array.isArray(entry.value)) throw new BindError(`output '${name}' is not a map keyed by deployment name`);
+          if (typeof key !== 'string' || key === '') throw new BindError(`output '${name}' is keyed by deployment; pass --deployment <name> (keys: [${Object.keys(entry.value).join(', ')}])`);
+          if (!(key in entry.value)) throw new BindError(`output '${name}' has keys [${Object.keys(entry.value).join(', ')}]; none is deployment '${key}' — pass --deployment <name>`);
+          const picked = entry.value[key];
+          if (typeof picked !== 'string' || picked === '') throw new BindError(`output '${name}'['${key}'] is not a non-empty string`);
+          setFragment(row.target, picked, `${name}[${key}]`);
+          break;
         }
         if (row.target === 'keycloak.issuer') {
           joined[name] = String(entry.value);
@@ -504,7 +532,7 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const out = { from: null, secretInputs: null, externals: null, identityClient: DEFAULT_IDENTITY_CLIENT, consumed: [] };
+  const out = { from: null, secretInputs: null, externals: null, identityClient: DEFAULT_IDENTITY_CLIENT, consumed: [], deployment: null };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const next = () => {
@@ -516,6 +544,7 @@ function parseArgs(argv) {
     else if (a === '--secret-inputs') out.secretInputs = next();
     else if (a === '--externals') out.externals = next();
     else if (a === '--identity-client') out.identityClient = next();
+    else if (a === '--deployment') out.deployment = next();
     else if (a === '--consumed') out.consumed.push(...next().split(',').map((s) => s.trim()).filter(Boolean));
     else throw new BindError(`unknown argument ${a}`);
   }
@@ -550,7 +579,7 @@ export function main(argv = process.argv.slice(2)) {
     throw new BindError(`input is not the JSON that 'terraform output -json' prints: ${error.message}`);
   }
   if (args.externals) assertOutsideWorkTree(args.externals);
-  const { fragment, externals, report } = bind(doc, { identityClient: args.identityClient, consumed: args.consumed });
+  const { fragment, externals, report } = bind(doc, { identityClient: args.identityClient, consumed: args.consumed, deployment: args.deployment });
   if (args.secretInputs) {
     const keyCount = Object.values(fragment).reduce((n, s) => n + Object.keys(s).length, 0);
     const existing = fs.existsSync(args.secretInputs) ? fs.readFileSync(args.secretInputs, 'utf8') : null;

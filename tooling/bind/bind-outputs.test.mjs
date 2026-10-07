@@ -341,3 +341,37 @@ for (const cloud of ['digitalocean', 'azure']) {
     }
   });
 }
+
+// ── per-deployment credential custody ───────────────────────────────────────
+
+const withCustody = (extra = {}) => ({
+  ...fixture('azure'),
+  deployment_name: { sensitive: false, type: 'string', value: 'acme-prod' },
+  custody_vault_urls: { sensitive: false, type: ['map', 'string'], value: { 'acme-prod': 'https://vault.acme.example', other: 'https://other.example' } },
+  custody_broker_client_ids: { sensitive: false, type: ['map', 'string'], value: { 'acme-prod': 'client-1', other: 'client-2' } },
+  ...extra,
+});
+
+test('custody: the deployment_name entry of each map binds to credentialCustody; deployment_name itself is ignored', () => {
+  const { fragment, report } = bind(withCustody());
+  assert.deepEqual(fragment.credentialCustody, { vaultUrl: 'https://vault.acme.example', brokerClientId: 'client-1' });
+  assert.ok(report.ignored.some((l) => l.startsWith('deployment_name:')));
+});
+
+test('custody: --deployment overrides; an unknown deployment or a non-map is refused', () => {
+  assert.equal(bind(withCustody(), { deployment: 'other' }).fragment.credentialCustody.brokerClientId, 'client-2');
+  assert.throws(() => bind(withCustody(), { deployment: 'nope' }), /none is deployment 'nope'/);
+  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: 'x' } })), /not a map/);
+  const noName = withCustody();
+  delete noName.deployment_name;
+  noName.substrate = { ...noName.substrate, value: { ...noName.substrate.value, deployment_name: null } };
+  assert.throws(() => bind(noName), /pass --deployment/);
+});
+
+test('custody: absent or null maps are omitted loudly; a sensitive one is refused', () => {
+  const { fragment, report } = bind(withCustody({ custody_vault_urls: { sensitive: false, value: null } }));
+  assert.equal(fragment.credentialCustody.vaultUrl, undefined);
+  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl')));
+  assert.ok(bind(fixture('azure')).report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId')));
+  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: true, value: { 'acme-prod': 'u' } } })), /marked sensitive/);
+});
