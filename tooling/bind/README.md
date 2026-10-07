@@ -71,7 +71,7 @@ top-level outputs that duplicate a map key are ignored as duplicates.
 | `substrate.redis_host` / `redis_port` | secret-inputs | `redis.host` / `redis.port` | omitted — no managed cache |
 | `realm_client_secrets[--identity-client]` | externals | `keycloak-identity-client-secret` | refused; a PUBLIC client (empty secret) is refused |
 | `redis_primary_key` (Azure) | externals | `redis-password` | omitted — absent or null on a cloud without a managed cache |
-| `custody_vault_urls[<deployment>]` / `custody_broker_client_ids[<deployment>]` | secret-inputs | `credentialCustody.vaultUrl` / `credentialCustody.brokerClientId` — the entry for `--deployment <name>` (default: the stack's `deployment_name` output); a missing entry or a non-map is refused | omitted — custody not provisioned |
+| `custody_vault_urls[<deployment>]` / `custody_broker_client_ids[<deployment>]` | secret-inputs | `credentialCustody.vaultUrl` / `credentialCustody.brokerClientId` — the entry for `--deployment <name>` (default: the stack's `deployment_name` output); a deployment absent from the map is SKIPPED (omitted loudly; e.g. a shared root with no custody); a non-map, a sensitive output or a malformed entry is refused | omitted — custody not provisioned |
 | `deployment_name` | **ignored** | not a binding: it keys the per-deployment maps above and defaults `--deployment` | — |
 | `postgres_uri` | **operator** — never written | the ADMIN credential the deployment root's database bootstrap runs under: `psql "$(terraform output -raw postgres_uri)" -f deployments/<d>/bootstrap/postgres-databases.sql` | — |
 | `kubeconfig_raw` | **operator** — never written | the kube-context the deployment root deploys through | — |

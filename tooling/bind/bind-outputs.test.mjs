@@ -358,9 +358,8 @@ test('custody: the deployment_name entry of each map binds to credentialCustody;
   assert.ok(report.ignored.some((l) => l.startsWith('deployment_name:')));
 });
 
-test('custody: --deployment overrides; an unknown deployment or a non-map is refused', () => {
+test('custody: --deployment overrides; a non-map is refused', () => {
   assert.equal(bind(withCustody(), { deployment: 'other' }).fragment.credentialCustody.brokerClientId, 'client-2');
-  assert.throws(() => bind(withCustody(), { deployment: 'nope' }), /none is deployment 'nope'/);
   assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: 'x' } })), /not a map/);
   const noName = withCustody();
   delete noName.deployment_name;
@@ -374,4 +373,24 @@ test('custody: absent or null maps are omitted loudly; a sensitive one is refuse
   assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl')));
   assert.ok(bind(fixture('azure')).report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId')));
   assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: true, value: { 'acme-prod': 'u' } } })), /marked sensitive/);
+});
+
+test('custody: a deployment absent from a per-deployment map is skipped with the omitted notice', () => {
+  const { fragment, report } = bind(withCustody(), { deployment: 'aura-shared' });
+  assert.equal(fragment.credentialCustody, undefined);
+  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl') && l.includes("no entry for deployment 'aura-shared'")));
+  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId') && l.includes("no entry for deployment 'aura-shared'")));
+});
+
+test('custody: a present entry is emitted; one map may skip while the other emits', () => {
+  const doc = withCustody({ custody_broker_client_ids: { sensitive: false, type: ['map', 'string'], value: { other: 'client-2' } } });
+  const { fragment, report } = bind(doc);
+  assert.deepEqual(fragment.credentialCustody, { vaultUrl: 'https://vault.acme.example' });
+  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId')));
+});
+
+test('custody: a present but malformed entry is still refused', () => {
+  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: { 'acme-prod': '' } } })), /not a non-empty string/);
+  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: { 'acme-prod': 7 } } })), /not a non-empty string/);
+  assert.throws(() => bind(withCustody({ custody_broker_client_ids: { sensitive: false, value: ['acme-prod'] } })), /not a map/);
 });

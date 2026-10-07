@@ -532,6 +532,17 @@ variable "platform_databases" {
   }
 }
 
+variable "postgres_provisioner_role" {
+  description = "Whether to create the second Postgres role, `<deployment>_provisioner`, with CREATEDB (for a consumer that provisions databases at runtime). \"enabled\" (default, the historical behaviour) creates it; \"disabled\" creates only the app role, and the `postgres_provisioner_role` entry of the `substrate` output is null and the role is absent from `postgres_roles` and `postgres_role_passwords`."
+  type        = string
+  default     = "enabled"
+
+  validation {
+    condition     = contains(["enabled", "disabled"], var.postgres_provisioner_role)
+    error_message = "postgres_provisioner_role must be \"enabled\" or \"disabled\"."
+  }
+}
+
 variable "existing_postgres_server_id" {
   description = "Resource id of an existing Flexible Server to host extension-claimed databases when enable_managed_postgres = false."
   type        = string

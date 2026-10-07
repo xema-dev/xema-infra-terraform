@@ -165,10 +165,7 @@ module "postgres_tenancy" {
 
   # The same ownership rule as the created server (locals.tf).
   database_owners = local.postgres_database_owners
-  connect_grants = {
-    (local.postgres_app_role)         = local.postgres_databases
-    (local.postgres_provisioner_role) = local.postgres_databases
-  }
+  connect_grants  = local.postgres_connect_grants
 }
 
 # The existing server's admin password, read from the Key Vault the creating

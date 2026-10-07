@@ -46,13 +46,17 @@ locals {
   # rewrite this stack applies is the Postgres-identifier prefix below.
   postgres_databases = toset([for d in var.platform_databases : "${local.pg}_${d}"])
 
-  # Two roles: the application role, and a provisioner role that may CREATE
-  # databases at runtime (for a consumer that provisions per-tenant databases).
-  postgres_app_role         = local.pg
-  postgres_provisioner_role = "${local.pg}_provisioner"
-  postgres_roles            = [local.postgres_app_role, local.postgres_provisioner_role]
-  postgres_role_options = {
-    (local.postgres_provisioner_role) = { create_database = true }
+  # The application role, and (var.postgres_provisioner_role = "enabled", the
+  # default) a provisioner role that may CREATE databases at runtime (for a
+  # consumer that provisions per-tenant databases). "disabled" creates only the
+  # app role; postgres_provisioner_role is then null everywhere it is exposed.
+  postgres_provisioner_enabled = var.postgres_provisioner_role == "enabled"
+  postgres_app_role            = local.pg
+  postgres_provisioner_role    = local.postgres_provisioner_enabled ? "${local.pg}_provisioner" : null
+  postgres_roles               = compact([local.postgres_app_role, local.postgres_provisioner_role])
+  postgres_role_options        = local.postgres_provisioner_enabled ? { (local.postgres_provisioner_role) = { create_database = true } } : {}
+  postgres_connect_grants = {
+    for r in local.postgres_roles : r => local.postgres_databases
   }
   # ONE ownership rule, for a created server and a consumed one alike: the app
   # role OWNS every database it is given, so a migration running as it can

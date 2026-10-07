@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.14.3 — optional Postgres provisioner role (Azure substrate); BIND skips absent custody
+
+No consumer change is required. `stacks/azure/xema-substrate` gains `postgres_provisioner_role` (`"enabled"` | `"disabled"`,
+default `"enabled"`, i.e. today's behaviour). `"disabled"` skips the second `<deployment>_provisioner` role (CREATEDB), for a
+consumer such as a Temporal server's database that never provisions databases at runtime: only the app role is created and
+granted, the role is absent from the `postgres_roles` and `postgres_role_passwords` outputs, and
+`substrate.postgres_provisioner_role` is `null`. In `tooling/bind/bind-outputs.mjs`, a deployment with no entry in
+`custody_vault_urls` / `custody_broker_client_ids` is now skipped for that row (omitted loudly) instead of refused, so a root
+with no custody (e.g. aura-shared) binds; a non-map, a sensitive output or a malformed entry is still refused.
+
 ## v0.14.2 — BIND binds per-deployment credential custody
 
 No consumer change is required. `tooling/bind/bind-outputs.mjs` classifies `custody_vault_urls` and

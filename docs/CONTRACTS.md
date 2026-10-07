@@ -645,7 +645,7 @@ that cloud; a consumer branches on `null`, never on which cloud it is on.
 | `namespaces` | `set(string)` | the roster ensured on the cluster — exactly `workload_namespaces`; carries NO roles, which namespace plays which part is the consumer's own knowledge | namespaces addon | namespaces addon |
 | `postgres_host` / `postgres_port` | `string` / `number` | the created server | managed postgres | managed postgres |
 | `postgres_app_role` | `string` | the application role the stack created | managed postgres | `null` (roles are a flat input, `postgres_roles`) |
-| `postgres_provisioner_role` | `string` | the role that may CREATE databases at runtime | managed postgres | `null` |
+| `postgres_provisioner_role` | `string` | the role that may CREATE databases at runtime; `null` when the Azure stack's `postgres_provisioner_role = "disabled"` | managed postgres | `null` |
 | `postgres_databases` | `set(string)` | the databases ensured on the created server — `platform_databases` after that stack's naming rule (Azure prefixes `<deployment_name>_`; DigitalOcean uses the names verbatim) | managed postgres | managed postgres |
 | `blob_account` / `blob_endpoint` / `blob_container_prefix` | `string` | the platform object-storage account, its endpoint, the container prefix | object storage | `null` (no platform bucket; extension buckets are the separate `extension_buckets` output) |
 | `key_vault_name` / `key_vault_uri` / `external_secrets_client_id` | `string` | the secrets backend and the identity that reads it | secrets backend | `null` |

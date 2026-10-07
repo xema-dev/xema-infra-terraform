@@ -469,7 +469,11 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
           const key = deployment ?? entries.get('deployment_name')?.value ?? entries.get('substrate.deployment_name')?.value;
           if (typeof entry.value !== 'object' || Array.isArray(entry.value)) throw new BindError(`output '${name}' is not a map keyed by deployment name`);
           if (typeof key !== 'string' || key === '') throw new BindError(`output '${name}' is keyed by deployment; pass --deployment <name> (keys: [${Object.keys(entry.value).join(', ')}])`);
-          if (!(key in entry.value)) throw new BindError(`output '${name}' has keys [${Object.keys(entry.value).join(', ')}]; none is deployment '${key}' — pass --deployment <name>`);
+          if (!Object.hasOwn(entry.value, key)) {
+            // A root that legitimately has no custody for this deployment (e.g. a shared root): skip the row, loudly.
+            report.omitted.push(`${row.target} ← ${name} has no entry for deployment '${key}' (keys: [${Object.keys(entry.value).join(', ')}]; ${row.note})`);
+            break;
+          }
           const picked = entry.value[key];
           if (typeof picked !== 'string' || picked === '') throw new BindError(`output '${name}'['${key}'] is not a non-empty string`);
           setFragment(row.target, picked, `${name}[${key}]`);

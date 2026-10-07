@@ -45,7 +45,7 @@ identity, OIDC); no credential is an input here.
 | storage account | `acmedevblob` | hyphens removed (Azure allows alphanumerics only) |
 | Keycloak realm, `BLOB_CONTAINER_PREFIX` | `acme-dev` | verbatim |
 | databases | `acme_dev_<name>` for every `<name>` in `platform_databases` | `-` → `_` (Postgres identifiers), then `_<name>` |
-| roles | `acme_dev` (app), `acme_dev_provisioner` (CREATEDB) | `-` → `_` |
+| roles | `acme_dev` (app), `acme_dev_provisioner` (CREATEDB; omitted with `postgres_provisioner_role = "disabled"`) | `-` → `_` |
 | namespaces | **not derived** — `workload_namespaces` is passed by full name | none |
 
 `deployment_name` is validated (3-20 chars, lowercase, single hyphens) so every
@@ -165,6 +165,11 @@ Every area is **independently toggleable** via an `enable_*` input:
 `postgres_extensions` (default `[]`) allow-lists PostgreSQL extensions on the
 created server (`azure.extensions`, lowercase identifiers); empty writes no
 parameter, so Azure's default stands.
+
+`postgres_provisioner_role` (`"enabled"` | `"disabled"`, default `"enabled"`, the historical behaviour) controls the
+second role `<deployment>_provisioner` (CREATEDB). `"disabled"` creates and grants only the app role (for a consumer,
+e.g. a Temporal server's database, that never provisions databases at runtime). The role is then absent from the
+`postgres_roles` and `postgres_role_passwords` outputs, and `substrate.postgres_provisioner_role` is `null`.
 
 `postgres_zone` (default `null`) pins the managed PostgreSQL server to zone "1", "2" or "3"; null keeps
 the regional placement. Set it before the first apply: changing it later replaces the server.
