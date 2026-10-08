@@ -16,7 +16,10 @@ substrate cannot know — which databases and which namespaces exist — are
 | `module.postgres_tenancy` | consume mode: the same prefixed databases and derived roles, ensured inside the EXISTING server over SQL — one stack instance per environment on a shared server; admin password read from Key Vault |
 | `module.dns` | the `apex_domain` zone's records (+ the cert-manager DNS-01 identity when that solver is used) |
 | `module.blob` | the storage account the platform's blob adapter targets |
-| `module.secrets_backend` | Key Vault + the External Secrets reader identity |
+| `module.secrets_backend` | the **operator vault**: break-glass/infra secrets (`key_vault_secrets`, the created Postgres admin password), never projected into the cluster. RBAC, purge protection, public access off, a private endpoint; no identity, no SecretStore, never given to the add-on |
+| `module.boundary_vault` | one Key Vault per `secret_store_boundaries` entry (RBAC, purge protection, public access off) + `module.boundary_vault_private_endpoint` |
+| `module.external_secrets` | per boundary: a managed identity, a federated credential per namespace, `Key Vault Secrets User` on that boundary's vault only, and a namespaced `SecretStore` |
+| `module.vault_names` | provider-free vault-name derivation and validation |
 | `module.cache` | (optional, off by default) Azure Cache for Redis |
 | `module.rwx_storage` | a ReadWriteMany `StorageClass` over the built-in Azure Files CSI driver (NFS) |
 | `module.workload_namespaces` | the `workload_namespaces` roster the consumer supplies |
@@ -84,7 +87,8 @@ module enforces; empty (the default) keeps the derived name:
 
 | Input | Derived default | Rule | Public name |
 | --- | --- | --- | --- |
-| `key_vault_name` | `acme-dev-kv` | 3-24 letters/digits/single hyphens, starts with a letter | `<name>.vault.azure.net` (resource group `<name>-rg`) |
+| `operator_vault_name` | `acme-dev-kv` | 3-24 letters/digits/single hyphens, starts with a letter | `<name>.vault.azure.net` (resource group `<name>-rg`) |
+| `secret_store_boundaries.<b>.vault_name` | `acme-dev-<b>-kv` | same rule; a derived name that breaks it is refused, never truncated, so set `vault_name` | `<name>.vault.azure.net` |
 | `storage_account_name` | `acmedevblob` | `^[a-z0-9]{3,24}$` | `<name>.blob.core.windows.net` |
 | `postgres_server_name` | `acme-dev-pg` | 3-63 lowercase letters/digits/hyphens, starts with a letter | `<name>.postgres.database.azure.com` (the private DNS zone and derived host follow it) |
 | `redis_cache_name` | `acme-dev-redis` | 1-63 letters/digits/hyphens | `<name>.redis.cache.windows.net` |
@@ -96,7 +100,7 @@ storage accounts carry their own explicit `name`.
 ### The in-cluster names a consumer's manifests reference
 
 `cluster_issuer_name` (default `letsencrypt`) and `secret_store_name`
-(default `platform`; kind `SecretStore`, one per boundary namespace — see `secret_stores`) are threaded to the `gateway-tls` addon, validated as
+(default `platform`; kind `SecretStore`, one per boundary namespace — see `secret_store_boundaries`) are threaded to the `gateway-tls` addon, validated as
 DNS-1123 subdomain names, and **read back** as the stack outputs of the same
 name (and in the `substrate` map: `substrate.gateway.cluster_issuer_name`,
 `substrate.secret_store_name`). A consumer's `Gateway`
@@ -105,11 +109,27 @@ manifests should read them from the stack, never restate the defaults. Both
 outputs are `null` exactly when the object does not exist — `enable_gateway_tls
 = false`, or for the store also `enable_secrets_backend = false`.
 
-### Outputs: Key Vault
+### Secret trust boundaries and the operator vault
+
+`secret_store_boundaries = map(object({ namespaces, vault_name? }))` is keyed by boundary name of the
+consumer's choosing (no boundary name is built in). For EACH boundary the stack creates its own Key
+Vault (RBAC, purge protection on, public access off), a private endpoint for it in the foundation's
+private-endpoint subnet and `vault` private DNS zone, and hands `{ namespaces, key_vault_id, vault_uri }`
+to `cluster-addons/external-secrets`. A namespace may belong to one boundary only; two vaults may not
+share a name. Seeding a boundary vault is the consumer's job; custody vaults are the consumer's too.
+
+**Operator vault:** break-glass/infra secrets, never projected into the cluster. It holds
+`key_vault_secrets` and the created Postgres admin password, has no identity and no SecretStore, is never
+passed to the add-on, and only the principal running Terraform gets `Key Vault Secrets Officer` on it.
+A boundary whose vault name equals it is refused. Because every vault is private, the machine running
+Terraform must reach the foundation's network to write its secrets.
+
+### Outputs: operator vault
 
 | Output | Value |
 |---|---|
-| `key_vault_id` | Key Vault resource id; `null` when `enable_secrets_backend = false`. Reference the vault by this id, never a constructed one built from `key_vault_name`, so the consumer depends on vault creation. |
+| `operator_vault_id` | Operator vault resource id; `null` when `enable_secrets_backend = false`. Reference the vault by this id, never one built from `operator_vault_name`, so the consumer depends on vault creation. |
+| `secret_stores` | per boundary: its identity client id, namespaces and its own vault id |
 
 ## The `substrate` output — the binding contract
 
@@ -151,10 +171,10 @@ Every area is **independently toggleable** via an `enable_*` input:
 | Input | Default | What it gates |
 | --- | --- | --- |
 | `enable_cluster` | `true` | Create AKS (in `network`). `false` ⇒ read the existing cluster by `cluster_name` / `cluster_resource_group_name`. |
-| `enable_managed_postgres` | `true` | Create the Flexible Server (and, with `enable_secrets_backend`, write its admin password to this stack's Key Vault). `false` ⇒ the tenancy and extension databases go to `existing_postgres_server_id` / `existing_postgres_host`, with the admin password READ from Key Vault — see [Consume mode: the existing server](#consume-mode-the-existing-server). |
+| `enable_managed_postgres` | `true` | Create the Flexible Server (and, with `enable_secrets_backend`, write its admin password to the operator vault). `false` ⇒ the tenancy and extension databases go to `existing_postgres_server_id` / `existing_postgres_host`, with the admin password READ from Key Vault — see [Consume mode: the existing server](#consume-mode-the-existing-server). |
 | `enable_dns` | `true` | Manage the `apex_domain` zone. `false` ⇒ DNS owned elsewhere (extension `dns_records` and `dns01-azure` then fail fast). |
 | `enable_object_storage` | `true` | Create the blob storage account. |
-| `enable_secrets_backend` | `true` | Create the Key Vault + reader identity (and, with it, the External Secrets store). |
+| `enable_secrets_backend` | `true` | Create the operator vault, the per-boundary vaults and the External Secrets store (needs `network` and the `vault` private DNS zone). |
 | `enable_cache` | `false` | Create a managed Redis. Off: the platform runs valkey in-cluster. |
 | `enable_container_registry` | `false` | Create a Premium, private-only container registry with `AcrPull` for the kubelet identity (needs `acr` in the foundation's `private_link_services`, in its default). The CI identity that pushes is **not** created: grant `AcrPush` to your own CI principal on `container_registry_id`. |
 | `enable_rwx_storage` | `true` | Create the RWX `StorageClass` on the (created or consumed) cluster. |
@@ -189,7 +209,7 @@ nothing.
 
 **The admin password is read from Key Vault, by reference.** An instance that
 CREATES a server (`enable_managed_postgres = true`, `enable_secrets_backend =
-true`) writes the server's admin password into its own vault under
+true`) writes the server's admin password into its own operator vault under
 `postgres_admin_password_secret_name` (default `postgres-admin-password`). A
 consuming instance reads it with an `azurerm_key_vault_secret` data source from
 `existing_postgres_admin_password_key_vault_id` under the same name — so the

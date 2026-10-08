@@ -228,11 +228,19 @@ module "blob" {
   tags                          = local.tags
 }
 
+module "vault_names" {
+  source = "../../../modules/providers/azure/vault-names"
+
+  deployment_name     = local.dep
+  operator_vault_name = var.operator_vault_name
+  boundaries          = { for k, b in(var.enable_secrets_backend ? var.secret_store_boundaries : {}) : k => { vault_name = b.vault_name } }
+}
+
 module "secrets_backend" {
   source = "../../../modules/providers/azure/secrets-backend"
   count  = var.enable_secrets_backend ? 1 : 0
 
-  name   = local.key_vault_name
+  name   = module.vault_names.operator
   region = var.region
 
   # The seeded secrets, plus the created server's admin password under
@@ -241,12 +249,32 @@ module "secrets_backend" {
   secret_names  = setunion(keys(var.key_vault_secrets), local.pg_admin_password_secret_names)
   secret_values = sensitive(merge(var.key_vault_secrets, local.pg_admin_password_secret))
 
-  # No reader identity here: each boundary's identity is created by cluster-addons/external-secrets.
-
-  purge_protection_enabled      = local.key_vault_purge_protection
-  public_network_access_enabled = !local.private_backing_services
+  # The OPERATOR vault: break-glass/infra secrets, never projected into the cluster. No reader
+  # identity, no SecretStore, never handed to the external-secrets add-on; only the principal
+  # running Terraform gets Secrets Officer (module default).
+  purge_protection_enabled      = true
+  public_network_access_enabled = false
   resource_group_name           = var.resource_group_name
   tags                          = local.tags
+}
+
+# One vault per secret trust boundary: holds that boundary's secrets only and is readable only by
+# the identity the add-on creates for it. Seeding is the consumer's own job, with its own role.
+module "boundary_vault" {
+  source   = "../../../modules/providers/azure/secrets-backend"
+  for_each = var.enable_secrets_backend ? var.secret_store_boundaries : {}
+
+  name   = module.vault_names.boundaries[each.key]
+  region = var.region
+
+  secret_names                   = []
+  secret_values                  = sensitive({})
+  grant_deployer_secrets_officer = false
+
+  purge_protection_enabled      = true
+  public_network_access_enabled = false
+  resource_group_name           = var.resource_group_name
+  tags                          = merge(local.tags, { secret-boundary = each.key })
 }
 
 module "cache" {
@@ -293,6 +321,20 @@ locals {
     postgres = one(module.postgres[*].cluster_id)
     acr      = one(module.container_registry[*].id)
   }
+}
+
+module "boundary_vault_private_endpoint" {
+  source   = "../../../modules/providers/azure/private-endpoint"
+  for_each = var.network == null ? {} : module.boundary_vault
+
+  name                = "${local.dep}-vault-${each.key}"
+  region              = var.region
+  resource_group_name = var.resource_group_name != "" ? var.resource_group_name : var.network.resource_group_name
+  service             = "vault"
+  target_resource_id  = each.value.key_vault_id
+  subnet_id           = var.network.private_endpoint_subnet_id
+  private_dns_zone_id = var.network.private_dns_zone_ids["vault"]
+  tags                = local.tags
 }
 
 module "private_endpoint" {
@@ -381,12 +423,12 @@ module "external_secrets" {
   source = "../../../modules/cluster-addons/external-secrets"
   count  = var.enable_secrets_backend ? 1 : 0
 
-  # This stack provisions ONE vault, so it serves ONE boundary; a second entry would share the
-  # vault and is refused by the add-on. Further boundaries bring their own vaults.
-  secret_stores = { for k, s in var.secret_stores : k => {
-    namespaces   = s.namespaces
-    key_vault_id = module.secrets_backend[0].key_vault_id
-    vault_uri    = module.secrets_backend[0].vault_uri
+  # One vault per boundary. The operator vault is deliberately absent: nothing in it is readable
+  # from the cluster.
+  secret_stores = { for k, b in var.secret_store_boundaries : k => {
+    namespaces   = b.namespaces
+    key_vault_id = module.boundary_vault[k].key_vault_id
+    vault_uri    = module.boundary_vault[k].vault_uri
   } }
   secret_store_name = var.secret_store_name
 

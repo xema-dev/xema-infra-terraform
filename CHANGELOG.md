@@ -4,6 +4,23 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — Azure stack: a vault per secret trust boundary, and an operator vault (BREAKING)
+
+BREAKING, no shim. `stacks/azure/xema-substrate` no longer has the single `secret_stores`-serving vault or the "at most one
+entry" limit. New input `secret_store_boundaries = map(object({ namespaces, vault_name = optional }))`, keyed by boundary name:
+for EACH boundary the stack creates its own Key Vault (RBAC, purge protection on, public access off), its private endpoint in
+the foundation's private-endpoint subnet and `vault` private DNS zone, and passes `{ namespaces, key_vault_id, vault_uri }` to
+`cluster-addons/external-secrets` (identity, federated credentials, `Key Vault Secrets User` on that vault only, namespaced
+`SecretStore`). Vault names derive as `<deployment_name>-<boundary>-kv`; a derived name outside 3-24 letters/digits/single
+hyphens (starting with a letter) is refused, never truncated: set that boundary's `vault_name`. New provider-free
+`modules/providers/azure/vault-names` validates the names and refuses duplicates, including a boundary equal to the operator
+vault (tested without mocks). The remaining stack vault is the **operator vault** (break-glass/infra secrets, never projected
+into the cluster): it holds `key_vault_secrets` and the created Postgres admin password, has no identity or SecretStore, is never
+given to the add-on, and is now always private with purge protection (it needs `network` and the `vault` private link zone).
+Renamed: input `key_vault_name` -> `operator_vault_name`; outputs `key_vault_name`/`key_vault_id`/`key_vault_uri` ->
+`operator_vault_name`/`operator_vault_id`/`operator_vault_uri`; `substrate.key_vault_*` -> `substrate.operator_vault_*`. Removed:
+`secret_stores` (stack input). `examples/azure` follows. Boundary vaults are not seeded by the stack; custody vaults stay with the consumer.
+
 ## Unreleased — secret stores per trust boundary (BREAKING: ClusterSecretStore/platform removed)
 
 BREAKING. `cluster-addons/external-secrets` no longer renders the cluster-wide `ClusterSecretStore/platform`, which read one Key
@@ -15,7 +32,7 @@ namespace or a vault (refused at plan; rules in the provider-free `external-secr
 `resource_group_name`, `oidc_issuer_url`; removed: `cluster_secret_store_name`, `secret_store_backend`, `azure_key_vault_store`,
 `service_account_name`. The namespaces must exist. `ExternalSecret`s change to `secretStoreRef: { kind: SecretStore, name: platform }`.
 Outputs: `cluster_secret_store_name` -> `secret_store_name`, new `secret_stores`. Stack `stacks/azure/xema-substrate`: new
-`secret_stores` (boundary -> `{ namespaces }`; one entry, it owns one vault) and `secret_store_name`; `cluster_secret_store_name`
+`secret_store_boundaries` (see the next entry) and `secret_store_name`; `cluster_secret_store_name`
 removed; its Key Vault no longer creates a reader identity; `substrate.external_secrets_client_id` and
 `substrate.cluster_secret_store_name` are replaced by `substrate.secret_stores` and `substrate.secret_store_name`. `examples/azure` follows (`secret_store_name`, `secret_stores`). `modules/assigned-roles` gains an `external-secrets` entry (gated by `enable_secrets_backend`; `Key Vault Secrets User`).
 

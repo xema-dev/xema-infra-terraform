@@ -9,7 +9,7 @@ variable "deployment_name" {
     starting with a letter and ending alphanumeric. The bound is what keeps
     every derived Azure name inside its limit (storage account "<compact>blob"
     <= 24, Key Vault "<name>-kv" <= 24). The four globally-unique derived
-    names each take an optional override (key_vault_name, storage_account_name,
+    names each take an optional override (operator_vault_name, storage_account_name,
     postgres_server_name, redis_cache_name). The ONE deterministic rewrite applied
     downstream is documented in locals.tf: Postgres identifiers replace "-"
     with "_" because an unquoted identifier cannot hold a hyphen.
@@ -70,15 +70,10 @@ variable "tags" {
 # cluster) need no override for this reason and already have one for another.
 # ---------------------------------------------------------------------------
 
-variable "key_vault_name" {
-  description = "Key Vault name. Empty derives \"<deployment_name>-kv\". Globally unique across Azure (3-24 letters, digits and single hyphens, starting with a letter, ending alphanumeric). The vault's dedicated resource group is \"<key_vault_name>-rg\"."
+variable "operator_vault_name" {
+  description = "Operator vault name. Empty derives \"<deployment_name>-kv\". Globally unique across Azure (3-24 letters, digits and single hyphens, starting with a letter, ending alphanumeric); required explicitly when the derived name would exceed 24 characters. Validated by providers/azure/vault-names, which also refuses a boundary vault with the same name. The vault's dedicated resource group is \"<name>-rg\"."
   type        = string
   default     = ""
-
-  validation {
-    condition     = var.key_vault_name == "" || (can(regex("^[a-zA-Z](?:[a-zA-Z0-9-]{1,22})[a-zA-Z0-9]$", var.key_vault_name)) && !can(regex("--", var.key_vault_name)))
-    error_message = "key_vault_name must be empty (derive it) or 3-24 letters, digits or hyphens, start with a letter, end alphanumeric, and contain no consecutive hyphens."
-  }
 }
 
 variable "storage_account_name" {
@@ -148,7 +143,7 @@ variable "enable_object_storage" {
 }
 
 variable "enable_secrets_backend" {
-  description = "Create the Key Vault, the External Secrets Operator with one identity and namespaced SecretStores per secret_stores boundary (cluster-addons/external-secrets) — independent of enable_gateway_tls."
+  description = "Create the operator vault, a vault per secret_store_boundaries boundary, and the External Secrets Operator with one identity and namespaced SecretStores per boundary (cluster-addons/external-secrets) — independent of enable_gateway_tls."
   type        = bool
   default     = true
 }
@@ -445,7 +440,7 @@ variable "network" {
 }
 
 variable "backing_services_network_access" {
-  description = "How the created cache, storage account and key vault are reached: \"private\" (public endpoint OFF, one private endpoint each in var.network) or \"public\" (public endpoint, TLS + key). The same closed set as postgres_network_access, and the same default."
+  description = "How the created cache and storage account are reached (the key vaults are always private): \"private\" (public endpoint OFF, one private endpoint each in var.network) or \"public\" (public endpoint, TLS + key). The same closed set as postgres_network_access, and the same default."
   type        = string
   default     = "private"
 
@@ -576,7 +571,7 @@ variable "existing_postgres_admin_password_key_vault_id" {
     the server writes it there (enable_managed_postgres = true with
     enable_secrets_backend = true), so for a server this stack created
     elsewhere this is THAT instance's vault:
-    `az keyvault show -n <its key_vault_name> --query id -o tsv`.
+    `az keyvault show -n <its operator_vault_name> --query id -o tsv`.
 
     There is deliberately no password input: a password typed into a tfvars
     file or an environment variable has been written somewhere before it
@@ -769,16 +764,22 @@ variable "cluster_issuer_name" {
   }
 }
 
-variable "secret_stores" {
+variable "secret_store_boundaries" {
   description = <<-EOT
-    The secret trust boundaries served from this stack's Key Vault, keyed by boundary name; each
-    lists the namespaces whose workloads may read it. Each boundary gets its own identity and
-    namespaced SecretStores (cluster-addons/external-secrets); there is no cluster-wide store.
-    The stack creates ONE vault, so at most one entry (a second would share it and is refused).
-    Namespaces must exist (see workload_namespaces). Only used when enable_secrets_backend.
+    The secret trust boundaries, keyed by boundary name of the caller's choosing. Each boundary
+    gets its OWN Key Vault (RBAC, purge protection on, public access off) with a private endpoint,
+    and through cluster-addons/external-secrets its own identity (Secrets User on that vault only)
+    and a namespaced SecretStore in each of its namespaces. Entry:
+      - namespaces : the namespaces whose workloads may read the boundary's vault (must exist; see
+                     workload_namespaces). A namespace belongs to one boundary only.
+      - vault_name : optional explicit vault name. Empty derives "<deployment_name>-<boundary>-kv",
+                     which is REFUSED (never truncated) when it is not a valid Key Vault name
+                     (3-24 letters, digits, single hyphens, starting with a letter); set vault_name then.
+    The operator vault is separate and is never one of these. Only used when enable_secrets_backend.
   EOT
   type = map(object({
     namespaces = list(string)
+    vault_name = optional(string, "")
   }))
   default = {}
 }

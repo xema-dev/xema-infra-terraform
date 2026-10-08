@@ -26,7 +26,7 @@ tags = {
 # name (acme-dev-kv, acmedevblob, acme-dev-pg, acme-dev-redis) can be taken by
 # someone else. Leave them out (or empty) to keep the derived name; set one
 # only when Azure reports the derived name as already in use.
-# key_vault_name       = "acme-dev-kv-7f3a"   # 3-24 letters/digits/single hyphens, starts with a letter
+# operator_vault_name = "acme-dev-kv-7f3a"   # 3-24 letters/digits/single hyphens, starts with a letter
 # storage_account_name = "acmedevblob7f3a"    # 3-24 lowercase letters/digits
 # postgres_server_name = "acme-dev-pg-7f3a"   # 3-63 lowercase letters/digits/hyphens
 # redis_cache_name     = "acme-dev-redis-7f3a"

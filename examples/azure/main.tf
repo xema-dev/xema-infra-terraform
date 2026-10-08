@@ -20,7 +20,7 @@ module "substrate" {
   tags            = var.tags
 
   # --- overrides for the four GLOBALLY-unique derived names (empty = derive) ---
-  key_vault_name       = var.key_vault_name
+  operator_vault_name  = var.operator_vault_name
   storage_account_name = var.storage_account_name
   postgres_server_name = var.postgres_server_name
   redis_cache_name     = var.redis_cache_name
@@ -92,7 +92,7 @@ module "substrate" {
   tls_solver                         = var.tls_solver
   cluster_issuer_name                = var.cluster_issuer_name
   secret_store_name                  = var.secret_store_name
-  secret_stores                      = var.secret_stores
+  secret_store_boundaries            = var.secret_store_boundaries
   gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
   gateway_implementation             = var.gateway_implementation
   customer_gateway                   = var.customer_gateway

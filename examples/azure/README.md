@@ -18,10 +18,10 @@ you deploy; the substrate does not know your services.
 
 Four of those names are unique across **every** Azure tenant (the vault, the
 storage account, the Flexible Server, the cache), so each has an optional
-override — `key_vault_name`, `storage_account_name`, `postgres_server_name`,
+override — `operator_vault_name`, `storage_account_name`, `postgres_server_name`,
 `redis_cache_name` — for when the derived name is already taken; see
 [Overriding the globally-unique names](../../stacks/azure/xema-substrate/README.md#overriding-the-globally-unique-names).
-The two in-cluster names your own manifests reference, the ClusterIssuer
+Secret trust boundaries (`secret_store_boundaries`) each get their own vault, private endpoint, identity and SecretStores; the stack's `operator_vault_*` vault holds break-glass/infra secrets and is never projected into the cluster. The two in-cluster names your own manifests reference, the ClusterIssuer
 (`cluster_issuer_name`, default `letsencrypt`) and the SecretStore
 (`secret_store_name`, default `platform`), are inputs here and come
 back as outputs of the same name — read them from `terraform output` rather

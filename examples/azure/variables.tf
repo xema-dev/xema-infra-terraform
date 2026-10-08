@@ -38,8 +38,8 @@ variable "tags" {
 
 # --- overrides for the GLOBALLY-unique derived names (validated by the stack) ---
 
-variable "key_vault_name" {
-  description = "Key Vault name. Empty derives \"<deployment_name>-kv\"; set it when the derived name collides with a vault another tenant owns."
+variable "operator_vault_name" {
+  description = "Operator vault name (break-glass/infra secrets, never projected into the cluster). Empty derives \"<deployment_name>-kv\"; set it when the derived name collides with a vault another tenant owns."
   type        = string
   default     = ""
 }
@@ -393,10 +393,13 @@ variable "secret_store_name" {
   default     = "platform"
 }
 
-variable "secret_stores" {
-  description = "Secret trust boundaries served from the stack's Key Vault, keyed by boundary name, each with the namespaces that may read it (see the stack's secret_stores)."
-  type        = map(object({ namespaces = list(string) }))
-  default     = {}
+variable "secret_store_boundaries" {
+  description = "Secret trust boundaries, keyed by boundary name. Each gets its own Key Vault, private endpoint, identity and namespaced SecretStores; vault_name is optional (empty derives \"<deployment_name>-<boundary>-kv\", refused when invalid). See the stack's secret_store_boundaries."
+  type = map(object({
+    namespaces = list(string)
+    vault_name = optional(string, "")
+  }))
+  default = {}
 }
 
 # --- identity realm ---

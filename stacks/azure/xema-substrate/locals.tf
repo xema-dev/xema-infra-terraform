@@ -22,7 +22,6 @@ locals {
   : (var.network != null ? var.network.resource_group_name : "${local.dep}-rg"))
   # The GLOBALLY-unique names: derived unless overridden (variables.tf).
   postgres_name         = var.postgres_server_name != "" ? var.postgres_server_name : "${local.dep}-pg"
-  key_vault_name        = var.key_vault_name != "" ? var.key_vault_name : "${local.dep}-kv"
   blob_account_name     = var.storage_account_name != "" ? var.storage_account_name : "${local.compact}blob"
   redis_name            = var.redis_cache_name != "" ? var.redis_cache_name : "${local.dep}-redis"
   registry_name         = var.container_registry_name != "" ? var.container_registry_name : "${local.compact}acr"
@@ -69,8 +68,7 @@ locals {
   dns01 = var.tls_solver == "dns01-azure"
 
   # Irreversible / cost-bearing safety knobs follow the environment.
-  key_vault_purge_protection = var.environment == "prod"
-  postgres_backup_retention  = var.environment == "prod" ? 35 : 7
+  postgres_backup_retention = var.environment == "prod" ? 35 : 7
 
   # ---------------------------------------------------------------------------
   # Cluster facts: from the created cluster, else the existing one read by name.
@@ -119,8 +117,10 @@ locals {
   private_endpoint_services_wanted = compact(concat(local.private_backing_services ? [
     var.enable_object_storage ? "blob" : "",
     var.enable_cache ? "redis" : "",
-    var.enable_secrets_backend ? "vault" : "",
     ] : [], [
+    # The key vaults have no public endpoint at all, so theirs does not follow
+    # backing_services_network_access.
+    var.enable_secrets_backend ? "vault" : "",
     # The registry has no public endpoint at all, so its endpoint does not
     # follow backing_services_network_access.
     var.enable_container_registry ? "acr" : "",

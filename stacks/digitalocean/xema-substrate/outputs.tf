@@ -131,10 +131,10 @@ output "substrate" {
     blob_endpoint         = null
     blob_container_prefix = null
 
-    key_vault_name    = null
-    key_vault_uri     = null
-    secret_store_name = null
-    secret_stores     = null
+    operator_vault_name = null
+    operator_vault_uri  = null
+    secret_store_name   = null
+    secret_stores       = null
 
     redis_host = null
     redis_port = null

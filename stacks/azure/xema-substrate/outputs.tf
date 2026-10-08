@@ -105,18 +105,18 @@ output "blob_primary_access_key" {
   sensitive   = true
 }
 
-output "key_vault_name" {
-  description = "Key Vault name (derived or overridden via var.key_vault_name); null when disabled."
-  value       = var.enable_secrets_backend ? local.key_vault_name : null
+output "operator_vault_name" {
+  description = "Operator vault name (derived or overridden via var.operator_vault_name); null when disabled. The operator vault holds break-glass/infra secrets and is never projected into the cluster."
+  value       = var.enable_secrets_backend ? module.vault_names.operator : null
 }
 
-output "key_vault_id" {
-  description = "Key Vault resource id; null when disabled. Reference the vault by this id rather than building it from key_vault_name: the id depends on the vault resource, so consumers order after its creation (a name-built id raced vault creation on a fresh apply)."
+output "operator_vault_id" {
+  description = "Operator vault resource id; null when disabled. Reference the vault by this id rather than building it from operator_vault_name: the id depends on the vault resource, so consumers order after its creation (a name-built id raced vault creation on a fresh apply)."
   value       = one(module.secrets_backend[*].key_vault_id)
 }
 
-output "key_vault_uri" {
-  description = "Key Vault URI; null when disabled."
+output "operator_vault_uri" {
+  description = "Operator vault URI; null when disabled."
   value       = one(module.secrets_backend[*].vault_uri)
 }
 
@@ -161,7 +161,7 @@ output "secret_store_name" {
 }
 
 output "secret_stores" {
-  description = "Per secret trust boundary: its identity client id, namespaces and vault id. Null when enable_secrets_backend = false."
+  description = "Per secret trust boundary: its identity client id, namespaces and its own vault id. Null when enable_secrets_backend = false."
   value       = one(module.external_secrets[*].secret_stores)
 }
 
@@ -235,10 +235,10 @@ output "substrate" {
     blob_endpoint         = one(module.blob[*].endpoint)
     blob_container_prefix = var.enable_object_storage ? local.blob_container_prefix : null
 
-    key_vault_name    = var.enable_secrets_backend ? local.key_vault_name : null
-    key_vault_uri     = one(module.secrets_backend[*].vault_uri)
-    secret_store_name = one(module.external_secrets[*].secret_store_name)
-    secret_stores     = one(module.external_secrets[*].secret_stores)
+    operator_vault_name = var.enable_secrets_backend ? module.vault_names.operator : null
+    operator_vault_uri  = one(module.secrets_backend[*].vault_uri)
+    secret_store_name   = one(module.external_secrets[*].secret_store_name)
+    secret_stores       = one(module.external_secrets[*].secret_stores)
 
     redis_host = one(module.cache[*].host)
     redis_port = one(module.cache[*].port)

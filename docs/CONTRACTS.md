@@ -502,7 +502,7 @@ The vault `name` is **globally unique across every Azure tenant** (it is the
 DNS label of `<name>.vault.azure.net`; 3-24 letters, digits and single hyphens,
 starting with a letter). A derived name can collide with a vault somebody else
 owns, and Azure refuses the create only at apply time — so the Azure stack
-derives `<deployment_name>-kv` AND takes `key_vault_name` to replace it,
+derives `<deployment_name>-kv` (the operator vault) AND takes `operator_vault_name` to replace it,
 validated against the module's own rule. The dedicated resource group follows
 the vault name (`<name>-rg`). The same holds for the other two globally-unique
 derived names the stack owns — `postgres_server_name` and `redis_cache_name`.
@@ -648,9 +648,9 @@ that cloud; a consumer branches on `null`, never on which cloud it is on.
 | `postgres_provisioner_role` | `string` | the role that may CREATE databases at runtime; `null` when the Azure stack's `postgres_provisioner_role = "disabled"` | managed postgres | `null` |
 | `postgres_databases` | `set(string)` | the databases ensured on the created server — `platform_databases` after that stack's naming rule (Azure prefixes `<deployment_name>_`; DigitalOcean uses the names verbatim) | managed postgres | managed postgres |
 | `blob_account` / `blob_endpoint` / `blob_container_prefix` | `string` | the platform object-storage account, its endpoint, the container prefix | object storage | `null` (no platform bucket; extension buckets are the separate `extension_buckets` output) |
-| `key_vault_name` / `key_vault_uri` | `string` | the secrets backend | secrets backend | `null` |
+| `operator_vault_name` / `operator_vault_uri` | `string` | the operator vault: break-glass/infra secrets, never projected into the cluster | secrets backend | `null` |
 | `secret_store_name` | `string` | the namespaced `SecretStore` every `ExternalSecret` names | secrets backend | `null` |
-| `secret_stores` | `map(object)` | per secret trust boundary: its identity client id, namespaces and vault id | secrets backend | `null` |
+| `secret_stores` | `map(object)` | per secret trust boundary (the Azure stack's `secret_store_boundaries`, one vault each): its identity client id, namespaces and vault id | secrets backend | `null` |
 | `redis_host` / `redis_port` | `string` / `number` | the managed cache (TLS port) | cache | `null` |
 | `kubelet_identity_object_id` | `string` | object id of the cluster's kubelet identity, for role assignments (e.g. a registry pull grant) | cluster (created or read) | `null` |
 | `container_registry_login_server` / `container_registry_id` | `string` | the container registry's host and resource id (the scope a consumer grants `AcrPush` to its own CI principal on) | container registry | `null` |
