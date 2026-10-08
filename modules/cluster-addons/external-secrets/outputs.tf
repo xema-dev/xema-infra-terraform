@@ -1,3 +1,8 @@
+output "assigned_role_names" {
+  description = "Azure role definition names this module assigns. Static: the names this module can assign, whatever the inputs, so a bootstrap's ABAC condition on the role-assignment writer can be derived before any state exists (see modules/assigned-roles)."
+  value       = ["Key Vault Secrets User"]
+}
+
 output "secret_store_name" {
   description = "Name of the SecretStore in every boundary namespace (every ExternalSecret's secretStoreRef.name, kind SecretStore)."
   value       = var.secret_store_name

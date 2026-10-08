@@ -10,6 +10,7 @@ locals {
     "cluster"            = ["Network Contributor"]
     "container-registry" = ["AcrPull"]
     "dns"                = ["DNS Zone Contributor"]
+    "external-secrets"   = ["Key Vault Secrets User"]
     "secrets-backend"    = ["Key Vault Secrets Officer", "Key Vault Secrets User"]
   }
 
@@ -17,6 +18,7 @@ locals {
     "cluster"            = var.enable_cluster
     "container-registry" = var.enable_container_registry
     "dns"                = var.enable_dns
+    "external-secrets"   = var.enable_secrets_backend
     "secrets-backend"    = var.enable_secrets_backend
   }
 }

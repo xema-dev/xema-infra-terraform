@@ -17,7 +17,7 @@ namespace or a vault (refused at plan; rules in the provider-free `external-secr
 Outputs: `cluster_secret_store_name` -> `secret_store_name`, new `secret_stores`. Stack `stacks/azure/xema-substrate`: new
 `secret_stores` (boundary -> `{ namespaces }`; one entry, it owns one vault) and `secret_store_name`; `cluster_secret_store_name`
 removed; its Key Vault no longer creates a reader identity; `substrate.external_secrets_client_id` and
-`substrate.cluster_secret_store_name` are replaced by `substrate.secret_stores` and `substrate.secret_store_name`.
+`substrate.cluster_secret_store_name` are replaced by `substrate.secret_stores` and `substrate.secret_store_name`. `examples/azure` follows (`secret_store_name`, `secret_stores`). `modules/assigned-roles` gains an `external-secrets` entry (gated by `enable_secrets_backend`; `Key Vault Secrets User`).
 
 ## Unreleased — Azure substrate stack passes `network_policy_engine` through
 

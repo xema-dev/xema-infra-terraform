@@ -138,9 +138,9 @@ gateway_infrastructure_annotations = {
 }
 # The two in-cluster names your Gateway / ExternalSecret manifests reference.
 # Defaults shown; whatever you set, READ them back from the stack outputs
-# (cluster_issuer_name, cluster_secret_store_name) instead of restating them.
+# (cluster_issuer_name, secret_store_name) instead of restating them.
 cluster_issuer_name       = "letsencrypt"
-cluster_secret_store_name = "platform"
+secret_store_name         = "platform"
 
 # --- identity realm (managed only when enable_identity_realm) ---
 realm_display_name = "Xema (acme-dev)"

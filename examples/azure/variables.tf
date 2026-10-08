@@ -387,10 +387,16 @@ variable "cluster_issuer_name" {
   default     = "letsencrypt"
 }
 
-variable "cluster_secret_store_name" {
-  description = "ClusterSecretStore name (ExternalSecret secretStoreRef.name). Read it back from the stack output rather than restating it in manifests."
+variable "secret_store_name" {
+  description = "SecretStore name in each boundary namespace (ExternalSecret secretStoreRef.name, kind SecretStore). Read it back from the stack output rather than restating it in manifests."
   type        = string
   default     = "platform"
+}
+
+variable "secret_stores" {
+  description = "Secret trust boundaries served from the stack's Key Vault, keyed by boundary name, each with the namespaces that may read it (see the stack's secret_stores)."
+  type        = map(object({ namespaces = list(string) }))
+  default     = {}
 }
 
 # --- identity realm ---

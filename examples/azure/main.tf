@@ -91,7 +91,8 @@ module "substrate" {
   acme_server                        = var.acme_server
   tls_solver                         = var.tls_solver
   cluster_issuer_name                = var.cluster_issuer_name
-  cluster_secret_store_name          = var.cluster_secret_store_name
+  secret_store_name                  = var.secret_store_name
+  secret_stores                      = var.secret_stores
   gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
   gateway_implementation             = var.gateway_implementation
   customer_gateway                   = var.customer_gateway
@@ -133,7 +134,7 @@ output "postgres_role_passwords" {
 
 # The two in-cluster names the consumer's own manifests reference — read from
 # the stack (also in substrate.gateway.cluster_issuer_name /
-# substrate.cluster_secret_store_name), never restated.
+# substrate.secret_store_name), never restated.
 output "gateway_parent_ref" {
   description = "The parentRef every HTTPRoute attaches to ({ name, namespace, section_name }); null when the gateway is disabled."
   value       = module.substrate.gateway_parent_ref
@@ -144,9 +145,9 @@ output "cluster_issuer_name" {
   value       = module.substrate.cluster_issuer_name
 }
 
-output "cluster_secret_store_name" {
-  description = "The ClusterSecretStore name for ExternalSecret secretStoreRef.name; null when the secrets backend is disabled."
-  value       = module.substrate.cluster_secret_store_name
+output "secret_store_name" {
+  description = "The SecretStore name for ExternalSecret secretStoreRef.name (kind SecretStore); null when the secrets backend is disabled."
+  value       = module.substrate.secret_store_name
 }
 
 output "dns_name_servers" {

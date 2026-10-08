@@ -1,5 +1,5 @@
 output "vault_uri" {
-  description = "Key Vault base URI (https://<name>.vault.azure.net/) — the ClusterSecretStore's vaultUrl."
+  description = "Key Vault base URI (https://<name>.vault.azure.net/) — a SecretStore's vaultUrl."
   value       = azurerm_key_vault.this.vault_uri
 }
 

@@ -95,11 +95,11 @@ storage accounts carry their own explicit `name`.
 
 ### The in-cluster names a consumer's manifests reference
 
-`cluster_issuer_name` (default `letsencrypt`) and `cluster_secret_store_name`
-(default `platform`) are threaded to the `gateway-tls` addon, validated as
+`cluster_issuer_name` (default `letsencrypt`) and `secret_store_name`
+(default `platform`; kind `SecretStore`, one per boundary namespace — see `secret_stores`) are threaded to the `gateway-tls` addon, validated as
 DNS-1123 subdomain names, and **read back** as the stack outputs of the same
 name (and in the `substrate` map: `substrate.gateway.cluster_issuer_name`,
-`substrate.cluster_secret_store_name`). A consumer's `Gateway`
+`substrate.secret_store_name`). A consumer's `Gateway`
 (`cert-manager.io/cluster-issuer`) and `ExternalSecret` (`secretStoreRef.name`)
 manifests should read them from the stack, never restate the defaults. Both
 outputs are `null` exactly when the object does not exist — `enable_gateway_tls

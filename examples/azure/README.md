@@ -22,8 +22,8 @@ override — `key_vault_name`, `storage_account_name`, `postgres_server_name`,
 `redis_cache_name` — for when the derived name is already taken; see
 [Overriding the globally-unique names](../../stacks/azure/xema-substrate/README.md#overriding-the-globally-unique-names).
 The two in-cluster names your own manifests reference, the ClusterIssuer
-(`cluster_issuer_name`, default `letsencrypt`) and the ClusterSecretStore
-(`cluster_secret_store_name`, default `platform`), are inputs here and come
+(`cluster_issuer_name`, default `letsencrypt`) and the SecretStore
+(`secret_store_name`, default `platform`), are inputs here and come
 back as outputs of the same name — read them from `terraform output` rather
 than restating them.
 
