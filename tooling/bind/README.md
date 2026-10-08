@@ -85,6 +85,25 @@ table does not know is REFUSED by name (nothing is dropped silently), and an
 output marked `sensitive` is refused if the table would put it in the
 committed fragment.
 
+## Root-local outputs
+
+A consumer root usually declares outputs of its own (say
+`temporal_workflow_attester`). The table knows only the stack's outputs, so by
+default such an output is refused as unknown. The root declares them
+not-a-binding itself, with one output, no edit to the vendored table:
+
+```hcl
+output "xema_bind_root_local_outputs" {
+  value = ["temporal_workflow_attester"]
+}
+```
+
+A list of output names, not sensitive. Validated: every name must be an output
+of the root, must not be a stack output name (a `DISPOSITIONS` row or
+`substrate`; a root cannot reclassify the stack), and may not repeat or list
+the declaration itself. Declared outputs are reported under `ignored`;
+everything else unclassified is still refused.
+
 ## What is deliberately NOT bound, and why — read before "fixing"
 
 - **The Postgres role password.** It is DECLARED, not bound, and there is
@@ -131,4 +150,6 @@ node --test 'tooling/bind/*.test.mjs'
 
 Fixtures under `fixtures/` are one `terraform output -json` document per stack
 carrying every output that stack declares; a stack output added without a table
-row reddens the suite.
+row reddens the suite. A further test reads each stack's `outputs.tf` and
+fails when any top-level output or any key of the `substrate` object lacks a
+row, so the gap is caught in this repo's CI, not in a consumer.

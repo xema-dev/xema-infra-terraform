@@ -14,7 +14,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { BindError, DISPOSITIONS, Disposition, assertOutsideWorkTree, bind, mergeIntoSecretInputs } from './bind-outputs.mjs';
+import { BindError, DISPOSITIONS, ROOT_LOCAL_OUTPUT, Disposition, assertOutsideWorkTree, bind, mergeIntoSecretInputs } from './bind-outputs.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(HERE, 'bind-outputs.mjs');
@@ -431,4 +431,78 @@ test('idp: partial realm data is refused (url without secrets, and secrets witho
 
 test('idp: --identity-client for a deployment without a realm is refused', () => {
   assert.throws(() => bind(noRealm(), { identityClient: 'identity-api' }), (e) => e instanceof BindError && /contradictory/.test(e.message));
+});
+
+// ── every stack output field is classified (fails HERE, not in a consumer) ───
+//
+// Reads each stack's outputs.tf: every top-level `output "x"` and every key of
+// the `substrate` object must have a DISPOSITIONS row.
+const REPO = path.resolve(HERE, '..', '..');
+for (const stack of ['azure', 'digitalocean']) {
+  test(`${stack}: every stack output and every substrate field has a disposition`, () => {
+    const src = fs.readFileSync(path.join(REPO, 'stacks', stack, 'xema-substrate', 'outputs.tf'), 'utf8');
+    const top = [...src.matchAll(/^output "([a-z0-9_]+)"/gm)].map((m) => m[1]);
+    assert.ok(top.includes('substrate'), 'outputs.tf declares the substrate output');
+    const block = src.slice(src.indexOf('output "substrate"'));
+    const body = block.slice(block.indexOf('value = {') + 'value = {'.length);
+    const keys = [];
+    for (const line of body.split('\n')) {
+      if (/^  \}/.test(line)) break; // end of the value object
+      const m = /^    ([a-z0-9_]+)\s+=/.exec(line);
+      if (m) keys.push(m[1]);
+    }
+    assert.ok(keys.length > 10, `parsed the substrate keys (${keys.length})`);
+    const missing = [...top.filter((n) => n !== 'substrate'), ...keys.map((k) => `substrate.${k}`)].filter((n) => !(n in DISPOSITIONS));
+    assert.deepEqual(missing, [], `classify in DISPOSITIONS: ${missing.join(', ')}`);
+  });
+}
+
+test('azure: kubelet identity and container registry fields are classified as not-a-binding', () => {
+  for (const n of ['kubelet_identity_object_id', 'container_registry_login_server', 'container_registry_id']) {
+    assert.equal(DISPOSITIONS[`substrate.${n}`].disposition, Disposition.Ignore);
+    assert.equal(DISPOSITIONS[n].disposition, Disposition.Ignore);
+  }
+  const { report } = bind(fixture('azure'));
+  assert.ok(report.ignored.some((l) => l.startsWith('substrate.container_registry_id:')));
+});
+
+// ── root-local outputs ───────────────────────────────────────────────────────
+
+const withRootLocal = (names, extra = {}) => {
+  const doc = fixture('azure');
+  doc.temporal_workflow_attester = { sensitive: false, type: 'string', value: 'x' };
+  doc[ROOT_LOCAL_OUTPUT] = { sensitive: false, type: ['list', 'string'], value: names };
+  return Object.assign(doc, extra);
+};
+
+test('a root output is refused unless the root declares it root-local', () => {
+  const doc = fixture('azure');
+  doc.temporal_workflow_attester = { sensitive: false, type: 'string', value: 'x' };
+  assert.throws(() => bind(doc), /unknown stack output\(s\): temporal_workflow_attester/);
+});
+
+test('a declared root-local output binds and is reported ignored; the declaration itself is not an unknown', () => {
+  const { report, fragment } = bind(withRootLocal(['temporal_workflow_attester']));
+  assert.ok(report.ignored.some((l) => l.startsWith('temporal_workflow_attester:')));
+  assert.deepEqual(fragment, bind(fixture('azure')).fragment);
+});
+
+test('an undeclared output is still refused beside declared ones', () => {
+  const doc = withRootLocal(['temporal_workflow_attester'], { other_thing: { sensitive: false, type: 'string', value: 'y' } });
+  assert.throws(() => bind(doc), /unknown stack output\(s\): other_thing/);
+});
+
+test('a root-local name colliding with a stack output is refused', () => {
+  assert.throws(() => bind(withRootLocal(['postgres_host'])), /stack output name/);
+  assert.throws(() => bind(withRootLocal(['substrate'])), /stack output name/);
+});
+
+test('a root-local name that is not an output of the root, a duplicate, itself, or a bad shape is refused', () => {
+  assert.throws(() => bind(withRootLocal(['nope'])), /not an output of this root/);
+  assert.throws(() => bind(withRootLocal(['temporal_workflow_attester', 'temporal_workflow_attester'])), /twice/);
+  assert.throws(() => bind(withRootLocal([ROOT_LOCAL_OUTPUT])), /cannot list itself/);
+  assert.throws(() => bind(withRootLocal('temporal_workflow_attester')), /list of non-empty/);
+  const doc = withRootLocal(['temporal_workflow_attester']);
+  doc[ROOT_LOCAL_OUTPUT].sensitive = true;
+  assert.throws(() => bind(doc), /sensitive/);
 });

@@ -133,6 +133,31 @@ const op = (reason) => ({ disposition: Disposition.Operator, reason });
 const ign = (reason) => ({ disposition: Disposition.Ignore, reason });
 
 /**
+ * The consumer root's own outputs, declared not-a-binding by the root itself:
+ * a root output `xema_bind_root_local_outputs = ["name", ...]` (list of
+ * strings, not sensitive). Validated: every name must be a top-level output of
+ * the document, and must not be a stack output name (a DISPOSITIONS row, the
+ * `substrate` map included) — a root cannot reclassify the stack's outputs.
+ */
+function readRootLocal(doc) {
+  const decl = doc[ROOT_LOCAL_OUTPUT];
+  if (decl === undefined) return new Set();
+  if (decl === null || typeof decl !== 'object' || !('value' in decl)) throw new BindError(`output '${ROOT_LOCAL_OUTPUT}' is not a terraform output entry ({ sensitive, type, value })`);
+  if (decl.sensitive) throw new BindError(`output ${ROOT_LOCAL_OUTPUT} is marked sensitive; it lists output names only — refusing`);
+  const list = decl.value;
+  if (!Array.isArray(list) || !list.every((n) => typeof n === 'string' && n !== '')) throw new BindError(`output ${ROOT_LOCAL_OUTPUT} must be a list of non-empty output names`);
+  const set = new Set();
+  for (const n of list) {
+    if (set.has(n)) throw new BindError(`${ROOT_LOCAL_OUTPUT} lists '${n}' twice`);
+    set.add(n);
+    if (n === ROOT_LOCAL_OUTPUT) throw new BindError(`${ROOT_LOCAL_OUTPUT} cannot list itself`);
+    if (n === 'substrate' || n in DISPOSITIONS) throw new BindError(`${ROOT_LOCAL_OUTPUT} lists '${n}', which is a stack output name — a root-local output must not collide with one`);
+    if (!(n in doc)) throw new BindError(`${ROOT_LOCAL_OUTPUT} lists '${n}', which is not an output of this root`);
+  }
+  return set;
+}
+
+/**
  * THE TABLE. One row per stack output, and per key of the `substrate` binding
  * map (`substrate.<key>`, the cross-cloud contract in docs/CONTRACTS.md). Both
  * stacks' outputs are here; a key one cloud always leaves null is `omit`.
@@ -171,6 +196,9 @@ export const DISPOSITIONS = Object.freeze({
   'substrate.operator_vault_uri': ign('same as operator_vault_name'),
   'substrate.secret_store_name': ign('a manifest reference (ExternalSecret.secretStoreRef.name), not a secret input'),
   'substrate.secret_stores': ign('per-boundary identities are bound by the external-secrets addon, not by the deployment root'),
+  'substrate.kubelet_identity_object_id': ign('a role-assignment principal (e.g. AcrPull on a registry the stack does not own), granted by the consumer root in Terraform; no secret-inputs key reads it'),
+  'substrate.container_registry_login_server': ign('an image registry host is a chart value (infra.yaml / values overlays), not a secret input'),
+  'substrate.container_registry_id': ign('the scope the consumer root grants AcrPush to its own CI principal on, in Terraform; no secret-inputs key reads it'),
   'substrate.dns_zone': ign('the deployment root derives hostnames from its own domain declarations (deployment-domains), not from a zone apex input'),
   'substrate.dns_name_servers': ign('a registrar delegation fact for the operator; the deployment root does not read it'),
   'substrate.gateway': op(
@@ -202,6 +230,9 @@ export const DISPOSITIONS = Object.freeze({
   postgres_role_passwords: ign('Azure: the passwords the stack happened to set when it created the roles. They are NOT an authority for any role password — the deployment declares those in its sealed secret surface and a scripted path reconciles Postgres to them (apply-postgres-bootstrap.sh for the deployment-wide postgres.role, the provision-service-database-roles workflow for the per-service migrator/runtime pairs). Whatever the stack set is superseded on the next reconcile, so copying it anywhere creates a second value for a fact that already has one'),
   postgres_databases: ign('duplicate of substrate.postgres_databases'),
   postgres_roles: ign('the roles the stack ensured; the deployment root names its role in postgres.role'),
+  kubelet_identity_object_id: ign('duplicate of substrate.kubelet_identity_object_id'),
+  container_registry_login_server: ign('duplicate of substrate.container_registry_login_server'),
+  container_registry_id: ign('duplicate of substrate.container_registry_id'),
   dns_domain: ign('duplicate of substrate.dns_zone'),
   dns_name_servers: ign('duplicate of substrate.dns_name_servers'),
   dns_record_ids: ign('provider record ids for imports'),
@@ -210,6 +241,8 @@ export const DISPOSITIONS = Object.freeze({
   blob_primary_access_key: op('Azure: the blob account key. Not written: the deployment root\'s object-store surface is S3-shaped and its `object-store-secret-key` external pairs with an S3 access key (objectStore.accessKey), which an Azure account key is not. Bind it when that surface grows an Azure Blob shape'),
   operator_vault_name: ign('duplicate of substrate.operator_vault_name'),
   operator_vault_uri: ign('duplicate of substrate.operator_vault_uri'),
+  operator_vault_id: ign('an Azure resource id (a role-assignment scope for the consumer root\'s Terraform); nothing in the deployment root reads it'),
+  assigned_role_names: ign('the Azure role names the stack assigns, for the consumer root\'s RBAC-Administrator ABAC condition in Terraform; not a deployment input'),
   redis_host: ign('duplicate of substrate.redis_host'),
   redis_port: ign('duplicate of substrate.redis_port'),
   redis_primary_key: x('redis-password', WhenNull.Omit, 'no managed cache on this cloud, or enable_cache = false'),
@@ -226,6 +259,9 @@ export const DISPOSITIONS = Object.freeze({
 });
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+/** The root output a consumer root declares its own, non-stack outputs in. */
+export const ROOT_LOCAL_OUTPUT = 'xema_bind_root_local_outputs';
 
 const isNil = (v) => v === null || v === undefined;
 
@@ -408,7 +444,13 @@ export function bind(doc, { identityClient: identityClientFlag = null, consumed 
 
   // Flatten: top-level outputs, plus `substrate.<key>` for each key of the map.
   const entries = new Map();
+  const rootLocal = readRootLocal(doc);
   for (const [name, out] of Object.entries(doc)) {
+    if (name === ROOT_LOCAL_OUTPUT) continue;
+    if (rootLocal.has(name)) {
+      report.ignored.push(`${name}: root-local output declared in ${ROOT_LOCAL_OUTPUT}; not a stack binding`);
+      continue;
+    }
     if (out === null || typeof out !== 'object' || !('value' in out)) {
       throw new BindError(`output '${name}' is not a terraform output entry ({ sensitive, type, value })`);
     }

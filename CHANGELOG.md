@@ -4,6 +4,15 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — bind classifies the substrate's kubelet/registry fields; root-local outputs declared by the root
+
+No input or resource change; nothing to adopt except the BIND tool. `tooling/bind` now classifies `substrate.kubelet_identity_object_id`,
+`substrate.container_registry_login_server`, `substrate.container_registry_id` (and the same top-level outputs) as not-a-binding, so a
+root on `stacks/azure/xema-substrate` v0.16.0 no longer gets "unknown stack output(s)" for them. A consumer root's own outputs are
+declared not-a-binding with a root output `xema_bind_root_local_outputs = ["name", ...]` (see `tooling/bind/README.md`), no edit to the
+vendored table; names colliding with a stack output are refused. A test now fails here if any stack output or `substrate` field lacks a
+disposition.
+
 ## v0.16.0 — a Key Vault per secret trust boundary, an operator vault, one identity per boundary namespace (BREAKING)
 
 BREAKING, no shim; measured from v0.15.0.
