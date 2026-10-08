@@ -44,6 +44,7 @@ output `cluster_secret_store_name` -> `secret_store_name`. `modules/assigned-rol
 - Renaming a boundary destroys that boundary's vault (soft-deleted for 7 days; recreating the same name recovers the old secrets).
 - A root with `backing_services_network_access = "public"` and no `network` now fails plan: the vaults are always private and need
   the foundation's `network` and `vault` private link zone.
+- A `moved` block (`module.private_endpoint["vault"]` -> `module.operator_vault_private_endpoint[0]`) keeps a running operator vault's private endpoint instead of recreating it; drop it at v0.17.
 
 ### Also in this release: Azure substrate stack passes `network_policy_engine` through
 

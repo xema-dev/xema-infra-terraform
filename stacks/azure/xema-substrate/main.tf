@@ -343,6 +343,12 @@ module "operator_vault_private_endpoint" {
   tags                = local.tags
 }
 
+# v0.15->v0.16 refactor: keeps a running operator vault's private endpoint; drop at v0.17.
+moved {
+  from = module.private_endpoint["vault"]
+  to   = module.operator_vault_private_endpoint[0]
+}
+
 module "boundary_vault_private_endpoint" {
   source   = "../../../modules/providers/azure/private-endpoint"
   for_each = var.network == null ? {} : module.boundary_vault
