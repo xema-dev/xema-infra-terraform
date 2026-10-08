@@ -135,6 +135,25 @@ variable "pod_cidr" {
   nullable    = false
 }
 
+variable "network_policy_engine" {
+  description = <<-EOT
+    The NetworkPolicy engine enforcing every Kubernetes NetworkPolicy on the cluster (Azure CNI overlay):
+      - "cilium" (default): Azure CNI Powered by Cilium (network_data_plane = "cilium")
+      - "azure"           : Azure Network Policy Manager (Azure dataplane)
+      - "calico"          : Calico (Azure dataplane)
+    There is deliberately no "none": a cluster without a policy engine ignores NetworkPolicies silently, so it is
+    unrepresentable. Changing this on an EXISTING cluster changes its network dataplane and forces cluster recreation.
+  EOT
+  type        = string
+  default     = "cilium"
+  nullable    = false
+
+  validation {
+    condition     = contains(["cilium", "azure", "calico"], var.network_policy_engine)
+    error_message = "network_policy_engine must be one of cilium, azure, calico. There is no \"none\": a cluster without a NetworkPolicy engine silently ignores every NetworkPolicy. (The module always uses Azure CNI overlay, which all three support; kubenet is not supported.)"
+  }
+}
+
 variable "sku_tier" {
   description = "AKS control-plane SKU tier: one of \"Free\", \"Standard\", \"Premium\"."
   type        = string

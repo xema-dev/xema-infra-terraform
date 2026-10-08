@@ -4,6 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — AKS enforces NetworkPolicy by default
+
+No consumer change is required to adopt it, but a consumer with an EXISTING AKS cluster gets a plan that RECREATES it: the
+cluster now sets `network_data_plane = "cilium"` and `network_policy = "cilium"` (Azure CNI overlay with the Cilium
+dataplane), because AKS with no policy engine silently ignored every NetworkPolicy. `modules/providers/azure/cluster` gains
+`network_policy_engine` (`"cilium"` default | `"azure"` | `"calico"`; no `"none"`). Land it before the first apply of a
+new cluster; on a live one, choose a maintenance window.
+
 ## v0.14.5 — container registry sets the AzureServices network bypass explicitly
 
 No consumer change is required. `modules/providers/azure/container-registry` now sets `network_rule_bypass_option =

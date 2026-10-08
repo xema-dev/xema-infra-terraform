@@ -53,7 +53,7 @@ output "oidc_issuer_url" {
 
 output "kubelet_identity_id" {
   description = "Object (principal) id of the kubelet identity — grant it AcrPull etc."
-  value       = azurerm_kubernetes_cluster.this.kubelet_identity[0].object_id
+  value       = one(azurerm_kubernetes_cluster.this.kubelet_identity[*].object_id)
 }
 
 output "cluster_identity_principal_id" {

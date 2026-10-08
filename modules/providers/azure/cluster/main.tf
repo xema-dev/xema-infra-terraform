@@ -146,7 +146,12 @@ resource "azurerm_kubernetes_cluster" "this" {
   network_profile {
     network_plugin      = "azure"
     network_plugin_mode = "overlay"
-    load_balancer_sku   = "standard"
+    # A NetworkPolicy engine is ALWAYS on (no "none"): without one AKS silently ignores every
+    # NetworkPolicy. cilium is the Azure CNI Powered by Cilium dataplane (its own policy engine);
+    # azure / calico keep the Azure dataplane (calico: Azure CNI overlay supports it).
+    network_data_plane = var.network_policy_engine == "cilium" ? "cilium" : "azure"
+    network_policy     = var.network_policy_engine
+    load_balancer_sku  = "standard"
     # "loadBalancer" (default) lets AKS give the cluster its own public egress
     # address. "userDefinedRouting" creates NO egress of its own: the nodes'
     # subnet must already route 0.0.0.0/0 somewhere (a firewall/NVA) — the
