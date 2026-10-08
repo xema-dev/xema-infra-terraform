@@ -24,6 +24,11 @@ resource "azurerm_container_registry" "this" {
   sku                           = "Premium"
   admin_enabled                 = false
   public_network_access_enabled = false
+
+  # Explicit, not the provider default: `az acr import` into a private ACR (how
+  # a customer installation receives Xema images by exact digest) works only
+  # with this bypass.
+  network_rule_bypass_option = "AzureServices"
 }
 
 # AcrPull only. The principal that PUSHES images (a CI identity) is the

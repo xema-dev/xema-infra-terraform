@@ -4,6 +4,13 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.14.5 — container registry sets the AzureServices network bypass explicitly
+
+No consumer change is required. `modules/providers/azure/container-registry` now sets `network_rule_bypass_option =
+"AzureServices"` instead of relying on the azurerm default (the value is unchanged, so no plan diff). `az acr import` into
+the network-restricted registry works only with this bypass, and it is how a customer installation receives Xema images, the
+engine image and the edition by exact digest.
+
 ## v0.14.3 — optional Postgres provisioner role (Azure substrate); BIND skips absent custody
 
 No consumer change is required. `stacks/azure/xema-substrate` gains `postgres_provisioner_role` (`"enabled"` | `"disabled"`,
