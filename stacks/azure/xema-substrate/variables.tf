@@ -356,6 +356,13 @@ variable "cluster_authorized_ip_ranges" {
   default     = []
 }
 
+variable "cluster_network_policy_engine" {
+  description = "The NetworkPolicy engine enforcing every Kubernetes NetworkPolicy on the AKS cluster: \"cilium\" (default) or \"calico\". There is no \"none\". The closed list is validated once, by modules/providers/azure/network-policy-engine, so an invalid value is refused at plan. Changing it on an EXISTING cluster changes its network dataplane and forces cluster recreation."
+  type        = string
+  default     = "cilium"
+  nullable    = false
+}
+
 variable "cluster_outbound_type" {
   description = "AKS egress for the created cluster: \"loadBalancer\" (default — AKS's own public egress), \"userDefinedRouting\" (the node subnet's existing route decides, e.g. 0.0.0.0/0 to the network owner's firewall; needs network.route_table_id), \"managedNATGateway\" or \"userAssignedNATGateway\"."
   type        = string

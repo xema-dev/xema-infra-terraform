@@ -4,7 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
-## Unreleased — AKS enforces NetworkPolicy by default
+## Unreleased — Azure substrate stack passes `network_policy_engine` through
+
+No consumer change is required (patch-level). `stacks/azure/xema-substrate` gains `cluster_network_policy_engine`
+(`"cilium"` default | `"calico"`), passed to `modules/providers/azure/cluster` as `network_policy_engine`, so a stack consumer
+can select Calico. The closed list is validated by the cluster module's `network-policy-engine` submodule (an invalid value is
+refused at plan). The default is unchanged. Changing it on an existing cluster recreates the cluster.
+
+## 0.15.0 (2026-10-08) — AKS enforces NetworkPolicy by default
 
 No consumer change is required to adopt it, but a consumer with an EXISTING AKS cluster gets a plan that RECREATES it: the
 cluster now sets `network_data_plane = "cilium"` and `network_policy = "cilium"` (Azure CNI overlay with the Cilium

@@ -73,6 +73,7 @@ module "cluster" {
   private_cluster_enabled             = var.cluster_private != null
   private_cluster_public_fqdn_enabled = var.cluster_private != null ? var.cluster_private.public_fqdn : false
   entra_rbac                          = var.cluster_entra_rbac
+  network_policy_engine               = var.cluster_network_policy_engine
 
   # null = the cluster module's own defaults (its range variables are non-nullable).
   service_cidr   = var.cluster_address_ranges != null ? var.cluster_address_ranges.service_cidr : null
