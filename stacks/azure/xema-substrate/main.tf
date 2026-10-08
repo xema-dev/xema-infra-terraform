@@ -241,10 +241,7 @@ module "secrets_backend" {
   secret_names  = setunion(keys(var.key_vault_secrets), local.pg_admin_password_secret_names)
   secret_values = sensitive(merge(var.key_vault_secrets, local.pg_admin_password_secret))
 
-  workload_identity = {
-    enabled         = true
-    oidc_issuer_url = local.oidc_issuer_url
-  }
+  # No reader identity here: each boundary's identity is created by cluster-addons/external-secrets.
 
   purge_protection_enabled      = local.key_vault_purge_protection
   public_network_access_enabled = !local.private_backing_services
@@ -384,12 +381,19 @@ module "external_secrets" {
   source = "../../../modules/cluster-addons/external-secrets"
   count  = var.enable_secrets_backend ? 1 : 0
 
-  cluster_secret_store_name = var.cluster_secret_store_name
-  azure_key_vault_store = {
-    vault_uri = module.secrets_backend[0].vault_uri
-    client_id = module.secrets_backend[0].client_id
-    tenant_id = module.secrets_backend[0].tenant_id
-  }
+  # This stack provisions ONE vault, so it serves ONE boundary; a second entry would share the
+  # vault and is refused by the add-on. Further boundaries bring their own vaults.
+  secret_stores = { for k, s in var.secret_stores : k => {
+    namespaces   = s.namespaces
+    key_vault_id = module.secrets_backend[0].key_vault_id
+    vault_uri    = module.secrets_backend[0].vault_uri
+  } }
+  secret_store_name = var.secret_store_name
+
+  region              = var.region
+  resource_group_name = module.secrets_backend[0].resource_group_name
+  oidc_issuer_url     = local.oidc_issuer_url
+  tags                = local.tags
 }
 
 module "identity_realm" {

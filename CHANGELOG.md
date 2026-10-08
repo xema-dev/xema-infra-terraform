@@ -4,6 +4,21 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — secret stores per trust boundary (BREAKING: ClusterSecretStore/platform removed)
+
+BREAKING. `cluster-addons/external-secrets` no longer renders the cluster-wide `ClusterSecretStore/platform`, which read one Key
+Vault through one identity for every namespace (any namespace could `ExternalSecret` another deployment's secrets). It now takes
+`secret_stores = map(object({ namespaces, key_vault_id, vault_uri }))`, keyed by secret trust boundary (a deployment, the
+infrastructure authority, ...), and creates per entry its own managed identity, a federated credential per namespace, `Key Vault
+Secrets User` on ONLY that vault, and a namespaced `SecretStore` (+ service account) in each namespace. No two entries may share a
+namespace or a vault (refused at plan; rules in the provider-free `external-secrets/boundaries`). Required new inputs: `region`,
+`resource_group_name`, `oidc_issuer_url`; removed: `cluster_secret_store_name`, `secret_store_backend`, `azure_key_vault_store`,
+`service_account_name`. The namespaces must exist. `ExternalSecret`s change to `secretStoreRef: { kind: SecretStore, name: platform }`.
+Outputs: `cluster_secret_store_name` -> `secret_store_name`, new `secret_stores`. Stack `stacks/azure/xema-substrate`: new
+`secret_stores` (boundary -> `{ namespaces }`; one entry, it owns one vault) and `secret_store_name`; `cluster_secret_store_name`
+removed; its Key Vault no longer creates a reader identity; `substrate.external_secrets_client_id` and
+`substrate.cluster_secret_store_name` are replaced by `substrate.secret_stores` and `substrate.secret_store_name`.
+
 ## Unreleased — Azure substrate stack passes `network_policy_engine` through
 
 No consumer change is required (patch-level). `stacks/azure/xema-substrate` gains `cluster_network_policy_engine`
@@ -11,7 +26,7 @@ No consumer change is required (patch-level). `stacks/azure/xema-substrate` gain
 can select Calico. The closed list is validated by the cluster module's `network-policy-engine` submodule (an invalid value is
 refused at plan). The default is unchanged. Changing it on an existing cluster recreates the cluster.
 
-## 0.15.0 (2026-10-08) — AKS enforces NetworkPolicy by default
+## v0.15.0 — AKS enforces NetworkPolicy by default
 
 No consumer change is required to adopt it, but a consumer with an EXISTING AKS cluster gets a plan that RECREATES it: the
 cluster now sets `network_data_plane = "cilium"` and `network_policy = "cilium"` (Azure CNI overlay with the Cilium

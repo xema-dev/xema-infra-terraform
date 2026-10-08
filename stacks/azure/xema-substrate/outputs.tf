@@ -155,9 +155,14 @@ output "cluster_issuer_name" {
   value       = one(module.gateway_tls[*].cluster_issuer_name)
 }
 
-output "cluster_secret_store_name" {
-  description = "Name of the ClusterSecretStore (every ExternalSecret's secretStoreRef.name); null when enable_secrets_backend = false."
-  value       = one(module.external_secrets[*].cluster_secret_store_name)
+output "secret_store_name" {
+  description = "Name of the SecretStore in every boundary namespace (every ExternalSecret's secretStoreRef.name, kind SecretStore); null when enable_secrets_backend = false."
+  value       = one(module.external_secrets[*].secret_store_name)
+}
+
+output "secret_stores" {
+  description = "Per secret trust boundary: its identity client id, namespaces and vault id. Null when enable_secrets_backend = false."
+  value       = one(module.external_secrets[*].secret_stores)
 }
 
 output "workload_namespaces" {
@@ -230,10 +235,10 @@ output "substrate" {
     blob_endpoint         = one(module.blob[*].endpoint)
     blob_container_prefix = var.enable_object_storage ? local.blob_container_prefix : null
 
-    key_vault_name             = var.enable_secrets_backend ? local.key_vault_name : null
-    key_vault_uri              = one(module.secrets_backend[*].vault_uri)
-    external_secrets_client_id = one(module.secrets_backend[*].client_id)
-    cluster_secret_store_name  = one(module.external_secrets[*].cluster_secret_store_name)
+    key_vault_name    = var.enable_secrets_backend ? local.key_vault_name : null
+    key_vault_uri     = one(module.secrets_backend[*].vault_uri)
+    secret_store_name = one(module.external_secrets[*].secret_store_name)
+    secret_stores     = one(module.external_secrets[*].secret_stores)
 
     redis_host = one(module.cache[*].host)
     redis_port = one(module.cache[*].port)

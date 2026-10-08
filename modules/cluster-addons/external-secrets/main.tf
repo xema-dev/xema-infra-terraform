@@ -1,37 +1,30 @@
-# The External Secrets Operator and the ONE ClusterSecretStore every ExternalSecret references.
+# The External Secrets Operator and one namespaced SecretStore per namespace of each secret trust
+# boundary. There is NO cluster-wide store: a ClusterSecretStore reads one vault through one
+# identity for every namespace, so any namespace could ExternalSecret any other's secrets. Here each
+# boundary has its own identity, federated to a service account in ITS namespaces only, with
+# Key Vault Secrets User on ONLY its own vault. The isolation rules (no shared namespace, no shared
+# vault) are enforced by ./boundaries.
 #
 # Its own add-on — not part of the ingress one — because a deployment needs its secrets from the
-# first workload on, whatever serves its inbound traffic (an ingress controller this module set
-# installs, a cloud provider's managed one, or none yet).
+# first workload on, whatever serves its inbound traffic.
+
+module "boundaries" {
+  source = "./boundaries"
+
+  secret_stores = var.secret_stores
+}
+
+data "azurerm_client_config" "current" {}
 
 locals {
   external_secrets_values = yamlencode({
-    serviceAccount = merge(
-      { name = var.service_account_name },
-      var.secret_store_backend == "azure-key-vault" && var.azure_key_vault_store != null ? {
-        annotations = {
-          "azure.workload.identity/client-id" = var.azure_key_vault_store.client_id
-          "azure.workload.identity/tenant-id" = var.azure_key_vault_store.tenant_id
-        }
-      } : {},
-    )
-    podLabels = { "azure.workload.identity/use" = "true" }
+    # Identity comes from each SecretStore's own service account, never from the operator's.
+    serviceAccount = { name = "external-secrets" }
   })
 
-  secret_store_values = yamlencode({
-    clusterSecretStore = {
-      enabled = true
-      name    = var.cluster_secret_store_name
-      backend = var.secret_store_backend
-      serviceAccount = {
-        name      = var.service_account_name
-        namespace = var.namespace
-      }
-      azureKeyVault = var.azure_key_vault_store != null ? {
-        vaultUrl = var.azure_key_vault_store.vault_uri
-      } : null
-    }
-  })
+  federations = merge([for k, b in module.boundaries.boundaries : {
+    for ns in b.namespaces : "${k}/${ns}" => { boundary = k, namespace = ns }
+  }]...)
 }
 
 resource "helm_release" "external_secrets" {
@@ -43,24 +36,58 @@ resource "helm_release" "external_secrets" {
   create_namespace = true
 
   values = concat([local.external_secrets_values], var.values)
-
-  lifecycle {
-    precondition {
-      condition     = var.secret_store_backend != "azure-key-vault" || var.azure_key_vault_store != null
-      error_message = "secret_store_backend = \"azure-key-vault\" requires azure_key_vault_store (vault_uri, client_id, tenant_id)."
-    }
-  }
 }
 
-# The ClusterSecretStore is a custom resource whose CRD does not exist until the release above is
-# installed, so it ships as a tiny LOCAL chart rather than kubernetes_manifest — which needs the CRD
-# at PLAN time and therefore cannot survive a first apply on a fresh cluster.
+resource "azurerm_user_assigned_identity" "boundary" {
+  for_each = module.boundaries.boundaries
+
+  name                = "${var.identity_name_prefix}-${each.key}"
+  location            = var.region
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+
+resource "azurerm_federated_identity_credential" "boundary" {
+  for_each = local.federations
+
+  name                      = "${each.value.boundary}-${each.value.namespace}"
+  user_assigned_identity_id = azurerm_user_assigned_identity.boundary[each.value.boundary].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.oidc_issuer_url
+  subject                   = "system:serviceaccount:${each.value.namespace}:${var.store_service_account_name}"
+}
+
+resource "azurerm_role_assignment" "boundary" {
+  for_each = module.boundaries.boundaries
+
+  scope                = each.value.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.boundary[each.key].principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# SecretStore is a custom resource whose CRD does not exist until the release above is installed,
+# so it ships as a tiny LOCAL chart rather than kubernetes_manifest — which needs the CRD at PLAN
+# time and therefore cannot survive a first apply on a fresh cluster. One release per boundary
+# namespace; the namespace must already exist.
 resource "helm_release" "secret_store" {
+  for_each = module.boundaries.stores
+
   name      = "external-secrets-store"
   chart     = "${path.module}/charts/secret-store"
-  namespace = var.namespace
+  namespace = each.value.namespace
 
-  values = [local.secret_store_values]
+  values = [yamlencode({
+    secretStore = {
+      name = var.secret_store_name
+      serviceAccount = {
+        name     = var.store_service_account_name
+        clientId = azurerm_user_assigned_identity.boundary[each.value.boundary].client_id
+        tenantId = data.azurerm_client_config.current.tenant_id
+      }
+      azureKeyVault = { vaultUrl = each.value.vault_uri }
+    }
+  })]
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [helm_release.external_secrets, azurerm_federated_identity_credential.boundary, azurerm_role_assignment.boundary]
 }

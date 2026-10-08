@@ -148,7 +148,7 @@ variable "enable_object_storage" {
 }
 
 variable "enable_secrets_backend" {
-  description = "Create the Key Vault, the External Secrets reader identity, and the External Secrets Operator with its ClusterSecretStore (cluster-addons/external-secrets) — independent of enable_gateway_tls."
+  description = "Create the Key Vault, the External Secrets Operator with one identity and namespaced SecretStores per secret_stores boundary (cluster-addons/external-secrets) — independent of enable_gateway_tls."
   type        = bool
   default     = true
 }
@@ -769,14 +769,28 @@ variable "cluster_issuer_name" {
   }
 }
 
-variable "cluster_secret_store_name" {
-  description = "Name of the ClusterSecretStore the addon creates (what ExternalSecret resources reference in secretStoreRef). A DNS-1123 subdomain name. Only created when enable_secrets_backend."
+variable "secret_stores" {
+  description = <<-EOT
+    The secret trust boundaries served from this stack's Key Vault, keyed by boundary name; each
+    lists the namespaces whose workloads may read it. Each boundary gets its own identity and
+    namespaced SecretStores (cluster-addons/external-secrets); there is no cluster-wide store.
+    The stack creates ONE vault, so at most one entry (a second would share it and is refused).
+    Namespaces must exist (see workload_namespaces). Only used when enable_secrets_backend.
+  EOT
+  type = map(object({
+    namespaces = list(string)
+  }))
+  default = {}
+}
+
+variable "secret_store_name" {
+  description = "Name of the SecretStore created in each boundary namespace (what ExternalSecret resources reference in secretStoreRef, kind SecretStore). A DNS-1123 subdomain name. Only created when enable_secrets_backend."
   type        = string
   default     = "platform"
 
   validation {
-    condition     = length(var.cluster_secret_store_name) <= 253 && can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$", var.cluster_secret_store_name))
-    error_message = "cluster_secret_store_name must be a DNS-1123 subdomain name: lowercase letters, digits, hyphens and dots, starting and ending alphanumeric, at most 253 chars."
+    condition     = length(var.secret_store_name) <= 253 && can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$", var.secret_store_name))
+    error_message = "secret_store_name must be a DNS-1123 subdomain name: lowercase letters, digits, hyphens and dots, starting and ending alphanumeric, at most 253 chars."
   }
 }
 

@@ -65,7 +65,7 @@ state is a DECLARATION the consumer makes, never something inferred:
 | etcd | `infra.yaml#etcd.provider: external` (scoped by an etcd namespace per deployment) | **no module** — no cloud here offers it managed | `etcd.provider: self-hosted` chart — the normal answer | never |
 | temporal | `infra.yaml#temporal.provider: external` | **no module** | `temporal.provider: self-hosted` chart | `temporal.provider: disabled` — every workflow service fails fast |
 | dns / gateway | `enable_dns = false` (DNS at your registrar or another zone owner); ingress edge already present in the cluster | `providers/<cloud>/dns` for the zone; `cluster-addons/gateway-tls` for the edge (Gateway API CRDs + NGINX Gateway Fabric + Gateway + cert-manager; or a customer-managed Gateway; wired by the Azure stack today) | — | never |
-| secret-authority | the deployment root's own generator + an operator-held externals file (the DigitalOcean shape today) | `providers/azure/secrets-backend` (Key Vault + External Secrets reader identity) with `cluster-addons/external-secrets`'s `ClusterSecretStore`; `cluster-addons/secrets` for operator-provided values as plain Secrets | — | never |
+| secret-authority | the deployment root's own generator + an operator-held externals file (the DigitalOcean shape today) | `providers/azure/secrets-backend` (Key Vault) with `cluster-addons/external-secrets`'s per-boundary `SecretStore`s; `cluster-addons/secrets` for operator-provided values as plain Secrets | — | never |
 | identity-realm | `enable_identity_realm = false`; `infra.yaml#keycloak.provider: external` | `identity-realm` — the REALM inside a Keycloak the consumer already runs (`keycloak_url`); this module set does not install Keycloak | `keycloak.provider: self-hosted` chart installs the server | never |
 
 Two things the table says that are easy to read past:
@@ -467,7 +467,7 @@ account name (`^[a-z0-9]{3,24}$`) that the bootstrap caller supplies explicitly
 
 A cloud secret store the cluster reads at runtime through the
 [External Secrets Operator](https://external-secrets.io) — the source that the
-`cluster-addons/external-secrets` add-on's `ClusterSecretStore` points at. Optional: a deployment may
+`cluster-addons/external-secrets` add-on's per-boundary `SecretStore`s point at. Optional: a deployment may
 instead materialize secrets with `cluster-addons/secrets`. Not every cloud has
 an implementation; today only Azure (Key Vault).
 
@@ -605,13 +605,13 @@ every cloud's stack:
   none of the Gateway-side parts and attaches to the customer's Gateway. Its
   output `gateway_parent_ref` (`{ name, namespace, section_name }`) is the
   parentRef every `HTTPRoute` carries. The External Secrets Operator and its
-  `ClusterSecretStore` are the separate `cluster-addons/external-secrets`. Chart versions are
+  per-boundary namespaced `SecretStore`s (one identity and one vault per trust boundary; no cluster-wide store) are the separate `cluster-addons/external-secrets`. Chart versions are
   pinned inputs with defaults. Cloud-specific facts (a DNS zone, a vault URI, the
   identities that may touch them) arrive as plain string inputs from the
   provider primitives, so the addon itself installs against any conformant
   cluster via the `helm` provider. The two object names a consumer's manifests
   reference — `cluster_issuer_name` (default `letsencrypt`, the
-  `cert-manager.io/cluster-issuer` annotation) and `cluster_secret_store_name`
+  `cert-manager.io/cluster-issuer` annotation) and `secret_store_name`
   (default `platform`, every `ExternalSecret`'s `secretStoreRef.name`) — are
   validated DNS-1123 inputs echoed as outputs; a stack exposes both as its own
   inputs and outputs (and in its `substrate` map) so a consumer reads the names
@@ -648,8 +648,9 @@ that cloud; a consumer branches on `null`, never on which cloud it is on.
 | `postgres_provisioner_role` | `string` | the role that may CREATE databases at runtime; `null` when the Azure stack's `postgres_provisioner_role = "disabled"` | managed postgres | `null` |
 | `postgres_databases` | `set(string)` | the databases ensured on the created server — `platform_databases` after that stack's naming rule (Azure prefixes `<deployment_name>_`; DigitalOcean uses the names verbatim) | managed postgres | managed postgres |
 | `blob_account` / `blob_endpoint` / `blob_container_prefix` | `string` | the platform object-storage account, its endpoint, the container prefix | object storage | `null` (no platform bucket; extension buckets are the separate `extension_buckets` output) |
-| `key_vault_name` / `key_vault_uri` / `external_secrets_client_id` | `string` | the secrets backend and the identity that reads it | secrets backend | `null` |
-| `cluster_secret_store_name` | `string` | the `ClusterSecretStore` every `ExternalSecret` names | secrets backend | `null` |
+| `key_vault_name` / `key_vault_uri` | `string` | the secrets backend | secrets backend | `null` |
+| `secret_store_name` | `string` | the namespaced `SecretStore` every `ExternalSecret` names | secrets backend | `null` |
+| `secret_stores` | `map(object)` | per secret trust boundary: its identity client id, namespaces and vault id | secrets backend | `null` |
 | `redis_host` / `redis_port` | `string` / `number` | the managed cache (TLS port) | cache | `null` |
 | `kubelet_identity_object_id` | `string` | object id of the cluster's kubelet identity, for role assignments (e.g. a registry pull grant) | cluster (created or read) | `null` |
 | `container_registry_login_server` / `container_registry_id` | `string` | the container registry's host and resource id (the scope a consumer grants `AcrPush` to its own CI principal on) | container registry | `null` |

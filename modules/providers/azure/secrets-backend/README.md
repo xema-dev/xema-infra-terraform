@@ -39,9 +39,10 @@ module "secrets" {
   deployer grant and the first secret write. Azure RBAC is eventually
   consistent, so this is a wait on an external system's documented lag — the
   alternative is a failed first apply and a manual retry.
-- Feed `vault_uri`, `client_id` and `tenant_id` to the
+- Feed `key_vault_id` and `vault_uri` to the
   [`external-secrets`](../../../cluster-addons/external-secrets/README.md) addon's
-  `azure-key-vault` ClusterSecretStore.
+  `secret_stores`, one boundary per vault; the addon creates each boundary's own reader identity,
+  so leave `workload_identity.enabled = false`.
 - `purge_protection_enabled` defaults **off** because it is irreversible and
   reserves the vault name after deletion; enable it for production.
 - The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
