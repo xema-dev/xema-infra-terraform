@@ -53,6 +53,12 @@ resource "time_sleep" "rbac_propagation" {
   depends_on      = [azurerm_role_assignment.deployer]
 }
 
+# Carries seed_prerequisites into the dependency graph: the secrets wait for whatever the caller
+# put there (the private endpoint) as an explicit edge, not a timer.
+resource "terraform_data" "seed_gate" {
+  input = var.seed_prerequisites
+}
+
 resource "azurerm_key_vault_secret" "this" {
   for_each = var.secret_names
 
@@ -61,7 +67,7 @@ resource "azurerm_key_vault_secret" "this" {
   value        = var.secret_values[each.value]
   tags         = var.tags
 
-  depends_on = [time_sleep.rbac_propagation]
+  depends_on = [time_sleep.rbac_propagation, terraform_data.seed_gate]
 
   lifecycle {
     precondition {

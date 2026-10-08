@@ -14,10 +14,10 @@ output "namespace" {
 }
 
 output "secret_stores" {
-  description = "Per boundary: the identity client id, its namespaces and its vault. Non-secret."
+  description = "Per boundary: its namespaces, its vault and the identity client id of each namespace's store. Non-secret."
   value = { for k, b in module.boundaries.boundaries : k => {
-    client_id    = azurerm_user_assigned_identity.boundary[k].client_id
     namespaces   = b.namespaces
     key_vault_id = b.key_vault_id
+    client_ids   = { for ns in b.namespaces : ns => azurerm_user_assigned_identity.store["${k}/${ns}"].client_id }
   } }
 }

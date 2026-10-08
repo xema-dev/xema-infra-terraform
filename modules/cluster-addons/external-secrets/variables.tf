@@ -19,9 +19,9 @@ variable "values" {
 variable "secret_stores" {
   description = <<-EOT
     One entry per secret trust boundary, keyed by a boundary name of the caller's choosing.
-    Each boundary gets its OWN user-assigned identity, federated to a service account in each of
-    its namespaces and holding Key Vault Secrets User on ONLY its own vault, plus a namespaced
-    SecretStore in each of those namespaces. Entries:
+    Each (boundary, namespace) gets its OWN user-assigned identity, federated to the store service
+    account in that namespace and holding Key Vault Secrets User on ONLY the boundary's vault, plus
+    a namespaced SecretStore in that namespace. Entries:
       - namespaces   : namespaces of the boundary (must already exist; no two entries share one)
       - key_vault_id : resource id of the boundary's Key Vault (no two entries share one)
       - vault_uri    : https://<name>.vault.azure.net/ of that vault
@@ -52,7 +52,7 @@ variable "store_service_account_name" {
 }
 
 variable "identity_name_prefix" {
-  description = "Prefix of each boundary's managed identity name (\"<prefix>-<boundary>\")."
+  description = "Prefix of each managed identity name (\"<prefix>-<boundary>-<namespace>\"): one identity per (boundary, namespace), because Azure refuses concurrent federated-credential writes on one identity and caps them at 20. Name length is validated (3-128), never truncated."
   type        = string
   default     = "eso"
 }
@@ -81,4 +81,10 @@ variable "tags" {
   description = "Tags applied to every created Azure resource."
   type        = map(string)
   default     = {}
+}
+
+variable "known_namespaces" {
+  description = "When set, the namespaces the caller creates; every boundary namespace must be one of them (the SecretStores are installed without creating their namespace). null skips the check, for namespaces owned elsewhere."
+  type        = set(string)
+  default     = null
 }

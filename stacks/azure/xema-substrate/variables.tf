@@ -23,7 +23,7 @@ variable "deployment_name" {
 }
 
 variable "environment" {
-  description = "Deployment environment: one of \"dev\", \"prod\". Decides the irreversible safety knobs (Key Vault purge protection, backup retention) and lands on every resource as a tag."
+  description = "Deployment environment: one of \"dev\", \"prod\". Decides the backup retention (35 days prod, 7 dev); Key Vault purge protection is always on and lands on every resource as a tag."
   type        = string
 
   validation {

@@ -43,8 +43,10 @@ module "secrets" {
   [`external-secrets`](../../../cluster-addons/external-secrets/README.md) addon's
   `secret_stores`, one boundary per vault; the addon creates each boundary's own reader identity,
   so leave `workload_identity.enabled = false`.
-- `purge_protection_enabled` defaults **off** because it is irreversible and
-  reserves the vault name after deletion; enable it for production.
+- `purge_protection_enabled` defaults **off** in the module because it is irreversible and
+  reserves the vault name after deletion; the substrate stack always enables it.
+- **`seed_prerequisites`** orders the seeded secrets after resources composed from the vault (the
+  stack passes the vault's private endpoint id), so seeding never races the endpoint.
 - The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
   here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
 

@@ -18,10 +18,14 @@ secret_stores = {
 }
 ```
 
-Per boundary the module creates its own user-assigned identity, a federated credential per
-namespace (subject `system:serviceaccount:<namespace>:<store_service_account_name>`), a
-`Key Vault Secrets User` assignment on ONLY that boundary's vault, and in each namespace a service
-account plus a `SecretStore` named `secret_store_name` (default `platform`). `ExternalSecret`s use
+Per (boundary, namespace) the module creates its own user-assigned identity
+`<identity_name_prefix>-<boundary>-<namespace>` (Azure refuses concurrent federated-credential writes
+on one identity and caps them at 20, hence one identity each), with a single federated credential
+(subject `system:serviceaccount:<namespace>:<store_service_account_name>`), a
+`Key Vault Secrets User` assignment on ONLY that boundary's vault, and in the namespace a service
+account plus a `SecretStore` named `secret_store_name` (default `platform`). An identity name outside
+Azure's 3-128 limit is refused, never truncated. With `known_namespaces` set, a boundary namespace
+outside it is refused at plan. `ExternalSecret`s use
 `secretStoreRef: { kind: SecretStore, name: platform }`. The namespaces must already exist.
 
 No two entries may share a namespace or a key vault; namespaces must be non-empty. These rules live

@@ -52,3 +52,15 @@ variable "secret_stores" {
     error_message = "Each secret_stores entry needs a key_vault_id and an https:// vault_uri."
   }
 }
+
+variable "identity_name_prefix" {
+  description = "Prefix of each store's managed identity name (\"<prefix>-<boundary>-<namespace>\"). The name must fit Azure's 3-128 limit; it is refused, never truncated."
+  type        = string
+  default     = "eso"
+}
+
+variable "known_namespaces" {
+  description = "When set, the namespaces that exist or are created alongside; every boundary namespace must be one of them (a SecretStore is installed without creating its namespace). null skips the check, for namespaces owned elsewhere."
+  type        = set(string)
+  default     = null
+}

@@ -69,8 +69,14 @@ variable "rbac_propagation_wait" {
   default     = "30s"
 }
 
+variable "seed_prerequisites" {
+  description = "Opaque values (e.g. ids) the seeded secrets must wait for: resources the caller composes AFTER the vault, such as its private endpoint. Seeding is a data-plane write, so a vault with no public access cannot be written before its endpoint exists. Empty when the vault is reachable as created."
+  type        = list(string)
+  default     = []
+}
+
 variable "purge_protection_enabled" {
-  description = "Key Vault purge protection. Cannot be turned off once on, and makes the vault name unusable for the retention period after deletion — so default false; enable for production."
+  description = "Key Vault purge protection. Cannot be turned off once on, and makes the vault name unusable for the retention period after deletion. The stack always enables it; the module default is off for callers that need a disposable vault."
   type        = bool
   default     = false
 }

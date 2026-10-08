@@ -18,7 +18,7 @@ substrate cannot know — which databases and which namespaces exist — are
 | `module.blob` | the storage account the platform's blob adapter targets |
 | `module.secrets_backend` | the **operator vault**: break-glass/infra secrets (`key_vault_secrets`, the created Postgres admin password), never projected into the cluster. RBAC, purge protection, public access off, a private endpoint; no identity, no SecretStore, never given to the add-on |
 | `module.boundary_vault` | one Key Vault per `secret_store_boundaries` entry (RBAC, purge protection, public access off) + `module.boundary_vault_private_endpoint` |
-| `module.external_secrets` | per boundary: a managed identity, a federated credential per namespace, `Key Vault Secrets User` on that boundary's vault only, and a namespaced `SecretStore` |
+| `module.external_secrets` | per (boundary, namespace): a managed identity `<deployment_name>-eso-<boundary>-<namespace>` with one federated credential, `Key Vault Secrets User` on that boundary's vault only, and a namespaced `SecretStore`; installed after `module.workload_namespaces` |
 | `module.vault_names` | provider-free vault-name derivation and validation |
 | `module.cache` | (optional, off by default) Azure Cache for Redis |
 | `module.rwx_storage` | a ReadWriteMany `StorageClass` over the built-in Azure Files CSI driver (NFS) |
@@ -54,8 +54,7 @@ identity, OIDC); no credential is an input here.
 `deployment_name` is validated (3-20 chars, lowercase, single hyphens) so every
 derived name fits its Azure limit; the hyphen-to-underscore mapping for Postgres
 is the one rewrite, and it is injective on that alphabet. `environment`
-(`dev | prod`) decides the irreversible knobs: Key Vault purge protection and
-the backup retention window are `prod`-only.
+(`dev | prod`) decides the irreversible knobs: the backup retention window is `prod`-only. Key Vault purge protection is always on (irreversible).
 
 ### The two rosters — required, never derived
 

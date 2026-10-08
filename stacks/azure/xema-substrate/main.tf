@@ -256,6 +256,10 @@ module "secrets_backend" {
   public_network_access_enabled = false
   resource_group_name           = var.resource_group_name
   tags                          = local.tags
+
+  # Seeding is a data-plane write: it needs the vault's private endpoint (which carries its DNS
+  # record), not only the role grant. The endpoint (with its DNS record) is composed below from this vault's id.
+  seed_prerequisites = module.operator_vault_private_endpoint[*].id
 }
 
 # One vault per secret trust boundary: holds that boundary's secrets only and is readable only by
@@ -317,10 +321,26 @@ locals {
   private_endpoint_targets = {
     blob     = one(module.blob[*].account_id)
     redis    = one(module.cache[*].id)
-    vault    = one(module.secrets_backend[*].key_vault_id)
     postgres = one(module.postgres[*].cluster_id)
     acr      = one(module.container_registry[*].id)
   }
+}
+
+# The operator vault's endpoint is its own module (not an entry of `private_endpoint`): the vault's
+# seeded secrets wait for it, and a for_each module that both consumes and feeds the vault's module
+# is a dependency cycle.
+module "operator_vault_private_endpoint" {
+  source = "../../../modules/providers/azure/private-endpoint"
+  count  = var.network != null && var.enable_secrets_backend ? 1 : 0
+
+  name                = "${local.dep}-vault"
+  region              = var.region
+  resource_group_name = var.resource_group_name != "" ? var.resource_group_name : var.network.resource_group_name
+  service             = "vault"
+  target_resource_id  = module.secrets_backend[0].key_vault_id
+  subnet_id           = var.network.private_endpoint_subnet_id
+  private_dns_zone_id = var.network.private_dns_zone_ids["vault"]
+  tags                = local.tags
 }
 
 module "boundary_vault_private_endpoint" {
@@ -339,7 +359,7 @@ module "boundary_vault_private_endpoint" {
 
 module "private_endpoint" {
   source   = "../../../modules/providers/azure/private-endpoint"
-  for_each = toset(local.private_endpoint_services)
+  for_each = toset([for s in local.private_endpoint_services : s if s != "vault"])
 
   name                = "${local.dep}-${each.value}"
   region              = var.region
@@ -432,10 +452,18 @@ module "external_secrets" {
   } }
   secret_store_name = var.secret_store_name
 
+  # "<deployment_name>-eso-<boundary>-<namespace>": one identity per boundary namespace.
+  identity_name_prefix = "${local.dep}-eso"
+  # The SecretStores are installed WITHOUT creating their namespace, so they wait for the roster
+  # this stack creates; a roster owned elsewhere (enable_workload_namespaces = false) is not checked.
+  known_namespaces = var.enable_workload_namespaces ? var.workload_namespaces : null
+
   region              = var.region
   resource_group_name = module.secrets_backend[0].resource_group_name
   oidc_issuer_url     = local.oidc_issuer_url
   tags                = local.tags
+
+  depends_on = [module.workload_namespaces]
 }
 
 module "identity_realm" {
