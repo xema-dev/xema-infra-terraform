@@ -90,7 +90,7 @@ test('an unknown output is refused by name', () => {
 test('a required output the document lacks is refused naming the stack output', () => {
   const doc = fixture('digitalocean');
   delete doc.realm_client_secrets;
-  assert.throws(() => bind(doc), /required stack output 'realm_client_secrets' is absent/);
+  assert.throws(() => bind(doc), /partial identity-realm data.*realm_client_secrets/);
   const doc2 = fixture('digitalocean');
   delete doc2.substrate;
   assert.throws(() => bind(doc2), /binding contract lacks 'substrate.postgres_host'/);
