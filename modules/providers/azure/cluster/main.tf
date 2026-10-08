@@ -82,6 +82,11 @@ data "azurerm_kubernetes_service_versions" "this" {
   version_prefix = var.kubernetes_version
 }
 
+module "network_policy_engine" {
+  source = "../network-policy-engine"
+  engine = var.network_policy_engine
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = var.name
   location            = var.region
@@ -149,8 +154,8 @@ resource "azurerm_kubernetes_cluster" "this" {
     # A NetworkPolicy engine is ALWAYS on (no "none"): without one AKS silently ignores every
     # NetworkPolicy. cilium is the Azure CNI Powered by Cilium dataplane (its own policy engine);
     # azure / calico keep the Azure dataplane (calico: Azure CNI overlay supports it).
-    network_data_plane = var.network_policy_engine == "cilium" ? "cilium" : "azure"
-    network_policy     = var.network_policy_engine
+    network_data_plane = module.network_policy_engine.network_data_plane
+    network_policy     = module.network_policy_engine.network_policy
     load_balancer_sku  = "standard"
     # "loadBalancer" (default) lets AKS give the cluster its own public egress
     # address. "userDefinedRouting" creates NO egress of its own: the nodes'
