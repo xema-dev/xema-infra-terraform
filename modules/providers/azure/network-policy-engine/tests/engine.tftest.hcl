@@ -17,15 +17,12 @@ run "calico_keeps_azure_dataplane" {
   }
 }
 
-run "azure_keeps_azure_dataplane" {
+run "azure_is_refused" {
   command = plan
   variables {
     engine = "azure"
   }
-  assert {
-    condition     = output.network_policy == "azure" && output.network_data_plane == "azure"
-    error_message = "azure policy runs on the Azure dataplane."
-  }
+  expect_failures = [var.engine]
 }
 
 run "none_is_refused" {

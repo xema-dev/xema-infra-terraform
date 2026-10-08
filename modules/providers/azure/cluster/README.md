@@ -54,10 +54,10 @@ module "cluster" {
 - Networking is Azure CNI **overlay** with a standard load balancer; the three
   CIDR inputs default to non-overlapping ranges.
 - **NetworkPolicy is always enforced.** `network_policy_engine` (`"cilium"` default |
-  `"azure"` | `"calico"`) sets `network_data_plane` / `network_policy`; there is no
+  `"calico"`) sets `network_data_plane` / `network_policy`; there is no
   `"none"`, since AKS without an engine silently ignores every NetworkPolicy. Changing
   it on an EXISTING cluster changes the network dataplane and **forces recreation**, so
-  settle it before the first apply.
+  settle it before the first apply. `cilium` requires AKS-managed Cilium and Linux node pools only.
 - The module always creates its own VNet; adopting an existing network is not
   modelled (the delegated Postgres subnet is part of the contract this module
   provides).
@@ -72,7 +72,7 @@ module "cluster" {
 | `resource_group_name` | no | use an existing resource group (else `"<name>-rg"` is created) |
 | `vnet_id`, `node_subnet_id` | yes | the network the nodes live in — CONSUMED from `providers/azure/network`, never created here |
 | `service_cidr`, `dns_service_ip`, `pod_cidr` | no | in-cluster address ranges |
-| `network_policy_engine` | no | `cilium` (default) \| `azure` \| `calico`; always one, never none |
+| `network_policy_engine` | no | `cilium` (default) \| `calico`; always one, never none |
 | `sku_tier`, `automatic_upgrade_channel`, `authorized_ip_ranges` | no | control-plane tier, upgrades, API allow-list |
 | `enable_log_analytics`, `log_analytics_retention_days`, `tags` | no | monitoring + tagging |
 

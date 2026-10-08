@@ -139,7 +139,6 @@ variable "network_policy_engine" {
   description = <<-EOT
     The NetworkPolicy engine enforcing every Kubernetes NetworkPolicy on the cluster (Azure CNI overlay):
       - "cilium" (default): Azure CNI Powered by Cilium (network_data_plane = "cilium")
-      - "azure"           : Azure Network Policy Manager (Azure dataplane)
       - "calico"          : Calico (Azure dataplane)
     There is deliberately no "none": a cluster without a policy engine ignores NetworkPolicies silently, so it is
     unrepresentable. Changing this on an EXISTING cluster changes its network dataplane and forces cluster recreation.

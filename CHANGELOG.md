@@ -9,7 +9,7 @@ was committed, but what a `main.tf` + tfvars have to say differently.
 No consumer change is required to adopt it, but a consumer with an EXISTING AKS cluster gets a plan that RECREATES it: the
 cluster now sets `network_data_plane = "cilium"` and `network_policy = "cilium"` (Azure CNI overlay with the Cilium
 dataplane), because AKS with no policy engine silently ignored every NetworkPolicy. `modules/providers/azure/cluster` gains
-`network_policy_engine` (`"cilium"` default | `"azure"` | `"calico"`; no `"none"`). Land it before the first apply of a
+`network_policy_engine` (`"cilium"` default | `"calico"`; no `"none"`). Land it before the first apply of a
 new cluster; on a live one, choose a maintenance window.
 
 ## v0.14.5 — container registry sets the AzureServices network bypass explicitly
