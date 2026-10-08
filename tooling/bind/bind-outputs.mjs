@@ -395,7 +395,8 @@ export function assertOutsideWorkTree(p, runGit = execFileSync) {
  * Bind a `terraform output -json` document. Pure: returns what would be
  * written plus the stderr report, throws BindError on any refusal.
  */
-export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed = [], deployment = null } = {}) {
+export function bind(doc, { identityClient: identityClientFlag = null, consumed = [], deployment = null } = {}) {
+  const identityClient = identityClientFlag ?? DEFAULT_IDENTITY_CLIENT;
   if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
     throw new BindError('expected the object `terraform output -json` prints (output name → { sensitive, type, value })');
   }
@@ -428,6 +429,23 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
     if (!(c in DISPOSITIONS)) throw new BindError(`--consumed names '${c}', which is not a stack output this table knows`);
   }
 
+  // In-platform IdP realm, or an external OIDC IdP? The stack models the realm
+  // as one area (enable_identity_realm): disabled, it nulls substrate.keycloak_url,
+  // substrate.realm_name and realm_client_secrets together. All three nil and not
+  // declared --consumed = the deployment uses an external IdP, so the realm rows
+  // are omitted. A mix of set and nil is partial realm data and is refused.
+  const REALM_OUTPUTS = ['substrate.keycloak_url', 'substrate.realm_name', 'realm_client_secrets'];
+  const realmSet = REALM_OUTPUTS.filter((n) => !isNil(entries.get(n)?.value));
+  const realmMissing = REALM_OUTPUTS.filter((n) => isNil(entries.get(n)?.value) && !consumedSet.has(n));
+  const externalIdp = realmSet.length === 0 && REALM_OUTPUTS.every((n) => !consumedSet.has(n));
+  if (realmSet.length > 0 && realmMissing.length > 0) {
+    throw new BindError(`partial identity-realm data: [${realmSet.join(', ')}] set but [${realmMissing.join(', ')}] null or absent — a deployment with an in-platform IdP realm needs all of them (or declare the missing ones --consumed); a deployment without one has none`);
+  }
+  if (externalIdp && identityClientFlag !== null) {
+    throw new BindError(`--identity-client '${identityClientFlag}' is contradictory: this deployment declares no in-platform IdP realm (substrate.keycloak_url, substrate.realm_name and realm_client_secrets are all null or absent), so there is no identity client to bind`);
+  }
+  const realmRow = (name) => REALM_OUTPUTS.includes(name);
+
   // The fragment keys that REQUIRE an output; joined keys collect both halves.
   const joined = {};
   const setFragment = (target, value, from) => {
@@ -439,6 +457,11 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
 
   for (const [name, row] of Object.entries(DISPOSITIONS)) {
     const entry = entries.get(name);
+    if (externalIdp && realmRow(name)) {
+      const what = row.disposition === Disposition.External ? `external ${row.name}` : row.target;
+      report.omitted.push(`${what} ← ${name} is null or absent (deployment uses an external OIDC identity provider, no in-platform IdP realm)`);
+      continue;
+    }
     switch (row.disposition) {
       case Disposition.Ignore: {
         if (entry) report.ignored.push(`${name}: ${row.reason}`);
@@ -536,7 +559,7 @@ export function bind(doc, { identityClient = DEFAULT_IDENTITY_CLIENT, consumed =
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const out = { from: null, secretInputs: null, externals: null, identityClient: DEFAULT_IDENTITY_CLIENT, consumed: [], deployment: null };
+  const out = { from: null, secretInputs: null, externals: null, identityClient: null, consumed: [], deployment: null };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const next = () => {

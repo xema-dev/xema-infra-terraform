@@ -394,3 +394,41 @@ test('custody: a present but malformed entry is still refused', () => {
   assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: { 'acme-prod': 7 } } })), /not a non-empty string/);
   assert.throws(() => bind(withCustody({ custody_broker_client_ids: { sensitive: false, value: ['acme-prod'] } })), /not a map/);
 });
+
+// ── deployment without an in-platform IdP realm (external OIDC IdP) ─────────
+const noRealm = () => {
+  const doc = fixture('azure');
+  doc.substrate.value.keycloak_url = null;
+  doc.substrate.value.realm_name = null;
+  doc.realm_client_secrets.value = null;
+  return doc;
+};
+
+test('idp: realm present → issuer and identity client secret are emitted', () => {
+  const { fragment, externals } = bind(fixture('azure'));
+  assert.equal(fragment.keycloak.issuer, 'https://id.acme.example/realms/acme-prod');
+  assert.equal(externals['keycloak-identity-client-secret'], 'FIXTURE-IDENTITY-CLIENT-SECRET');
+});
+
+test('idp: no realm at all → keycloak rows omitted loudly, not refused', () => {
+  const { fragment, externals, report } = bind(noRealm());
+  assert.equal(fragment.keycloak, undefined);
+  assert.equal(externals['keycloak-identity-client-secret'], undefined);
+  assert.ok(report.omitted.some((l) => l.startsWith('keycloak.issuer ← substrate.keycloak_url') && l.includes('external OIDC identity provider')));
+  assert.ok(report.omitted.some((l) => l.startsWith('keycloak.issuer ← substrate.realm_name')));
+  assert.ok(report.omitted.some((l) => l.startsWith('external keycloak-identity-client-secret ← realm_client_secrets')));
+});
+
+test('idp: partial realm data is refused (url without secrets, and secrets without url)', () => {
+  const a = noRealm();
+  a.substrate.value.keycloak_url = 'https://id.acme.example';
+  a.substrate.value.realm_name = 'acme-prod';
+  assert.throws(() => bind(a), (e) => e instanceof BindError && /partial identity-realm data/.test(e.message));
+  const b = noRealm();
+  b.realm_client_secrets.value = { 'identity-api': 'S' };
+  assert.throws(() => bind(b), (e) => e instanceof BindError && /partial identity-realm data/.test(e.message));
+});
+
+test('idp: --identity-client for a deployment without a realm is refused', () => {
+  assert.throws(() => bind(noRealm(), { identityClient: 'identity-api' }), (e) => e instanceof BindError && /contradictory/.test(e.message));
+});
