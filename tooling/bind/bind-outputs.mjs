@@ -437,8 +437,9 @@ export function bind(doc, { identityClient: identityClientFlag = null, consumed 
   const REALM_OUTPUTS = ['substrate.keycloak_url', 'substrate.realm_name', 'realm_client_secrets'];
   const realmSet = REALM_OUTPUTS.filter((n) => !isNil(entries.get(n)?.value));
   const realmMissing = REALM_OUTPUTS.filter((n) => isNil(entries.get(n)?.value) && !consumedSet.has(n));
-  const externalIdp = realmSet.length === 0 && REALM_OUTPUTS.every((n) => !consumedSet.has(n));
-  if (realmSet.length > 0 && realmMissing.length > 0) {
+  // No substrate map at all is the contract refusal below, not an IdP signal.
+  const externalIdp = 'substrate' in doc && realmSet.length === 0 && REALM_OUTPUTS.every((n) => !consumedSet.has(n));
+  if ('substrate' in doc && realmSet.length > 0 && realmMissing.length > 0) {
     throw new BindError(`partial identity-realm data: [${realmSet.join(', ')}] set but [${realmMissing.join(', ')}] null or absent — a deployment with an in-platform IdP realm needs all of them (or declare the missing ones --consumed); a deployment without one has none`);
   }
   if (externalIdp && identityClientFlag !== null) {
