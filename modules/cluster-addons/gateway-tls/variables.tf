@@ -19,7 +19,8 @@ variable "customer_gateway" {
       - name, namespace     : the Gateway
       - http_section_name   : its port-80 HTTP listener, where cert-manager's HTTP-01 solver route attaches
       - https_section_names : its HTTPS listeners the deployment's HTTPRoutes may attach to, the keys
-                              of the output gateway_parent_refs. Their certificates are the customer's.
+                              of the output gateway_parent_refs; DNS-1123 labels other than "http".
+                              Their certificates are the customer's.
   EOT
   type = object({
     name                = string

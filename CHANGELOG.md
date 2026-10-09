@@ -17,12 +17,29 @@ customer-managed Gateway): `acme_email` and `tls_solver` default to `null`, are 
 output `cluster_issuer_name` is `null` without an issuer. Refused at plan (provider-free, `gateway-tls/tls-plan/tests`): duplicate hostnames, a customer_supplied listener without a
 valid secret, a managed one with one, an unknown mode, a managed wildcard with `http01`, a managed hostname outside the
 `dns01-azure` zone, a customer Secret equal to a managed one, the reserved name `http`, more than 63 listeners. `customer_gateway`'s
-`https_section_name` is `https_section_names` (a set). `dns01_azure.hosted_zone_name` is `hosted_zone_names` (a set): one DNS-01 solver per zone, selected by `dnsZones`, so each apex issues from its own zone. Output `gateway_parent_ref` is `gateway_parent_refs` (keyed by listener).
+`https_section_name` is `https_section_names` (a set; each a DNS-1123 label other than `http`, the rule listener keys follow). `dns01_azure.hosted_zone_name` is `hosted_zone_names` (a set): one DNS-01 solver per zone, selected by `dnsZones`, so each apex issues from its own zone. Output `gateway_parent_ref` is `gateway_parent_refs` (keyed by listener).
 **Stack `stacks/azure/xema-substrate` / `examples/azure`:** `gateway_hostname` is `gateway_listeners` (same shape as `listeners`);
 output `gateway_parent_ref` is `gateway_parent_refs`; `substrate.gateway.parent_ref` is `substrate.gateway.parent_refs`. `acme_email` and `tls_solver`
 default to `null` (were `""` and `"http01"`): a root with a managed listener sets both; one with only customer_supplied listeners sets neither. A root that
 set `gateway_hostname = "h"` sets `gateway_listeners = { <name> = { hostname = "h", certificate_mode = "managed" } }` and takes its
 deployment's `gateway.parentRef` from `parent_refs["<name>"]` (`tooling/bind` prints the block for a named listener).
+
+**Upgrading an existing `enable_gateway_tls` install** (nginx-gateway-fabric), in this order:
+
+1. **Remove the old Certificate and Secret first, by hand.** The previous listener certificate was a `Certificate` named
+   `gateway_tls_secret_name` (default `gateway-tls`) in `gateway_namespace`, created by cert-manager's gateway-shim from the
+   Gateway's annotation — not by Terraform or Helm, so no plan destroys it. Removing the annotation does not delete it either (the
+   shim only acts on annotated Gateways, and the Certificate is owned by the Gateway, which is kept), so it would keep renewing
+   into that Secret — including over a customer_supplied Secret of the same name. Before applying, run
+   `kubectl -n <gateway_namespace> delete certificate <gateway_tls_secret_name>` and then
+   `kubectl -n <gateway_namespace> delete secret <gateway_tls_secret_name>`.
+2. **Plan a window: HTTPS is down until ACME issues.** A managed listener's Secret is now `<gateway_name>-<key>-tls`, a new and empty
+   Secret, so its host serves no valid certificate until cert-manager issues it (minutes with a healthy solver). A customer_supplied
+   listener has no gap if its Secret exists in `gateway_namespace` before the apply.
+3. **Keep the listener key `https`, or move the routes.** HTTPRoutes attached with `sectionName: https` detach unless the listener
+   that serves their host keeps the key `https` (`gateway_listeners = { https = { hostname = "<old gateway_hostname>",
+   certificate_mode = "managed" } }` keeps them attached). Any other key: update each deployment's `gateway.parentRef.sectionName`
+   to it in the same window.
 
 ## Unreleased — bind classifies the substrate's kubelet/registry fields; root-local outputs declared by the root
 

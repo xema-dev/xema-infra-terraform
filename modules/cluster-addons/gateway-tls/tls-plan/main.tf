@@ -5,6 +5,13 @@
 locals {
   ngf = var.gateway_implementation == "nginx-gateway-fabric"
 
+  # An HTTPS listener name (the parentRef sectionName), the module's listener keys and a
+  # customer-managed Gateway's alike: a DNS-1123 label, never the port-80 listener's "http".
+  https_section_name_pattern = "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$"
+  customer_gateway_given     = var.customer_gateway_https_section_names != null
+  invalid_listener_keys      = sort([for k, _ in var.listeners : k if !can(regex(local.https_section_name_pattern, k)) || k == "http"])
+  invalid_customer_sections  = sort([for n in coalesce(var.customer_gateway_https_section_names, []) : n if !can(regex(local.https_section_name_pattern, n)) || n == "http"])
+
   listeners = { for k, l in var.listeners : k => {
     hostname         = l.hostname
     certificate_mode = l.certificate_mode
@@ -29,6 +36,14 @@ locals {
 resource "terraform_data" "guard" {
   lifecycle {
     precondition {
+      condition     = length(local.invalid_listener_keys) == 0
+      error_message = "Each listener key must be a DNS-1123 label (1-63 lowercase letters, digits or hyphens, starting and ending alphanumeric) other than \"http\", which is the port-80 listener's name. Invalid: ${join(", ", local.invalid_listener_keys)}."
+    }
+    precondition {
+      condition     = length(local.invalid_customer_sections) == 0
+      error_message = "Each customer_gateway.https_section_names entry must be a DNS-1123 label (1-63 lowercase letters, digits or hyphens, starting and ending alphanumeric) other than \"http\", the port-80 listener's name. Invalid: ${join(", ", local.invalid_customer_sections)}."
+    }
+    precondition {
       condition     = !local.ngf || length(var.listeners) > 0
       error_message = "gateway_implementation = \"nginx-gateway-fabric\" needs at least one HTTPS listener."
     }
@@ -41,11 +56,11 @@ resource "terraform_data" "guard" {
       error_message = "gateway_implementation = \"nginx-gateway-fabric\" requires a non-empty route_namespaces: no namespace may attach routes by default."
     }
     precondition {
-      condition     = local.ngf || var.customer_gateway_given
+      condition     = local.ngf || local.customer_gateway_given
       error_message = "gateway_implementation = \"customer-managed\" requires customer_gateway (the existing Gateway's name, namespace and listener names)."
     }
     precondition {
-      condition     = !local.ngf || !var.customer_gateway_given
+      condition     = !local.ngf || !local.customer_gateway_given
       error_message = "customer_gateway is only meaningful with gateway_implementation = \"customer-managed\"."
     }
     precondition {

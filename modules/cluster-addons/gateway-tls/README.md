@@ -113,7 +113,7 @@ fresh cluster. Helm validates them at install, once the CRDs are up.
 
 A missing companion input fails at plan with a precondition naming it. The listener
 rules and the issuer decision fail at plan too, enforced provider-free by
-`./tls-plan` (tested in `tls-plan/tests`): listener names are DNS-1123 labels other than `http`, at most 63;
+`./tls-plan` (tested in `tls-plan/tests`): listener names and `customer_gateway.https_section_names` are DNS-1123 labels other than `http`, at most 63;
 hostnames are lowercase DNS names (optionally `*.`), each on one listener only; a
 `customer_supplied` Secret may not be a managed listener's Secret.
 

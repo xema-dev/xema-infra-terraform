@@ -126,7 +126,7 @@ run "reserved_listener_name_refused" {
       http = { hostname = "app.example.com", certificate_mode = "managed" }
     }
   }
-  expect_failures = [var.listeners]
+  expect_failures = [terraform_data.guard]
 }
 
 run "invalid_listener_name_refused" {
@@ -136,7 +136,7 @@ run "invalid_listener_name_refused" {
       "App_1" = { hostname = "app.example.com", certificate_mode = "managed" }
     }
   }
-  expect_failures = [var.listeners]
+  expect_failures = [terraform_data.guard]
 }
 
 run "invalid_hostname_refused" {
@@ -471,10 +471,10 @@ run "dns01_zones_without_dns01_refused" {
 run "customer_managed_gateway_installs_the_issuer" {
   command = plan
   variables {
-    gateway_implementation = "customer-managed"
-    customer_gateway_given = true
-    route_namespaces       = []
-    listeners              = {}
+    gateway_implementation               = "customer-managed"
+    customer_gateway_https_section_names = ["https"]
+    route_namespaces                     = []
+    listeners                            = {}
   }
   assert {
     condition     = output.issuer == true && length(output.listeners) == 0 && length(output.certificates) == 0
@@ -485,10 +485,10 @@ run "customer_managed_gateway_installs_the_issuer" {
 run "customer_managed_without_acme_email_refused" {
   command = plan
   variables {
-    gateway_implementation = "customer-managed"
-    customer_gateway_given = true
-    listeners              = {}
-    acme_email             = null
+    gateway_implementation               = "customer-managed"
+    customer_gateway_https_section_names = ["https"]
+    listeners                            = {}
+    acme_email                           = null
   }
   expect_failures = [terraform_data.guard]
 }
@@ -505,8 +505,8 @@ run "customer_managed_without_customer_gateway_refused" {
 run "customer_managed_with_listeners_refused" {
   command = plan
   variables {
-    gateway_implementation = "customer-managed"
-    customer_gateway_given = true
+    gateway_implementation               = "customer-managed"
+    customer_gateway_https_section_names = ["https"]
   }
   expect_failures = [terraform_data.guard]
 }
@@ -514,7 +514,7 @@ run "customer_managed_with_listeners_refused" {
 run "ngf_with_customer_gateway_refused" {
   command = plan
   variables {
-    customer_gateway_given = true
+    customer_gateway_https_section_names = ["https"]
   }
   expect_failures = [terraform_data.guard]
 }
@@ -533,4 +533,38 @@ run "unknown_gateway_implementation_refused" {
     gateway_implementation = "istio"
   }
   expect_failures = [var.gateway_implementation]
+}
+
+run "customer_gateway_sections_follow_the_listener_name_rule" {
+  command = plan
+  variables {
+    gateway_implementation               = "customer-managed"
+    customer_gateway_https_section_names = ["prod", "dev-1"]
+    route_namespaces                     = []
+    listeners                            = {}
+  }
+  assert {
+    condition     = output.issuer == true
+    error_message = "DNS-1123-label section names are accepted."
+  }
+}
+
+run "customer_gateway_section_http_refused" {
+  command = plan
+  variables {
+    gateway_implementation               = "customer-managed"
+    customer_gateway_https_section_names = ["https", "http"]
+    listeners                            = {}
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "customer_gateway_section_invalid_name_refused" {
+  command = plan
+  variables {
+    gateway_implementation               = "customer-managed"
+    customer_gateway_https_section_names = ["Prod_1"]
+    listeners                            = {}
+  }
+  expect_failures = [terraform_data.guard]
 }

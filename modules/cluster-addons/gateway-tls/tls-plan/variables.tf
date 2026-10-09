@@ -29,11 +29,6 @@ variable "listeners" {
   default = {}
 
   validation {
-    condition     = alltrue([for k, _ in var.listeners : can(regex("^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$", k)) && k != "http"])
-    error_message = "Each listener key must be a DNS-1123 label (1-63 lowercase letters, digits or hyphens, starting and ending alphanumeric) other than \"http\", which is the port-80 listener's name."
-  }
-
-  validation {
     condition     = length(var.listeners) <= 63
     error_message = "At most 63 HTTPS listeners: a Gateway holds 64 listeners and one is the port-80 listener."
   }
@@ -75,10 +70,10 @@ variable "route_namespaces" {
   default     = []
 }
 
-variable "customer_gateway_given" {
-  description = "Whether the caller named a customer-managed Gateway (customer_gateway != null)."
-  type        = bool
-  default     = false
+variable "customer_gateway_https_section_names" {
+  description = "With a customer-managed Gateway, its HTTPS listener names routes may attach to (customer_gateway.https_section_names); null when no customer_gateway is given."
+  type        = set(string)
+  default     = null
 }
 
 variable "cluster_issuer_name" {

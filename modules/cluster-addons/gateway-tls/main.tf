@@ -4,15 +4,15 @@
 module "tls_plan" {
   source = "./tls-plan"
 
-  gateway_implementation = var.gateway_implementation
-  listeners              = var.listeners
-  gateway_name           = var.gateway_name
-  route_namespaces       = var.route_namespaces
-  customer_gateway_given = var.customer_gateway != null
-  cluster_issuer_name    = var.cluster_issuer_name
-  acme_email             = var.acme_email
-  tls_solver             = var.tls_solver
-  dns01_zones            = try(var.dns01_azure.hosted_zone_names, [])
+  gateway_implementation               = var.gateway_implementation
+  listeners                            = var.listeners
+  gateway_name                         = var.gateway_name
+  route_namespaces                     = var.route_namespaces
+  customer_gateway_https_section_names = try(var.customer_gateway.https_section_names, null)
+  cluster_issuer_name                  = var.cluster_issuer_name
+  acme_email                           = var.acme_email
+  tls_solver                           = var.tls_solver
+  dns01_zones                          = try(var.dns01_azure.hosted_zone_names, [])
 }
 
 locals {
