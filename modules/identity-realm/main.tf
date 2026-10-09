@@ -3,22 +3,12 @@ resource "keycloak_realm" "this" {
   enabled      = var.enabled
   display_name = var.display_name != "" ? var.display_name : var.realm_name
 
-  registration_allowed     = var.registration_allowed
-  reset_password_allowed   = var.reset_password_allowed
-  login_with_email_allowed = var.login_with_email_allowed
-  ssl_required             = var.ssl_required
-
-  access_token_lifespan    = var.access_token_lifespan != "" ? var.access_token_lifespan : null
-  sso_session_idle_timeout = var.sso_session_idle_timeout != "" ? var.sso_session_idle_timeout : null
-  sso_session_max_lifespan = var.sso_session_max_lifespan != "" ? var.sso_session_max_lifespan : null
-
-  # This module owns the realm's IDENTITY (existence, display, login flags, token
-  # lifespans) + its clients/roles/mappers — NOT its rich operational config.
-  # Themes, SMTP, password policy, i18n, and signing crypto are owned by the
-  # platform/operator (e.g. identity-api's realm reconciliation). Ignore them so
-  # adopting an existing realm is a clean import and Terraform never strips that
-  # config. To bring any of these under Terraform, remove it from this list and
-  # add an explicit input.
+  # This module owns only the realm SHELL (existence, enabled, display name) + its
+  # clients/roles/mappers. Every realm POLICY setting (login flags, token and SSO
+  # session lifespans, SSL requirement, themes, SMTP, password policy, i18n,
+  # signing crypto) is owned by identity-api's realm reconciliation at boot.
+  # Ignore them so adopting an existing realm is a clean import and Terraform
+  # never fights or strips that config. Do not add an input for any of them.
   lifecycle {
     ignore_changes = [
       account_theme,
@@ -28,6 +18,13 @@ resource "keycloak_realm" "this" {
       default_signature_algorithm,
       password_policy,
       internationalization,
+      access_token_lifespan,
+      registration_allowed,
+      reset_password_allowed,
+      ssl_required,
+      sso_session_idle_timeout,
+      sso_session_max_lifespan,
+      login_with_email_allowed,
       smtp_server,
     ]
   }

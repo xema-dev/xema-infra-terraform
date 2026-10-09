@@ -54,11 +54,11 @@ module "substrate" {
   dns_records = var.dns_records
 
   # --- identity realm ---
-  realm_name                  = var.realm_name
-  realm_display_name          = var.realm_display_name
-  realm_access_token_lifespan = var.realm_access_token_lifespan
-  realm_clients               = var.realm_clients
-  realm_roles                 = var.realm_roles
+  realm_name         = var.realm_name
+  realm_display_name = var.realm_display_name
+
+  realm_clients = var.realm_clients
+  realm_roles   = var.realm_roles
 }
 
 # ── outputs: exactly what BIND reads (tooling/bind/README.md) ────────────────

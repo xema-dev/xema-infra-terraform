@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — identity-api owns all realm policy; identity-realm keeps only the shell (BREAKING for module consumers)
+
+BREAKING, no shim. `modules/identity-realm` keeps only the realm shell (`realm_name`, `enabled`, `display_name`) and its
+clients/roles/mappers. The inputs `access_token_lifespan`, `login_with_email_allowed`, `registration_allowed`, `reset_password_allowed`,
+`ssl_required`, `sso_session_idle_timeout` and `sso_session_max_lifespan` are removed, and the `keycloak_realm` ignores those attributes (`lifecycle.ignore_changes`). identity-api is the single owner of realm policy: it
+reconciles `realmSettings.accessTokenLifespanSeconds` (default 300) and `realmSettings.loginWithEmailAllowed` at boot. The pass-through
+variable `realm_access_token_lifespan` is removed from `stacks/digitalocean/xema-substrate`, `stacks/azure/xema-substrate` and
+`examples/customer`. A consumer root must delete `realm_access_token_lifespan` (and any of the removed inputs passed to the module) from its `main.tf` and tfvars, and set the values in identity-api's configuration
+instead. Terraform no longer plans a change for any of these settings.
+
 ## Unreleased — one Gateway, many hosts and apex domains, a certificate per listener (BREAKING)
 
 BREAKING, no shim. **Module `cluster-addons/gateway-tls`:** `gateway_hostname` and `gateway_tls_secret_name` are gone; the new

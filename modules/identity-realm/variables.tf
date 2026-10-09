@@ -20,53 +20,6 @@ variable "enabled" {
   default     = true
 }
 
-variable "registration_allowed" {
-  description = "Whether self-registration is allowed on the realm."
-  type        = bool
-  default     = false
-}
-
-variable "reset_password_allowed" {
-  description = "Whether the realm exposes the \"forgot password\" flow."
-  type        = bool
-  default     = true
-}
-
-variable "login_with_email_allowed" {
-  description = "Whether users may log in with their email address."
-  type        = bool
-  default     = true
-}
-
-variable "ssl_required" {
-  description = "SSL enforcement for the realm. One of \"all\", \"external\", or \"none\"."
-  type        = string
-  default     = "external"
-
-  validation {
-    condition     = contains(["all", "external", "none"], var.ssl_required)
-    error_message = "ssl_required must be one of all, external, none."
-  }
-}
-
-variable "access_token_lifespan" {
-  description = "Access token lifespan as a Go duration string (e.g. \"5m\"). Empty string keeps the Keycloak default."
-  type        = string
-  default     = ""
-}
-
-variable "sso_session_idle_timeout" {
-  description = "SSO session idle timeout as a Go duration string (e.g. \"30m\"). Empty string keeps the Keycloak default."
-  type        = string
-  default     = ""
-}
-
-variable "sso_session_max_lifespan" {
-  description = "SSO session max lifespan as a Go duration string (e.g. \"10h\"). Empty string keeps the Keycloak default."
-  type        = string
-  default     = ""
-}
-
 variable "clients" {
   description = <<-EOT
     OpenID clients to create in the realm, keyed by a stable id. Each client:

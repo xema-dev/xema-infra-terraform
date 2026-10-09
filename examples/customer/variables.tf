@@ -121,12 +121,6 @@ variable "realm_display_name" {
   default     = ""
 }
 
-variable "realm_access_token_lifespan" {
-  description = "Access-token lifespan as a Go duration (e.g. \"5m\"). Set it: empty inherits Keycloak's default rather than deciding."
-  type        = string
-  default     = "5m"
-}
-
 variable "realm_clients" {
   description = "OpenID clients keyed by a stable id. BIND expects the identity-api client under the key `identity-api` (or pass --identity-client)."
   type = map(object({

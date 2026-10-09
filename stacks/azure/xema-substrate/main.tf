@@ -472,12 +472,12 @@ module "identity_realm" {
   source = "../../../modules/identity-realm"
   count  = var.enable_identity_realm ? 1 : 0
 
-  realm_name            = local.realm_name
-  display_name          = local.realm_display_name
-  access_token_lifespan = var.realm_access_token_lifespan
-  clients               = var.realm_clients
-  realm_roles           = var.realm_roles
-  protocol_mappers      = var.realm_protocol_mappers
+  realm_name   = local.realm_name
+  display_name = local.realm_display_name
+
+  clients          = var.realm_clients
+  realm_roles      = var.realm_roles
+  protocol_mappers = var.realm_protocol_mappers
 }
 
 # The Azure role definition names this stack's enabled modules assign: the one list a bootstrap's

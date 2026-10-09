@@ -34,15 +34,8 @@ The `keycloak` provider is configured by the root. Import ids: the realm name, `
 | Input | Required | Description |
 | --- | --- | --- |
 | `realm_name` | yes | The single realm this module owns (e.g, "acme-prod"). |
-| `display_name` | no | Human-readable realm display name shown on login screens. |
-| `enabled` | no | Whether the realm is enabled. |
-| `registration_allowed` | no | Whether self-registration is allowed on the realm. |
-| `reset_password_allowed` | no | Whether the realm exposes the "forgot password" flow. |
-| `login_with_email_allowed` | no | Whether users may log in with their email address. |
-| `ssl_required` | no | SSL enforcement for the realm. |
-| `access_token_lifespan` | no | Access token lifespan as a Go duration string (e.g, "5m"). |
-| `sso_session_idle_timeout` | no | SSO session idle timeout as a Go duration string (e.g, "30m"). |
-| `sso_session_max_lifespan` | no | SSO session max lifespan as a Go duration string (e.g, "10h"). |
+| `display_name` | no | Human-readable realm display name shown on login screens (realm shell). |
+| `enabled` | no | Whether the realm is enabled (realm shell). All realm policy (login flags, token and session lifespans, SSL requirement) is owned by identity-api. |
 | `clients` | no | OpenID clients to create in the realm, keyed by a stable id. |
 | `realm_roles` | no | Realm-level roles to create. |
 | `protocol_mappers` | no | Optional per-client user-attribute → token-claim protocol mappers, keyed by a stable id. |

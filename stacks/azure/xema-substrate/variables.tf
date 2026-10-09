@@ -880,12 +880,6 @@ variable "realm_display_name" {
   default     = ""
 }
 
-variable "realm_access_token_lifespan" {
-  description = "Access-token lifespan for the managed realm, as a Go duration string (e.g. \"5m\"). Empty keeps the Keycloak default; set it so the lifespan is intent."
-  type        = string
-  default     = ""
-}
-
 variable "realm_clients" {
   description = "OpenID clients to create in the realm, keyed by a stable id. See modules/identity-realm."
   type = map(object({

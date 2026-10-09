@@ -74,7 +74,6 @@ The `substrate` output is a non-secret map with the same keys as the Azure stack
 | `workload_namespace_labels` | no | Optional per-namespace labels, keyed by namespace name. |
 | `realm_name` | no | The single Keycloak realm this stack owns (e.g, "acme-prod"). |
 | `realm_display_name` | no | Human-readable realm display name shown on login screens. |
-| `realm_access_token_lifespan` | no | Access-token lifespan for the managed realm, as a Go duration string (e.g, "5m"). |
 | `realm_clients` | no | OpenID clients to create in the realm, keyed by a stable id. |
 | `realm_roles` | no | Realm-level roles to create. |
 | `realm_protocol_mappers` | no | Per-client user-attribute → token-claim protocol mappers, keyed by a stable id. |
