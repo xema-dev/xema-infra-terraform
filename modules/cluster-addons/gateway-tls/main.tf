@@ -1,21 +1,37 @@
+# The HTTPS listeners, their Secrets and the Certificates of the managed ones, validated
+# without a provider (./listeners/tests). Only with NGINX Gateway Fabric: a customer-managed
+# Gateway's listeners and certificates are the customer's.
+module "listeners" {
+  source = "./listeners"
+  count  = local.ngf ? 1 : 0
+
+  listeners           = var.listeners
+  gateway_name        = var.gateway_name
+  cluster_issuer_name = var.cluster_issuer_name
+  tls_solver          = var.tls_solver
+  dns01_zones         = try(var.dns01_azure.hosted_zone_names, [])
+}
+
 locals {
   dns01 = var.tls_solver == "dns01-azure"
   ngf   = var.gateway_implementation == "nginx-gateway-fabric"
 
-  # Listener names are the contract the parent ref and the HTTP-01 solver share.
-  http_section_name  = "http"
-  https_section_name = "https"
+  # The port-80 listener's name: the contract the HTTP-01 solver route and the redirect share.
+  http_section_name = "http"
+
+  listeners    = local.ngf ? module.listeners[0].listeners : {}
+  certificates = local.ngf ? module.listeners[0].certificates : {}
 
   gateway_ref = local.ngf ? {
-    name               = var.gateway_name
-    namespace          = var.gateway_namespace
-    http_section_name  = local.http_section_name
-    https_section_name = local.https_section_name
+    name                = var.gateway_name
+    namespace           = var.gateway_namespace
+    http_section_name   = local.http_section_name
+    https_section_names = sort(keys(local.listeners))
     } : {
-    name               = try(var.customer_gateway.name, null)
-    namespace          = try(var.customer_gateway.namespace, null)
-    http_section_name  = try(var.customer_gateway.http_section_name, null)
-    https_section_name = try(var.customer_gateway.https_section_name, null)
+    name                = try(var.customer_gateway.name, null)
+    namespace           = try(var.customer_gateway.namespace, null)
+    http_section_name   = try(var.customer_gateway.http_section_name, null)
+    https_section_names = sort(tolist(try(var.customer_gateway.https_section_names, [])))
   }
 
   # The Gateway, NginxProxy and ClientSettingsPolicy live in the Gateway's namespace;
@@ -28,8 +44,9 @@ locals {
     }
   })
 
-  # enableGatewayAPI turns on cert-manager's gateway-shim (listener certificates from the
-  # Gateway's cert-manager.io/cluster-issuer annotation) and the HTTP-01 gatewayHTTPRoute solver.
+  # enableGatewayAPI turns on cert-manager's HTTP-01 gatewayHTTPRoute solver. The Gateway carries no
+  # cert-manager.io/cluster-issuer annotation, so the gateway-shim issues nothing: each managed
+  # listener gets an explicit Certificate, and a customer_supplied listener none.
   # With dns01-azure the controller pod must carry the workload-identity label so the Azure
   # webhook injects the federated token cert-manager exchanges.
   cert_manager_values = yamlencode(merge(
@@ -63,19 +80,27 @@ locals {
       dns01Azure = local.dns01 ? {
         subscriptionID    = var.dns01_azure.subscription_id
         resourceGroupName = var.dns01_azure.resource_group_name
-        hostedZoneName    = var.dns01_azure.hosted_zone_name
+        hostedZoneNames   = sort(tolist(var.dns01_azure.hosted_zone_names))
         clientID          = var.dns01_azure.client_id
         environment       = var.dns01_azure.environment
       } : null
     }
     gateway = local.ngf ? {
-      name                      = var.gateway_name
-      namespace                 = var.gateway_namespace
-      className                 = var.gateway_class_name
-      hostname                  = var.gateway_hostname
-      httpSectionName           = local.http_section_name
-      httpsSectionName          = local.https_section_name
-      tlsSecretName             = var.gateway_tls_secret_name
+      name            = var.gateway_name
+      namespace       = var.gateway_namespace
+      className       = var.gateway_class_name
+      httpSectionName = local.http_section_name
+      listeners = [for k in sort(keys(local.listeners)) : {
+        name       = k
+        hostname   = local.listeners[k].hostname
+        secretName = local.listeners[k].secret_name
+      }]
+      certificates = [for k in sort(keys(local.certificates)) : {
+        name       = local.certificates[k].name
+        dnsNames   = local.certificates[k].dns_names
+        secretName = local.certificates[k].secret_name
+        issuerName = local.certificates[k].issuer_name
+      }]
       routeNamespaces           = sort(tolist(var.route_namespaces))
       infrastructureAnnotations = var.gateway_infrastructure_annotations
       maxRequestBody            = "${var.max_request_body_mib}m"
@@ -146,17 +171,17 @@ resource "helm_release" "cert_manager" {
       error_message = "customer_gateway is only meaningful with gateway_implementation = \"customer-managed\"."
     }
     precondition {
-      condition     = !local.ngf || (var.gateway_hostname != "" && length(var.route_namespaces) > 0)
-      error_message = "gateway_implementation = \"nginx-gateway-fabric\" requires gateway_hostname (the HTTPS listener's hostname, which cert-manager issues the certificate for) and a non-empty route_namespaces."
+      condition     = !local.ngf || length(var.route_namespaces) > 0
+      error_message = "gateway_implementation = \"nginx-gateway-fabric\" requires a non-empty route_namespaces: no namespace may attach routes by default."
     }
     precondition {
-      condition     = !(local.ngf && var.tls_solver == "http01") || !startswith(var.gateway_hostname, "*.")
-      error_message = "A wildcard gateway_hostname needs tls_solver = \"dns01-azure\": HTTP-01 cannot issue wildcard certificates."
+      condition     = local.ngf || length(var.listeners) == 0
+      error_message = "listeners are only meaningful with gateway_implementation = \"nginx-gateway-fabric\": a customer-managed Gateway's listeners and certificates are the customer's (name them in customer_gateway.https_section_names)."
     }
   }
 }
 
-# The ClusterIssuer, Gateway, NginxProxy and ClientSettingsPolicy are custom resources whose CRDs do
+# The ClusterIssuer, Gateway, Certificates, NginxProxy and ClientSettingsPolicy are custom resources whose CRDs do
 # not exist until cert-manager and NGINX Gateway Fabric are installed, so they ship as a tiny LOCAL
 # chart rather than kubernetes_manifest — which needs the CRD at PLAN time and therefore cannot
 # survive a first apply on a fresh cluster. Helm validates them at install, when the CRDs and their

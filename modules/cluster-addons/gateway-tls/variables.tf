@@ -16,17 +16,23 @@ variable "gateway_implementation" {
 variable "customer_gateway" {
   description = <<-EOT
     The existing Gateway, for gateway_implementation = "customer-managed" (null otherwise):
-      - name, namespace    : the Gateway
-      - http_section_name  : its port-80 HTTP listener, where cert-manager's HTTP-01 solver route attaches
-      - https_section_name : its HTTPS listener, the output gateway_parent_ref's section_name
+      - name, namespace     : the Gateway
+      - http_section_name   : its port-80 HTTP listener, where cert-manager's HTTP-01 solver route attaches
+      - https_section_names : its HTTPS listeners the deployment's HTTPRoutes may attach to, the keys
+                              of the output gateway_parent_refs. Their certificates are the customer's.
   EOT
   type = object({
-    name               = string
-    namespace          = string
-    http_section_name  = string
-    https_section_name = string
+    name                = string
+    namespace           = string
+    http_section_name   = string
+    https_section_names = set(string)
   })
   default = null
+
+  validation {
+    condition     = var.customer_gateway == null || try(length(var.customer_gateway.https_section_names) > 0, false)
+    error_message = "customer_gateway.https_section_names must name at least one HTTPS listener."
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -76,25 +82,34 @@ variable "gateway_name" {
 }
 
 variable "gateway_namespace" {
-  description = "Namespace the Gateway, its NginxProxy and the ClientSettingsPolicy live in (created if absent). cert-manager issues the listener certificate here."
+  description = "Namespace the Gateway, its NginxProxy and the ClientSettingsPolicy live in (created if absent). managed listener certificates and customer_supplied Secrets live here."
   type        = string
   default     = "gateway-system"
 }
 
-variable "gateway_hostname" {
-  description = "Hostname of the Gateway listeners, and the name cert-manager's gateway-shim issues the listener certificate for (e.g. \"*.example.com\", which needs tls_solver = \"dns01-azure\"). Required with nginx-gateway-fabric."
-  type        = string
-  default     = ""
-}
-
-variable "gateway_tls_secret_name" {
-  description = "Secret the HTTPS listener's certificateRefs point at and cert-manager fills."
-  type        = string
-  default     = "gateway-tls"
+variable "listeners" {
+  description = <<-EOT
+    The Gateway's HTTPS listeners with nginx-gateway-fabric (empty with customer-managed), keyed by
+    listener name, which is the sectionName an HTTPRoute's parentRef names. One listener per
+    hostname, each with its own certificate; any number of hosts and apex domains. Each entry:
+      - hostname         : exact ("app.example.com") or wildcard ("*.example.com")
+      - certificate_mode : "managed" (cert-manager issues it from the ClusterIssuer into
+                           "<gateway_name>-<key>-tls") or "customer_supplied" (the customer's
+                           kubernetes.io/tls Secret in gateway_namespace; nothing is issued)
+      - secret_name      : that Secret's name; required with customer_supplied, refused with managed
+    The rules (unique hostnames, the solver able to issue every managed hostname, ...) are
+    enforced at plan time by ./listeners.
+  EOT
+  type = map(object({
+    hostname         = string
+    certificate_mode = string
+    secret_name      = optional(string)
+  }))
+  default = {}
 }
 
 variable "route_namespaces" {
-  description = "Namespaces whose HTTPRoutes may attach to the HTTPS listener (allowedRoutes). Required and non-empty with nginx-gateway-fabric: no namespace is trusted by default."
+  description = "Namespaces whose HTTPRoutes may attach to every HTTPS listener (allowedRoutes). Required and non-empty with nginx-gateway-fabric: no namespace is trusted by default."
   type        = set(string)
   default     = []
 }
@@ -229,7 +244,9 @@ variable "dns01_azure" {
     Azure DNS solver settings, used only when tls_solver = "dns01-azure":
       - subscription_id     : subscription the zone lives in
       - resource_group_name : resource group of the zone
-      - hosted_zone_name    : the zone apex
+      - hosted_zone_names   : the zones (in that resource group) the solver writes
+                              challenge records into, one per apex it issues for;
+                              every managed listener hostname must sit in one
       - client_id           : client id of the identity holding DNS Zone Contributor,
                               federated to cert-manager's service account
                               (providers/azure/dns output dns01_client_id)
@@ -238,7 +255,7 @@ variable "dns01_azure" {
   type = object({
     subscription_id     = string
     resource_group_name = string
-    hosted_zone_name    = string
+    hosted_zone_names   = set(string)
     client_id           = string
     environment         = optional(string, "AzurePublicCloud")
   })

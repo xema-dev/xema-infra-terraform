@@ -96,7 +96,7 @@ module "substrate" {
   gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
   gateway_implementation             = var.gateway_implementation
   customer_gateway                   = var.customer_gateway
-  gateway_hostname                   = var.gateway_hostname
+  gateway_listeners                  = var.gateway_listeners
   max_request_body_mib               = var.max_request_body_mib
   gateway_load_balancer_ip           = var.gateway_load_balancer_ip
 
@@ -133,11 +133,11 @@ output "postgres_role_passwords" {
 }
 
 # The two in-cluster names the consumer's own manifests reference — read from
-# the stack (also in substrate.gateway.cluster_issuer_name /
+# the stack (also in substrate.gateway / substrate.gateway.cluster_issuer_name /
 # substrate.secret_store_name), never restated.
-output "gateway_parent_ref" {
-  description = "The parentRef every HTTPRoute attaches to ({ name, namespace, section_name }); null when the gateway is disabled."
-  value       = module.substrate.gateway_parent_ref
+output "gateway_parent_refs" {
+  description = "The parentRefs HTTPRoutes attach to, one per HTTPS listener, keyed by listener name ({ name, namespace, section_name }); null when the gateway is disabled."
+  value       = module.substrate.gateway_parent_refs
 }
 
 output "cluster_issuer_name" {

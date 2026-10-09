@@ -131,7 +131,18 @@ key_vault_secrets = {}
 acme_email = "ops@example.com"
 acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory" # staging while testing; switch to production after
 tls_solver  = "dns01-azure"                                             # wildcard certificates need DNS-01
-gateway_hostname = "*.acme.example.com"                                      # the Gateway listeners' hostname; the wildcard certificate is issued for it
+# One HTTPS listener per hostname, each with its own certificate; any number of hosts and apex
+# domains. managed: issued by the ClusterIssuer (a wildcard needs dns01-azure, and with dns01-azure
+# the hostname must sit in apex_domain's zone). customer_supplied: your own kubernetes.io/tls
+# Secret in the Gateway's namespace (gateway-system); nothing is issued.
+gateway_listeners = {
+  acme = { hostname = "*.acme.example.com", certificate_mode = "managed" }
+  partner = {
+    hostname         = "acme.example.net"
+    certificate_mode = "customer_supplied"
+    secret_name      = "acme-example-net-tls"
+  }
+}
 max_request_body_mib = 256                                              # finite request-body ceiling per route; configuration tightens it
 gateway_infrastructure_annotations = {
   "service.beta.kubernetes.io/azure-dns-label-name" = "acme-dev-gateway"

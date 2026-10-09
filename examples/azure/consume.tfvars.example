@@ -92,7 +92,9 @@ workload_namespaces = [ # full names; nothing derived
 # --- gateway + tls (applied to the consumed cluster) ---
 acme_email = "ops@example.com"
 tls_solver = "http01" # dns01-azure needs enable_dns
-gateway_hostname = "acme-dev.example.com" # a wildcard needs dns01-azure
+gateway_listeners = { # one HTTPS listener per hostname; a managed wildcard needs dns01-azure
+  app = { hostname = "acme-dev.example.com", certificate_mode = "managed" }
+}
 
 # --- secrets backend ---
 key_vault_secrets = {} # seed via TF_VAR_key_vault_secrets

@@ -94,7 +94,8 @@ second full implementation of the substrate, and it adds three optional
 primitives the DigitalOcean stack does not have — a **secrets backend**
 (Key Vault + External Secrets), an optional **managed cache**, and the
 cloud-agnostic **`gateway-tls`** addon (Gateway API CRDs, NGINX Gateway
-Fabric + a `Gateway`, cert-manager + `ClusterIssuer`). Three properties
+Fabric + one `Gateway` for many hosts and apex domains with a certificate per
+listener, managed or customer-supplied, cert-manager + `ClusterIssuer`). Three properties
 decide its shape:
 
 - **One input names everything the substrate owns.** `deployment_name`

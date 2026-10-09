@@ -202,7 +202,7 @@ export const DISPOSITIONS = Object.freeze({
   'substrate.dns_zone': ign('the deployment root derives hostnames from its own domain declarations (deployment-domains), not from a zone apex input'),
   'substrate.dns_name_servers': ign('a registrar delegation fact for the operator; the deployment root does not read it'),
   'substrate.gateway': op(
-    'the Gateway every HTTPRoute attaches to, for deployments/<d>/values.yaml#gateway.parentRef. NOT merged: that is a nested mapping in the values file, not a two-level secret-inputs scalar, and a parentRef is no secret input. Print the block and paste it once: `terraform output -json substrate | jq -r \'"gateway:", "  parentRef:", "    name: \\(.gateway.parent_ref.name)", "    namespace: \\(.gateway.parent_ref.namespace)", "    sectionName: \\(.gateway.parent_ref.section_name)"\'`. Null when enable_gateway_tls = false',
+    'the Gateway listeners HTTPRoutes attach to (parent_refs, one per HTTPS listener, keyed by listener name), for deployments/<d>/values.yaml#gateway.parentRef: the listener serving that deployment\'s hosts. NOT merged: that is a nested mapping in the values file, not a two-level secret-inputs scalar, and a parentRef is no secret input. Print the block for the listener and paste it once: `terraform output -json substrate | jq -r --arg l <listener> \'.gateway.parent_refs[$l] | "gateway:", "  parentRef:", "    name: \\(.name)", "    namespace: \\(.namespace)", "    sectionName: \\(.section_name)"\'`. Null when enable_gateway_tls = false',
   ),
 
   // ── per-deployment credential custody ────────────────────────────────────
@@ -247,7 +247,7 @@ export const DISPOSITIONS = Object.freeze({
   redis_port: ign('duplicate of substrate.redis_port'),
   redis_primary_key: x('redis-password', WhenNull.Omit, 'no managed cache on this cloud, or enable_cache = false'),
   storage_class_name: ign('duplicate of substrate.storage_class_name'),
-  gateway_parent_ref: ign('duplicate of substrate.gateway'),
+  gateway_parent_refs: ign('duplicate of substrate.gateway.parent_refs'),
   cluster_issuer_name: ign('a manifest annotation value (cert-manager.io/cluster-issuer), not a secret input'),
   secret_store_name: ign('duplicate of substrate.secret_store_name'),
   secret_stores: ign('duplicate of substrate.secret_stores'),

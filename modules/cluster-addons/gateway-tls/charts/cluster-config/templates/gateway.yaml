@@ -1,13 +1,12 @@
 {{- with .Values.gateway }}
-# The Gateway carries cert-manager.io/cluster-issuer, so cert-manager's gateway-shim issues the
-# HTTPS listener's certificate into the listener's certificateRefs Secret.
+# One HTTPS listener per hostname, each with its own certificateRefs Secret: a managed listener's
+# is filled by its Certificate (certificates.yaml), a customer_supplied listener's is the
+# customer's. The Gateway carries no cert-manager annotation, so the gateway-shim issues nothing.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: {{ required "gateway.name is required" .name | quote }}
   namespace: {{ required "gateway.namespace is required" .namespace | quote }}
-  annotations:
-    cert-manager.io/cluster-issuer: {{ $.Values.clusterIssuer.name | quote }}
 spec:
   gatewayClassName: {{ required "gateway.className is required" .className | quote }}
   infrastructure:
@@ -20,26 +19,28 @@ spec:
       {{- toYaml .infrastructureAnnotations | nindent 6 }}
 {{- end }}
   listeners:
-    # Port 80 carries cert-manager's HTTP-01 solver route and the https redirect route (same namespace); no application route may attach.
+    # Port 80 serves every host: it carries cert-manager's HTTP-01 solver routes and the https
+    # redirect route (same namespace); no application route may attach.
     - name: {{ .httpSectionName | quote }}
       port: 80
       protocol: HTTP
-      hostname: {{ required "gateway.hostname is required" .hostname | quote }}
       allowedRoutes:
         namespaces:
           from: Same
         kinds:
           - kind: HTTPRoute
-    - name: {{ .httpsSectionName | quote }}
+{{- $routeNamespaces := required "gateway.routeNamespaces is required" .routeNamespaces }}
+{{- range (required "gateway.listeners is required" .listeners) }}
+    - name: {{ required "gateway.listeners[].name is required" .name | quote }}
       port: 443
       protocol: HTTPS
-      hostname: {{ .hostname | quote }}
+      hostname: {{ required "gateway.listeners[].hostname is required" .hostname | quote }}
       tls:
         mode: Terminate
         certificateRefs:
           - group: ""
             kind: Secret
-            name: {{ required "gateway.tlsSecretName is required" .tlsSecretName | quote }}
+            name: {{ required "gateway.listeners[].secretName is required" .secretName | quote }}
       allowedRoutes:
         namespaces:
           from: Selector
@@ -48,12 +49,13 @@ spec:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values:
-                  {{- toYaml (required "gateway.routeNamespaces is required" .routeNamespaces) | nindent 18 }}
+                  {{- toYaml $routeNamespaces | nindent 18 }}
         kinds:
           - kind: HTTPRoute
+{{- end }}
 ---
-# Plain HTTP answers 301 to https for every host the HTTP listener serves (the route sets no
-# hostnames, so it inherits the listener's). cert-manager's HTTP-01 solver route matches a longer
+# Plain HTTP answers 301 to https for every host (the route and the port-80 listener set no
+# hostnames). cert-manager's HTTP-01 solver route matches a longer
 # path prefix (/.well-known/acme-challenge/<token>), which Gateway API ranks above this "/" match,
 # so challenges still reach the solver.
 apiVersion: gateway.networking.k8s.io/v1

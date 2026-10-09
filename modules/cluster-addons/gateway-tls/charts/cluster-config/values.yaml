@@ -18,10 +18,19 @@ gateway: null
 #   name: gateway
 #   namespace: gateway-system
 #   className: nginx
-#   hostname: "*.example.com"
 #   httpSectionName: http
-#   httpsSectionName: https
-#   tlsSecretName: gateway-tls
+#   listeners: # one HTTPS listener per hostname
+#     - name: app
+#       hostname: app.example.com
+#       secretName: gateway-app-tls # managed: filled by the Certificate below
+#     - name: shop
+#       hostname: shop.example.org
+#       secretName: shop-example-org-tls # customer_supplied: the customer's Secret
+#   certificates: # the managed listeners only
+#     - name: gateway-app
+#       dnsNames: [app.example.com]
+#       secretName: gateway-app-tls
+#       issuerName: letsencrypt
 #   routeNamespaces: [apps]
 #   infrastructureAnnotations: {}
 #   maxRequestBody: 256m

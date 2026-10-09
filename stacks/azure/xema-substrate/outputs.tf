@@ -145,9 +145,9 @@ output "storage_class_name" {
 # the addon's outputs — never from the input — so they are null exactly when
 # the resource does not exist (gateway disabled; or, for the store, the secrets
 # backend disabled).
-output "gateway_parent_ref" {
-  description = "The parentRef every HTTPRoute attaches to ({ name, namespace, section_name }); null when enable_gateway_tls = false."
-  value       = one(module.gateway_tls[*].gateway_parent_ref)
+output "gateway_parent_refs" {
+  description = "The parentRefs HTTPRoutes attach to, one per HTTPS listener, keyed by listener name ({ name, namespace, section_name }); null when enable_gateway_tls = false."
+  value       = one(module.gateway_tls[*].gateway_parent_refs)
 }
 
 output "cluster_issuer_name" {
@@ -250,7 +250,7 @@ output "substrate" {
     dns_name_servers = one(module.dns[*].name_servers)
 
     gateway = var.enable_gateway_tls ? {
-      parent_ref          = one(module.gateway_tls[*].gateway_parent_ref)
+      parent_refs         = one(module.gateway_tls[*].gateway_parent_refs)
       cluster_issuer_name = one(module.gateway_tls[*].cluster_issuer_name)
     } : null
 

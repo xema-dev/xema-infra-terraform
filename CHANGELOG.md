@@ -4,6 +4,23 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — one Gateway, many hosts and apex domains, a certificate per listener (BREAKING)
+
+BREAKING, no shim. **Module `cluster-addons/gateway-tls`:** `gateway_hostname` and `gateway_tls_secret_name` are gone; the new
+`listeners = map(object({ hostname, certificate_mode, secret_name = optional }))` declares one HTTPS listener per hostname, keyed by
+listener name (the HTTPRoute `sectionName`), each with its own certificate. `certificate_mode` is `managed` (the module renders a
+cert-manager `Certificate` from the ClusterIssuer into `<gateway_name>-<key>-tls`; `secret_name` refused) or `customer_supplied`
+(`secret_name` required: the customer's `kubernetes.io/tls` Secret in `gateway_namespace`; nothing issued). The Gateway no longer
+carries `cert-manager.io/cluster-issuer` (the gateway-shim issues nothing); the port-80 listener has no hostname and serves every
+host. Refused at plan (provider-free, `gateway-tls/listeners/tests`): duplicate hostnames, a customer_supplied listener without a
+valid secret, a managed one with one, an unknown mode, a managed wildcard with `http01`, a managed hostname outside the
+`dns01-azure` zone, a customer Secret equal to a managed one, the reserved name `http`, more than 63 listeners. `customer_gateway`'s
+`https_section_name` is `https_section_names` (a set). `dns01_azure.hosted_zone_name` is `hosted_zone_names` (a set): one DNS-01 solver per zone, selected by `dnsZones`, so each apex issues from its own zone. Output `gateway_parent_ref` is `gateway_parent_refs` (keyed by listener).
+**Stack `stacks/azure/xema-substrate` / `examples/azure`:** `gateway_hostname` is `gateway_listeners` (same shape as `listeners`);
+output `gateway_parent_ref` is `gateway_parent_refs`; `substrate.gateway.parent_ref` is `substrate.gateway.parent_refs`. A root that
+set `gateway_hostname = "h"` sets `gateway_listeners = { <name> = { hostname = "h", certificate_mode = "managed" } }` and takes its
+deployment's `gateway.parentRef` from `parent_refs["<name>"]` (`tooling/bind` prints the block for a named listener).
+
 ## Unreleased — bind classifies the substrate's kubelet/registry fields; root-local outputs declared by the root
 
 No input or resource change; nothing to adopt except the BIND tool. `tooling/bind` now classifies `substrate.kubelet_identity_object_id`,

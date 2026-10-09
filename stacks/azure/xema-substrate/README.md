@@ -102,8 +102,8 @@ storage accounts carry their own explicit `name`.
 (default `platform`; kind `SecretStore`, one per boundary namespace — see `secret_store_boundaries`) are threaded to the `gateway-tls` addon, validated as
 DNS-1123 subdomain names, and **read back** as the stack outputs of the same
 name (and in the `substrate` map: `substrate.gateway.cluster_issuer_name`,
-`substrate.secret_store_name`). A consumer's `Gateway`
-(`cert-manager.io/cluster-issuer`) and `ExternalSecret` (`secretStoreRef.name`)
+`substrate.secret_store_name`). A consumer's `Certificate`
+(`issuerRef.name`) and `ExternalSecret` (`secretStoreRef.name`)
 manifests should read them from the stack, never restate the defaults. Both
 outputs are `null` exactly when the object does not exist — `enable_gateway_tls
 = false`, or for the store also `enable_secrets_backend = false`.
@@ -178,7 +178,7 @@ Every area is **independently toggleable** via an `enable_*` input:
 | `enable_container_registry` | `false` | Create a Premium, private-only container registry with `AcrPull` for the kubelet identity (needs `acr` in the foundation's `private_link_services`, in its default). The CI identity that pushes is **not** created: grant `AcrPush` to your own CI principal on `container_registry_id`. |
 | `enable_rwx_storage` | `true` | Create the RWX `StorageClass` on the (created or consumed) cluster. |
 | `enable_workload_namespaces` | `true` | Ensure the `workload_namespaces` roster exists. |
-| `enable_gateway_tls` | `true` | Install the Gateway API edge (needs `acme_email`; `gateway_hostname` and non-empty `workload_namespaces` with `nginx-gateway-fabric`). The stack output `gateway_parent_ref` is the parentRef every HTTPRoute attaches to. |
+| `enable_gateway_tls` | `true` | Install the Gateway API edge (needs `acme_email`; at least one `gateway_listeners` entry and non-empty `workload_namespaces` with `nginx-gateway-fabric`). `gateway_listeners` is one HTTPS listener per hostname, any number of hosts and apex domains, each `managed` (issued by the ClusterIssuer) or `customer_supplied` (`secret_name`: your `kubernetes.io/tls` Secret in the Gateway's namespace; nothing issued). The stack output `gateway_parent_refs` (keyed by listener) holds the parentRef an HTTPRoute carries for the listener serving its host. |
 | `enable_identity_realm` | `true` | Manage the Keycloak realm (needs a reachable `keycloak_url`). |
 
 `postgres_extensions` (default `[]`) allow-lists PostgreSQL extensions on the

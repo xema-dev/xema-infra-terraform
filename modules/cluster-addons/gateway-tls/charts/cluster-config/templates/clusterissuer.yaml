@@ -19,14 +19,21 @@ spec:
                 namespace: {{ required "clusterIssuer.httpParentRef.namespace is required" .Values.clusterIssuer.httpParentRef.namespace | quote }}
                 sectionName: {{ required "clusterIssuer.httpParentRef.sectionName is required" .Values.clusterIssuer.httpParentRef.sectionName | quote }}
 {{- else if eq .Values.clusterIssuer.solver "dns01-azure" }}
-      - dns01:
+{{- $azure := required "clusterIssuer.dns01Azure is required" .Values.clusterIssuer.dns01Azure }}
+{{- /* One solver per zone, selected by dnsZones: cert-manager picks the most specific zone a name sits in. */}}
+{{- range (required "clusterIssuer.dns01Azure.hostedZoneNames is required" $azure.hostedZoneNames) }}
+      - selector:
+          dnsZones:
+            - {{ . | quote }}
+        dns01:
           azureDNS:
-            subscriptionID: {{ required "clusterIssuer.dns01Azure.subscriptionID is required" .Values.clusterIssuer.dns01Azure.subscriptionID | quote }}
-            resourceGroupName: {{ required "clusterIssuer.dns01Azure.resourceGroupName is required" .Values.clusterIssuer.dns01Azure.resourceGroupName | quote }}
-            hostedZoneName: {{ required "clusterIssuer.dns01Azure.hostedZoneName is required" .Values.clusterIssuer.dns01Azure.hostedZoneName | quote }}
-            environment: {{ .Values.clusterIssuer.dns01Azure.environment | default "AzurePublicCloud" | quote }}
+            subscriptionID: {{ required "clusterIssuer.dns01Azure.subscriptionID is required" $azure.subscriptionID | quote }}
+            resourceGroupName: {{ required "clusterIssuer.dns01Azure.resourceGroupName is required" $azure.resourceGroupName | quote }}
+            hostedZoneName: {{ . | quote }}
+            environment: {{ $azure.environment | default "AzurePublicCloud" | quote }}
             managedIdentity:
-              clientID: {{ required "clusterIssuer.dns01Azure.clientID is required" .Values.clusterIssuer.dns01Azure.clientID | quote }}
+              clientID: {{ required "clusterIssuer.dns01Azure.clientID is required" $azure.clientID | quote }}
+{{- end }}
 {{- else }}
 {{- fail (printf "unsupported clusterIssuer.solver %q (http01 | dns01-azure)" .Values.clusterIssuer.solver) }}
 {{- end }}

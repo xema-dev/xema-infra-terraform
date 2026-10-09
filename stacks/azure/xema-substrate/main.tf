@@ -429,7 +429,7 @@ module "gateway_tls" {
 
   gateway_implementation             = var.gateway_implementation
   customer_gateway                   = var.customer_gateway
-  gateway_hostname                   = var.gateway_hostname
+  listeners                          = var.gateway_listeners
   route_namespaces                   = var.workload_namespaces
   max_request_body_mib               = var.max_request_body_mib
   gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
@@ -438,7 +438,7 @@ module "gateway_tls" {
   dns01_azure = local.dns01 && var.enable_dns ? {
     subscription_id     = module.dns[0].subscription_id
     resource_group_name = module.dns[0].resource_group_name
-    hosted_zone_name    = module.dns[0].domain
+    hosted_zone_names   = [module.dns[0].domain]
     client_id           = module.dns[0].dns01_client_id
   } : null
 }

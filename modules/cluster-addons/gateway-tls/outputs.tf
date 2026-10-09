@@ -1,17 +1,17 @@
-output "gateway_parent_ref" {
-  description = "The parentRef every HTTPRoute attaches to: the Gateway's HTTPS listener (name, namespace, section_name). Bound into the deployment's gateway.parentRef."
-  value = {
+output "gateway_parent_refs" {
+  description = "The parentRefs HTTPRoutes attach to, one per HTTPS listener, keyed by listener name: { name, namespace, section_name }. A route for a host names the listener serving that host."
+  value = { for k in local.gateway_ref.https_section_names : k => {
     name         = local.gateway_ref.name
     namespace    = local.gateway_ref.namespace
-    section_name = local.gateway_ref.https_section_name
-  }
+    section_name = k
+  } }
 
   # The release is what makes the Gateway exist (or, customer-managed, the issuer that targets it).
   depends_on = [helm_release.cluster_config]
 }
 
 output "cluster_issuer_name" {
-  description = "Name of the ACME ClusterIssuer (the cert-manager.io/cluster-issuer annotation value on the Gateway)."
+  description = "Name of the ACME ClusterIssuer (the issuerRef of every managed listener's Certificate)."
   value       = var.cluster_issuer_name
 
   depends_on = [helm_release.cluster_config]

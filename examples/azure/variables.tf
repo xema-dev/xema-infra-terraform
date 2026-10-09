@@ -355,18 +355,22 @@ variable "gateway_implementation" {
 variable "customer_gateway" {
   description = "The customer's existing Gateway when gateway_implementation = \"customer-managed\"."
   type = object({
-    name               = string
-    namespace          = string
-    http_section_name  = string
-    https_section_name = string
+    name                = string
+    namespace           = string
+    http_section_name   = string
+    https_section_names = set(string)
   })
   default = null
 }
 
-variable "gateway_hostname" {
-  description = "Hostname of the Gateway listeners; cert-manager issues its certificate (a wildcard needs dns01-azure). Required with nginx-gateway-fabric."
-  type        = string
-  default     = ""
+variable "gateway_listeners" {
+  description = "The Gateway's HTTPS listeners, keyed by listener name: { hostname, certificate_mode = managed | customer_supplied, secret_name (customer_supplied only) }. One hostname and one certificate each. Required with nginx-gateway-fabric."
+  type = map(object({
+    hostname         = string
+    certificate_mode = string
+    secret_name      = optional(string)
+  }))
+  default = {}
 }
 
 variable "max_request_body_mib" {

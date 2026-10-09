@@ -1,5 +1,5 @@
 apiVersion: v2
 name: cluster-config
-description: ACME ClusterIssuer and, with NGINX Gateway Fabric, the Gateway + NginxProxy + ClientSettingsPolicy, rendered from values by cluster-addons/gateway-tls. Not published; installed from the module directory.
+description: ACME ClusterIssuer and, with NGINX Gateway Fabric, the Gateway (one HTTPS listener per hostname) + the managed listeners' Certificates + NginxProxy + ClientSettingsPolicy, rendered from values by cluster-addons/gateway-tls. Not published; installed from the module directory.
 type: application
-version: 0.2.0
+version: 0.3.0

@@ -1,0 +1,21 @@
+{{- with .Values.gateway }}
+{{- $namespace := .namespace }}
+{{- range .certificates }}
+---
+# A managed listener's certificate, issued by the ACME ClusterIssuer into the Secret the
+# listener's certificateRefs name. customer_supplied listeners have no entry here.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ required "gateway.certificates[].name is required" .name | quote }}
+  namespace: {{ $namespace | quote }}
+spec:
+  secretName: {{ required "gateway.certificates[].secretName is required" .secretName | quote }}
+  dnsNames:
+    {{- toYaml (required "gateway.certificates[].dnsNames is required" .dnsNames) | nindent 4 }}
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ required "gateway.certificates[].issuerName is required" .issuerName | quote }}
+{{- end }}
+{{- end }}

@@ -714,20 +714,35 @@ variable "gateway_implementation" {
 }
 
 variable "customer_gateway" {
-  description = "The customer's existing Gateway ({ name, namespace, http_section_name, https_section_name }) when gateway_implementation = \"customer-managed\"; null otherwise."
+  description = "The customer's existing Gateway ({ name, namespace, http_section_name, https_section_names }) when gateway_implementation = \"customer-managed\"; null otherwise. https_section_names are its HTTPS listeners routes may attach to."
   type = object({
-    name               = string
-    namespace          = string
-    http_section_name  = string
-    https_section_name = string
+    name                = string
+    namespace           = string
+    http_section_name   = string
+    https_section_names = set(string)
   })
   default = null
 }
 
-variable "gateway_hostname" {
-  description = "Hostname of the Gateway listeners, which cert-manager issues the certificate for (a wildcard needs tls_solver = \"dns01-azure\"). Required with nginx-gateway-fabric."
-  type        = string
-  default     = ""
+variable "gateway_listeners" {
+  description = <<-EOT
+    The Gateway's HTTPS listeners with nginx-gateway-fabric (leave empty with customer-managed),
+    keyed by listener name (the HTTPRoute parentRef sectionName): one hostname and one certificate
+    each, any number of hosts and apex domains.
+      - hostname         : exact or wildcard ("*.example.com")
+      - certificate_mode : "managed" (issued by the ClusterIssuer; a wildcard needs dns01-azure,
+                           and with dns01-azure the hostname must sit in the DNS zone) or
+                           "customer_supplied" (the customer's kubernetes.io/tls Secret in the
+                           Gateway's namespace; nothing is issued)
+      - secret_name      : that Secret; required with customer_supplied, refused with managed
+    Validated by modules/cluster-addons/gateway-tls/listeners.
+  EOT
+  type = map(object({
+    hostname         = string
+    certificate_mode = string
+    secret_name      = optional(string)
+  }))
+  default = {}
 }
 
 variable "max_request_body_mib" {

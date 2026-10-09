@@ -596,15 +596,16 @@ every cloud's stack:
   DECLARES, never something derived from a directory name.
 - **`cluster-addons/gateway-tls`** — the Gateway API edge every hostname on the
   deployment sits behind (no `Ingress` anywhere): the vendored Gateway API
-  standard-channel CRDs, NGINX Gateway Fabric with one `Gateway` (an HTTPS listener
-  admitting `HTTPRoute`s only from the declared namespaces, a data-plane Service
+  standard-channel CRDs, NGINX Gateway Fabric with one `Gateway` (one HTTPS listener
+  per hostname, any number of hosts and apex domains, each with its own certificate,
+  `managed` by the issuer or `customer_supplied`, admitting `HTTPRoute`s only from the declared namespaces, a data-plane Service
   whose type and annotations pass through, a finite request-body ceiling, default
   256 MiB), and `cert-manager` with Gateway API integration plus one ACME
   `ClusterIssuer` (closed-set solver: `http01 | dns01-azure`; HTTP-01 is a
   Gateway `HTTPRoute`). `gateway_implementation = "customer-managed"` installs
   none of the Gateway-side parts and attaches to the customer's Gateway. Its
-  output `gateway_parent_ref` (`{ name, namespace, section_name }`) is the
-  parentRef every `HTTPRoute` carries. The External Secrets Operator and its
+  output `gateway_parent_refs` (keyed by listener, `{ name, namespace, section_name }`)
+  holds the parentRef an `HTTPRoute` carries for the listener serving its host. The External Secrets Operator and its
   per-boundary namespaced `SecretStore`s (one identity and one vault per trust boundary; no cluster-wide store) are the separate `cluster-addons/external-secrets`. Chart versions are
   pinned inputs with defaults. Cloud-specific facts (a DNS zone, a vault URI, the
   identities that may touch them) arrive as plain string inputs from the
@@ -656,7 +657,7 @@ that cloud; a consumer branches on `null`, never on which cloud it is on.
 | `container_registry_login_server` / `container_registry_id` | `string` | the container registry's host and resource id (the scope a consumer grants `AcrPush` to its own CI principal on) | container registry | `null` |
 | `dns_zone` | `string` | the managed zone apex | dns | dns |
 | `dns_name_servers` | `list(string)` | delegate the apex to these | dns | `null` (DigitalOcean's are fixed) |
-| `gateway` | `object({ parent_ref = { name, namespace, section_name }, cluster_issuer_name })` | the Gateway the consumer's `HTTPRoute` objects attach to (`parent_ref`) and the issuer its listener certificate comes from | gateway addon | `null` |
+| `gateway` | `object({ parent_refs = map({ name, namespace, section_name }), cluster_issuer_name })` | the Gateway listeners the consumer's `HTTPRoute` objects attach to (`parent_refs`, keyed by listener) and the issuer its managed listener certificates come from | gateway addon | `null` |
 | `keycloak_url` / `realm_name` | `string` | the identity realm and where it lives | identity realm | identity realm |
 
 Adding a key is a change to BOTH stacks in the same commit — a consumer must be
