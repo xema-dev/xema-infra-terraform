@@ -323,9 +323,9 @@ variable "key_vault_secrets" {
 # --- gateway + tls ---
 
 variable "acme_email" {
-  description = "ACME account contact (required when enable_gateway_tls)."
+  description = "ACME account contact; required exactly when a listener is managed (or the Gateway is customer-managed)."
   type        = string
-  default     = ""
+  default     = null
 }
 
 variable "acme_server" {
@@ -335,9 +335,9 @@ variable "acme_server" {
 }
 
 variable "tls_solver" {
-  description = "\"http01\" or \"dns01-azure\"."
+  description = "\"http01\" or \"dns01-azure\"; required exactly when a listener is managed (or the Gateway is customer-managed)."
   type        = string
-  default     = "http01"
+  default     = null
 }
 
 variable "gateway_infrastructure_annotations" {

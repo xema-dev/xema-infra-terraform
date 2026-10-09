@@ -59,9 +59,14 @@ output "gateway_parent_refs" { value = module.gateway_tls.gateway_parent_refs }
 | `gateway-tls-cluster-config` | the bundled local chart in `charts/cluster-config` | `gateway-system` |
 
 The first two exist only with `gateway_implementation = "nginx-gateway-fabric"`
-(the default). The fourth renders, from one set of values:
+(the default). `cert-manager` exists only when something is issued: some listener
+is `managed`, or the Gateway is `customer-managed` (whose point here is the issuer).
+With every listener `customer_supplied`, nothing in the module creates a
+cert-manager resource, so neither cert-manager, an ACME account, a solver nor
+`acme_email` exists — and setting `acme_email`, `tls_solver` or `dns01_azure` then
+fails at plan. The fourth renders, from one set of values:
 
-- the `ClusterIssuer`: HTTP-01 through `gatewayHTTPRoute.parentRefs` (the Gateway's
+- the `ClusterIssuer` (only with an issuer): HTTP-01 through `gatewayHTTPRoute.parentRefs` (the Gateway's
   port-80 listener) or `dns01-azure`;
 - the `Gateway` (NGF only): one `http` listener on 80, for every host, that admits
   only same-namespace routes (`allowedRoutes: Same`) - cert-manager's solver routes
@@ -107,8 +112,8 @@ fresh cluster. Helm validates them at install, once the CRDs are up.
   `dns01_workload_identity`.
 
 A missing companion input fails at plan with a precondition naming it. The listener
-rules fail at plan too, enforced provider-free by `./listeners` (tested in
-`listeners/tests`): listener names are DNS-1123 labels other than `http`, at most 63;
+rules and the issuer decision fail at plan too, enforced provider-free by
+`./tls-plan` (tested in `tls-plan/tests`): listener names are DNS-1123 labels other than `http`, at most 63;
 hostnames are lowercase DNS names (optionally `*.`), each on one listener only; a
 `customer_supplied` Secret may not be a managed listener's Secret.
 
@@ -136,12 +141,12 @@ a deployment's configuration tightens it.
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `acme_email` | yes | ACME account contact |
+| `acme_email`, `tls_solver` | exactly with an issuer | ACME account contact and challenge solver; refused when every listener is `customer_supplied` |
 | `listeners`, `route_namespaces` | with NGF | one HTTPS listener per hostname with its certificate mode, and the namespaces whose routes may attach |
 | `customer_gateway` | with `customer-managed` | the existing Gateway, its port-80 listener and its HTTPS listeners |
-| `tls_solver`, `dns01_azure`, `acme_server`, `cluster_issuer_name` | no | issuer shape |
+| `dns01_azure`, `acme_server`, `cluster_issuer_name` | no | issuer shape |
 | `gateway_*`, `data_plane_*`, `max_request_body_mib` | no | Gateway placement, data-plane Service, body ceiling |
 | `*_chart_version`, `*_namespace`, `*_service_account_name`, `*_values` | no | pins, placement, overrides |
 
 Outputs: `gateway_parent_refs` (keyed by HTTPS listener: `{ name, namespace, section_name }`),
-`cluster_issuer_name`.
+`cluster_issuer_name` (`null` without an issuer).

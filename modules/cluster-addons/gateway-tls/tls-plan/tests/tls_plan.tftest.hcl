@@ -1,8 +1,11 @@
-# Every listener invariant of cluster-addons/gateway-tls, at plan time, with no provider.
+# Every input-combination invariant of cluster-addons/gateway-tls, at plan time, with no provider.
 variables {
-  gateway_name        = "gateway"
-  cluster_issuer_name = "letsencrypt"
-  tls_solver          = "http01"
+  gateway_implementation = "nginx-gateway-fabric"
+  gateway_name           = "gateway"
+  route_namespaces       = ["apps"]
+  cluster_issuer_name    = "letsencrypt"
+  acme_email             = "ops@example.test"
+  tls_solver             = "http01"
   listeners = {
     app = { hostname = "app.example.com", certificate_mode = "managed" }
     shop = {
@@ -40,6 +43,8 @@ run "customer_supplied_issues_nothing" {
 run "all_customer_supplied" {
   command = plan
   variables {
+    acme_email = null
+    tls_solver = null
     listeners = {
       a = { hostname = "*.example.com", certificate_mode = "customer_supplied", secret_name = "wildcard" }
       b = { hostname = "example.net", certificate_mode = "customer_supplied", secret_name = "wildcard" }
@@ -47,7 +52,11 @@ run "all_customer_supplied" {
   }
   assert {
     condition     = length(output.certificates) == 0 && output.listeners["a"].secret_name == "wildcard" && output.listeners["b"].secret_name == "wildcard"
-    error_message = "customer_supplied listeners issue nothing, even a wildcard with http01, and may share one Secret."
+    error_message = "customer_supplied listeners issue nothing, even a wildcard, and may share one Secret."
+  }
+  assert {
+    condition     = output.issuer == false
+    error_message = "with every listener customer_supplied no issuer (and no cert-manager) is installed."
   }
 }
 
@@ -333,11 +342,17 @@ run "two_wildcard_apexes_one_managed_one_customer_supplied" {
     condition     = join(",", keys(output.certificates)) == "dev" && output.listeners["prod"].secret_name == "example-test-wildcard"
     error_message = "the customer_supplied apex issues nothing; the managed one issues from the zone it sits in."
   }
+  assert {
+    condition     = output.issuer == true
+    error_message = "a mixed Gateway installs the issuer for its managed listener."
+  }
 }
 
 run "two_wildcard_apexes_customer_supplied" {
   command = plan
   variables {
+    acme_email = null
+    tls_solver = null
     listeners = {
       prod = {
         hostname         = "*.example.test"
@@ -355,6 +370,10 @@ run "two_wildcard_apexes_customer_supplied" {
     condition     = length(output.certificates) == 0 && output.listeners["dev"].secret_name == "dev-example-test-wildcard"
     error_message = "two customer_supplied wildcard apexes need no DNS-01 solver and issue nothing."
   }
+  assert {
+    condition     = output.issuer == false
+    error_message = "no managed listener: no issuer, no ACME account, no solver."
+  }
 }
 
 run "two_wildcard_apexes_second_zone_missing_refused" {
@@ -368,4 +387,150 @@ run "two_wildcard_apexes_second_zone_missing_refused" {
     }
   }
   expect_failures = [terraform_data.guard]
+}
+
+# --- whether an issuer exists: only for something to issue -------------------------------------
+
+run "mixed_listeners_install_the_issuer" {
+  command = plan
+  assert {
+    condition     = output.issuer == true && join(",", keys(output.certificates)) == "app"
+    error_message = "one managed listener among customer_supplied ones installs the issuer and issues only its own Certificate."
+  }
+}
+
+run "customer_supplied_only_with_acme_email_refused" {
+  command = plan
+  variables {
+    tls_solver = null
+    listeners = {
+      a = { hostname = "*.example.test", certificate_mode = "customer_supplied", secret_name = "s" }
+    }
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "customer_supplied_only_with_solver_refused" {
+  command = plan
+  variables {
+    acme_email = null
+    listeners = {
+      a = { hostname = "*.example.test", certificate_mode = "customer_supplied", secret_name = "s" }
+    }
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "customer_supplied_only_with_dns01_zones_refused" {
+  command = plan
+  variables {
+    acme_email  = null
+    tls_solver  = null
+    dns01_zones = ["example.test"]
+    listeners = {
+      a = { hostname = "*.example.test", certificate_mode = "customer_supplied", secret_name = "s" }
+    }
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "managed_without_acme_email_refused" {
+  command = plan
+  variables {
+    acme_email = null
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "managed_without_solver_refused" {
+  command = plan
+  variables {
+    tls_solver = null
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "unknown_solver_refused" {
+  command = plan
+  variables {
+    tls_solver = "dns01-route53"
+  }
+  expect_failures = [var.tls_solver]
+}
+
+run "dns01_zones_without_dns01_refused" {
+  command = plan
+  variables {
+    dns01_zones = ["example.com"]
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+# --- gateway implementation --------------------------------------------------------------------
+
+run "customer_managed_gateway_installs_the_issuer" {
+  command = plan
+  variables {
+    gateway_implementation = "customer-managed"
+    customer_gateway_given = true
+    route_namespaces       = []
+    listeners              = {}
+  }
+  assert {
+    condition     = output.issuer == true && length(output.listeners) == 0 && length(output.certificates) == 0
+    error_message = "a customer-managed Gateway gets the issuer and no module-owned listener."
+  }
+}
+
+run "customer_managed_without_acme_email_refused" {
+  command = plan
+  variables {
+    gateway_implementation = "customer-managed"
+    customer_gateway_given = true
+    listeners              = {}
+    acme_email             = null
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "customer_managed_without_customer_gateway_refused" {
+  command = plan
+  variables {
+    gateway_implementation = "customer-managed"
+    listeners              = {}
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "customer_managed_with_listeners_refused" {
+  command = plan
+  variables {
+    gateway_implementation = "customer-managed"
+    customer_gateway_given = true
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "ngf_with_customer_gateway_refused" {
+  command = plan
+  variables {
+    customer_gateway_given = true
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "ngf_without_route_namespaces_refused" {
+  command = plan
+  variables {
+    route_namespaces = []
+  }
+  expect_failures = [terraform_data.guard]
+}
+
+run "unknown_gateway_implementation_refused" {
+  command = plan
+  variables {
+    gateway_implementation = "istio"
+  }
+  expect_failures = [var.gateway_implementation]
 }

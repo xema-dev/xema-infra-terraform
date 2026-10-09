@@ -11,8 +11,8 @@ output "gateway_parent_refs" {
 }
 
 output "cluster_issuer_name" {
-  description = "Name of the ACME ClusterIssuer (the issuerRef of every managed listener's Certificate)."
-  value       = var.cluster_issuer_name
+  description = "Name of the ACME ClusterIssuer (the issuerRef of every managed listener's Certificate); null when no issuer is installed (every listener customer_supplied)."
+  value       = local.issuer ? var.cluster_issuer_name : null
 
   depends_on = [helm_release.cluster_config]
 }

@@ -25,10 +25,6 @@ resource "terraform_data" "input_guards" {
       error_message = "enable_dns = true requires apex_domain."
     }
     precondition {
-      condition     = !var.enable_gateway_tls || var.acme_email != ""
-      error_message = "enable_gateway_tls = true requires acme_email (the ACME account contact)."
-    }
-    precondition {
       condition     = !(var.enable_gateway_tls && local.dns01) || var.enable_dns
       error_message = "tls_solver = \"dns01-azure\" requires enable_dns = true (the solver edits this stack's zone through workload identity)."
     }

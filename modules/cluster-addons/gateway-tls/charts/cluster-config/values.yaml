@@ -1,4 +1,5 @@
-# Every value is set by cluster-addons/gateway-tls from its Terraform inputs.
+# Every value is set by cluster-addons/gateway-tls from its Terraform inputs. clusterIssuer is
+# null when nothing is issued (every listener customer_supplied).
 # These defaults exist only so `helm lint` renders; the module always overrides them.
 clusterIssuer:
   name: letsencrypt

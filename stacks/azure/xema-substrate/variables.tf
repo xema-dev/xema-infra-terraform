@@ -680,9 +680,9 @@ variable "key_vault_secrets" {
 # ---------------------------------------------------------------------------
 
 variable "acme_email" {
-  description = "ACME account contact e-mail. Required when enable_gateway_tls."
+  description = "ACME account contact e-mail. Required exactly when the gateway installs an issuer (some gateway_listeners entry managed, or a customer-managed Gateway); refused when every listener is customer_supplied."
   type        = string
-  default     = ""
+  default     = null
 }
 
 variable "acme_server" {
@@ -692,12 +692,12 @@ variable "acme_server" {
 }
 
 variable "tls_solver" {
-  description = "ACME challenge solver: \"http01\" or \"dns01-azure\" (needs enable_dns; required for wildcard certificates)."
+  description = "ACME challenge solver: \"http01\" or \"dns01-azure\" (needs enable_dns; required for managed wildcards). Required exactly when the gateway installs an issuer; refused when every listener is customer_supplied."
   type        = string
-  default     = "http01"
+  default     = null
 
   validation {
-    condition     = contains(["http01", "dns01-azure"], var.tls_solver)
+    condition     = var.tls_solver == null || contains(["http01", "dns01-azure"], coalesce(var.tls_solver, "-"))
     error_message = "tls_solver must be one of http01, dns01-azure."
   }
 }
@@ -735,7 +735,7 @@ variable "gateway_listeners" {
                            "customer_supplied" (the customer's kubernetes.io/tls Secret in the
                            Gateway's namespace; nothing is issued)
       - secret_name      : that Secret; required with customer_supplied, refused with managed
-    Validated by modules/cluster-addons/gateway-tls/listeners.
+    Validated by modules/cluster-addons/gateway-tls/tls-plan.
   EOT
   type = map(object({
     hostname         = string

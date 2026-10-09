@@ -12,12 +12,15 @@ listener name (the HTTPRoute `sectionName`), each with its own certificate. `cer
 cert-manager `Certificate` from the ClusterIssuer into `<gateway_name>-<key>-tls`; `secret_name` refused) or `customer_supplied`
 (`secret_name` required: the customer's `kubernetes.io/tls` Secret in `gateway_namespace`; nothing issued). The Gateway no longer
 carries `cert-manager.io/cluster-issuer` (the gateway-shim issues nothing); the port-80 listener has no hostname and serves every
-host. Refused at plan (provider-free, `gateway-tls/listeners/tests`): duplicate hostnames, a customer_supplied listener without a
+host. cert-manager and the ACME ClusterIssuer are installed only when something is issued (a managed listener, or a
+customer-managed Gateway): `acme_email` and `tls_solver` default to `null`, are required exactly then and refused otherwise, and the
+output `cluster_issuer_name` is `null` without an issuer. Refused at plan (provider-free, `gateway-tls/tls-plan/tests`): duplicate hostnames, a customer_supplied listener without a
 valid secret, a managed one with one, an unknown mode, a managed wildcard with `http01`, a managed hostname outside the
 `dns01-azure` zone, a customer Secret equal to a managed one, the reserved name `http`, more than 63 listeners. `customer_gateway`'s
 `https_section_name` is `https_section_names` (a set). `dns01_azure.hosted_zone_name` is `hosted_zone_names` (a set): one DNS-01 solver per zone, selected by `dnsZones`, so each apex issues from its own zone. Output `gateway_parent_ref` is `gateway_parent_refs` (keyed by listener).
 **Stack `stacks/azure/xema-substrate` / `examples/azure`:** `gateway_hostname` is `gateway_listeners` (same shape as `listeners`);
-output `gateway_parent_ref` is `gateway_parent_refs`; `substrate.gateway.parent_ref` is `substrate.gateway.parent_refs`. A root that
+output `gateway_parent_ref` is `gateway_parent_refs`; `substrate.gateway.parent_ref` is `substrate.gateway.parent_refs`. `acme_email` and `tls_solver`
+default to `null` (were `""` and `"http01"`): a root with a managed listener sets both; one with only customer_supplied listeners sets neither. A root that
 set `gateway_hostname = "h"` sets `gateway_listeners = { <name> = { hostname = "h", certificate_mode = "managed" } }` and takes its
 deployment's `gateway.parentRef` from `parent_refs["<name>"]` (`tooling/bind` prints the block for a named listener).
 

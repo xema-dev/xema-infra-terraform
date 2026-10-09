@@ -1,15 +1,18 @@
-# The HTTPS listeners, their Secrets and the Certificates of the managed ones, validated
-# without a provider (./listeners/tests). Only with NGINX Gateway Fabric: a customer-managed
-# Gateway's listeners and certificates are the customer's.
-module "listeners" {
-  source = "./listeners"
-  count  = local.ngf ? 1 : 0
+# Every input-combination rule, the HTTPS listeners with their Secrets, the Certificates of the
+# managed ones, and whether an issuer is installed at all — validated without a provider
+# (./tls-plan/tests).
+module "tls_plan" {
+  source = "./tls-plan"
 
-  listeners           = var.listeners
-  gateway_name        = var.gateway_name
-  cluster_issuer_name = var.cluster_issuer_name
-  tls_solver          = var.tls_solver
-  dns01_zones         = try(var.dns01_azure.hosted_zone_names, [])
+  gateway_implementation = var.gateway_implementation
+  listeners              = var.listeners
+  gateway_name           = var.gateway_name
+  route_namespaces       = var.route_namespaces
+  customer_gateway_given = var.customer_gateway != null
+  cluster_issuer_name    = var.cluster_issuer_name
+  acme_email             = var.acme_email
+  tls_solver             = var.tls_solver
+  dns01_zones            = try(var.dns01_azure.hosted_zone_names, [])
 }
 
 locals {
@@ -19,8 +22,10 @@ locals {
   # The port-80 listener's name: the contract the HTTP-01 solver route and the redirect share.
   http_section_name = "http"
 
-  listeners    = local.ngf ? module.listeners[0].listeners : {}
-  certificates = local.ngf ? module.listeners[0].certificates : {}
+  listeners    = module.tls_plan.listeners
+  certificates = module.tls_plan.certificates
+  # cert-manager and the ACME ClusterIssuer: only when something is issued (tls-plan decides).
+  issuer = module.tls_plan.issuer
 
   gateway_ref = local.ngf ? {
     name                = var.gateway_name
@@ -34,8 +39,8 @@ locals {
     https_section_names = sort(tolist(try(var.customer_gateway.https_section_names, [])))
   }
 
-  # The Gateway, NginxProxy and ClientSettingsPolicy live in the Gateway's namespace;
-  # a customer-managed Gateway is not ours, so the issuer chart sits with cert-manager.
+  # The Gateway, its Certificates, NginxProxy and ClientSettingsPolicy live in the Gateway's
+  # namespace; a customer-managed Gateway is not ours, so the issuer chart sits with cert-manager.
   config_namespace = local.ngf ? var.gateway_namespace : var.cert_manager_namespace
 
   ngf_values = yamlencode({
@@ -67,7 +72,7 @@ locals {
   ))
 
   cluster_config_values = yamlencode({
-    clusterIssuer = {
+    clusterIssuer = local.issuer ? {
       name   = var.cluster_issuer_name
       email  = var.acme_email
       server = var.acme_server
@@ -84,7 +89,7 @@ locals {
         clientID          = var.dns01_azure.client_id
         environment       = var.dns01_azure.environment
       } : null
-    }
+    } : null
     gateway = local.ngf ? {
       name            = var.gateway_name
       namespace       = var.gateway_namespace
@@ -144,7 +149,11 @@ resource "helm_release" "nginx_gateway_fabric" {
   depends_on = [helm_release.gateway_api_crds]
 }
 
+# cert-manager is installed only with an issuer: with every listener customer_supplied nothing in
+# this module (or anywhere else in this repository) creates a cert-manager resource.
 resource "helm_release" "cert_manager" {
+  count = local.issuer ? 1 : 0
+
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
   chart            = "cert-manager"
@@ -156,29 +165,6 @@ resource "helm_release" "cert_manager" {
 
   # cert-manager's controller fails to start with enableGatewayAPI when the Gateway API CRDs are absent.
   depends_on = [helm_release.gateway_api_crds]
-
-  lifecycle {
-    precondition {
-      condition     = !local.dns01 || var.dns01_azure != null
-      error_message = "tls_solver = \"dns01-azure\" requires dns01_azure (subscription, resource group, zone, client id)."
-    }
-    precondition {
-      condition     = local.ngf || var.customer_gateway != null
-      error_message = "gateway_implementation = \"customer-managed\" requires customer_gateway (the existing Gateway's name, namespace and listener names)."
-    }
-    precondition {
-      condition     = !local.ngf || var.customer_gateway == null
-      error_message = "customer_gateway is only meaningful with gateway_implementation = \"customer-managed\"."
-    }
-    precondition {
-      condition     = !local.ngf || length(var.route_namespaces) > 0
-      error_message = "gateway_implementation = \"nginx-gateway-fabric\" requires a non-empty route_namespaces: no namespace may attach routes by default."
-    }
-    precondition {
-      condition     = local.ngf || length(var.listeners) == 0
-      error_message = "listeners are only meaningful with gateway_implementation = \"nginx-gateway-fabric\": a customer-managed Gateway's listeners and certificates are the customer's (name them in customer_gateway.https_section_names)."
-    }
-  }
 }
 
 # The ClusterIssuer, Gateway, Certificates, NginxProxy and ClientSettingsPolicy are custom resources whose CRDs do

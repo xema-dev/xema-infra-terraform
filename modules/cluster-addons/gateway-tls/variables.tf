@@ -98,7 +98,7 @@ variable "listeners" {
                            kubernetes.io/tls Secret in gateway_namespace; nothing is issued)
       - secret_name      : that Secret's name; required with customer_supplied, refused with managed
     The rules (unique hostnames, the solver able to issue every managed hostname, ...) are
-    enforced at plan time by ./listeners.
+    enforced at plan time by ./tls-plan.
   EOT
   type = map(object({
     hostname         = string
@@ -213,11 +213,12 @@ variable "cluster_issuer_name" {
 }
 
 variable "acme_email" {
-  description = "Contact e-mail registered with the ACME account (expiry notices). Required."
+  description = "Contact e-mail registered with the ACME account (expiry notices). Required exactly when an issuer is installed (some listener managed, or a customer-managed Gateway); refused when every listener is customer_supplied."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.acme_email))
+    condition     = var.acme_email == null || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", coalesce(var.acme_email, "-")))
     error_message = "acme_email must be an e-mail address."
   }
 }
@@ -229,12 +230,12 @@ variable "acme_server" {
 }
 
 variable "tls_solver" {
-  description = "ACME challenge solver: \"http01\" (a cert-manager HTTPRoute on the Gateway's port-80 listener; needs public reachability of every hostname) or \"dns01-azure\" (Azure DNS via workload identity; needed for wildcard certificates)."
+  description = "ACME challenge solver: \"http01\" (a cert-manager HTTPRoute on the Gateway's port-80 listener; needs public reachability of every managed hostname) or \"dns01-azure\" (Azure DNS via workload identity; needed for managed wildcards). Required exactly when an issuer is installed; refused when every listener is customer_supplied."
   type        = string
-  default     = "http01"
+  default     = null
 
   validation {
-    condition     = contains(["http01", "dns01-azure"], var.tls_solver)
+    condition     = var.tls_solver == null || contains(["http01", "dns01-azure"], coalesce(var.tls_solver, "-"))
     error_message = "tls_solver must be one of http01, dns01-azure."
   }
 }
@@ -260,4 +261,9 @@ variable "dns01_azure" {
     environment         = optional(string, "AzurePublicCloud")
   })
   default = null
+
+  validation {
+    condition     = var.dns01_azure == null || try(length(var.dns01_azure.hosted_zone_names) > 0, false)
+    error_message = "dns01_azure.hosted_zone_names must name at least one zone."
+  }
 }

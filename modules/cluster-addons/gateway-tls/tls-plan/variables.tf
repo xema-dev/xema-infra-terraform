@@ -1,6 +1,16 @@
+variable "gateway_implementation" {
+  description = "\"nginx-gateway-fabric\" (the module owns the Gateway and its listeners) or \"customer-managed\" (the customer's Gateway; the module provides only the issuer)."
+  type        = string
+
+  validation {
+    condition     = contains(["nginx-gateway-fabric", "customer-managed"], var.gateway_implementation)
+    error_message = "gateway_implementation must be one of nginx-gateway-fabric, customer-managed."
+  }
+}
+
 variable "listeners" {
   description = <<-EOT
-    The Gateway's HTTPS listeners, keyed by listener name (the HTTPRoute parentRef sectionName).
+    With nginx-gateway-fabric, the Gateway's HTTPS listeners (empty with customer-managed), keyed by listener name (the HTTPRoute parentRef sectionName).
     One listener per hostname, each with its own certificate. Each entry:
       - hostname         : the host it serves, exact ("app.example.com") or a wildcard
                            ("*.example.com"); any number of apex domains may appear
@@ -16,6 +26,7 @@ variable "listeners" {
     certificate_mode = string
     secret_name      = optional(string)
   }))
+  default = {}
 
   validation {
     condition     = alltrue([for k, _ in var.listeners : can(regex("^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$", k)) && k != "http"])
@@ -58,23 +69,42 @@ variable "gateway_name" {
   type        = string
 }
 
+variable "route_namespaces" {
+  description = "Namespaces whose HTTPRoutes may attach to the module's HTTPS listeners."
+  type        = set(string)
+  default     = []
+}
+
+variable "customer_gateway_given" {
+  description = "Whether the caller named a customer-managed Gateway (customer_gateway != null)."
+  type        = bool
+  default     = false
+}
+
 variable "cluster_issuer_name" {
   description = "The ACME ClusterIssuer every managed listener's Certificate references."
   type        = string
 }
 
-variable "tls_solver" {
-  description = "The ClusterIssuer's ACME solver (\"http01\" | \"dns01-azure\"); decides which managed hostnames can be issued."
+variable "acme_email" {
+  description = "ACME account contact. Required exactly when an issuer is installed (a managed listener, or a customer-managed Gateway); refused otherwise."
   type        = string
+  default     = null
+}
+
+variable "tls_solver" {
+  description = "The ClusterIssuer's ACME solver (\"http01\" | \"dns01-azure\"). Required exactly when an issuer is installed; refused otherwise."
+  type        = string
+  default     = null
 
   validation {
-    condition     = contains(["http01", "dns01-azure"], var.tls_solver)
+    condition     = var.tls_solver == null || contains(["http01", "dns01-azure"], coalesce(var.tls_solver, "-"))
     error_message = "tls_solver must be one of http01, dns01-azure."
   }
 }
 
 variable "dns01_zones" {
-  description = "With dns01-azure, the DNS zones the solver writes challenge records into (one per apex it issues for); every managed hostname must sit in one of them. Empty with http01."
+  description = "The DNS zones a dns01-azure solver writes challenge records into (one per apex it issues for); every managed hostname must sit in one. Empty unless tls_solver = \"dns01-azure\"."
   type        = set(string)
   default     = []
 }
