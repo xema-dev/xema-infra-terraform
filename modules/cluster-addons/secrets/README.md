@@ -1,18 +1,10 @@
-# `cluster-addons/secrets`
+# cluster-addons/secrets
 
-Cloud-agnostic. Materializes operator-provided credentials as **Kubernetes
-Secrets** on the target cluster — the **management-plane secret backend**: the
-source that Helm values reference via `secretKeyRef` (registry-mirror creds,
-Teleport/Headscale credentials, etc.).
+Creates operator-provided credentials as Kubernetes Secrets on the target cluster. Helm values reference them with `secretKeyRef`. The Secret names are the stable contract.
 
-Works on any conformant cluster (uses the `kubernetes` provider only). The
-namespaces must already exist (pair with
-[`cluster-addons/workload-namespaces`](../workload-namespaces) if you need to
-create them first).
+## When to use it
 
-> **v1 scope.** This materializes the values handed to Terraform. The Secret
-> **names** are the stable contract, so it can later be swapped for an
-> external-secrets-operator / Vault flow without changing the Helm consumers.
+Use it for credentials a cluster needs before any secrets backend exists. The namespaces must already exist (see [`workload-namespaces`](../workload-namespaces)). It uses only the `kubernetes` provider.
 
 ## Usage
 
@@ -26,21 +18,16 @@ module "secrets" {
       type      = "kubernetes.io/dockerconfigjson"
       data      = { ".dockerconfigjson" = var.registry_dockerconfigjson }
     }
-    teleport_oidc = {
-      namespace = "teleport"
-      data      = { client-secret = var.teleport_oidc_client_secret }
-    }
   }
 }
 ```
 
-The whole `secrets` input is `sensitive`. Provide values via `TF_VAR_*` env or a
-sops-decrypted tfvars that is never committed.
+The `secrets` input is sensitive. Pass values through `TF_VAR_*` or a decrypted tfvars file that is never committed. The import id of a Secret is `<namespace>/<name>`.
+
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `secrets` | no (default `{}`) | map keyed by id → `{ name?, namespace, type?, data, labels? }` |
+| `secrets` | no | Operator-provided credentials to materialize as Kubernetes Secrets, keyed by a stable id. |
 
-Outputs: `secret_names` (map id→name), `namespaces` (distinct list).
-
-Import id of a Kubernetes Secret = `"<namespace>/<name>"`.
+Outputs: `secret_names`, `namespaces`.

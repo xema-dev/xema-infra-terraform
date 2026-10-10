@@ -1,78 +1,43 @@
-# `cluster-addons/rwx-storage`
+# cluster-addons/rwx-storage
 
-Cloud-agnostic [`cluster-addons/rwx-storage`](../../../docs/CONTRACTS.md#cloud-agnostic-modules-no-per-cloud-implementation-needed)
-module. Installs an NFS provisioner via Helm and creates a ReadWriteMany
-`StorageClass` against it. Works against any conformant Kubernetes cluster.
+Installs an NFS provisioner with Helm and creates a ReadWriteMany `StorageClass` against it. It works on any conformant Kubernetes cluster. The defaults use the OpenEBS dynamic NFS provisioner and the class name `nfs-rwx-storage`.
 
-The canonical Xema deployment uses the StorageClass name `nfs-rwx-storage`
-backed by the OpenEBS dynamic NFS provisioner — the defaults match that live
-setup so an existing cluster imports as a no-op.
+## When to use it
+
+Use it when workloads need ReadWriteMany volumes. Set `manage_provisioner_chart = false` to create only the `StorageClass` when a provisioner is already installed.
 
 ## Usage
 
 ```hcl
 module "rwx_storage" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/rwx-storage?ref=v0.13.0"
-
-  # Defaults already target the canonical OpenEBS dynamic NFS provisioner.
-  storage_class_name        = "nfs-rwx-storage"
-  storage_class_provisioner = "openebs.io/nfsrwx"
-
-  # Swap the chart to adopt a different provisioner, e.g. csi-driver-nfs:
-  # chart_repository          = "https://kubernetes-sigs.github.io/csi-driver-nfs"
-  # chart_name                = "csi-driver-nfs"
-  # storage_class_provisioner = "nfs.csi.k8s.io"
 }
 ```
 
-## Consuming a pre-installed provisioner
+To use another provisioner, set `chart_repository`, `chart_name` and `storage_class_provisioner` (for example `csi-driver-nfs` with `nfs.csi.k8s.io`). The `helm` and `kubernetes` providers are configured by the root.
 
-If the cluster **already** has an NFS provisioner (e.g. hand-installed), set
-`manage_provisioner_chart = false` to manage **only** the StorageClass and leave
-the existing Helm release alone. This avoids adopting a drift-prone Helm release
-into Terraform state — you import just the StorageClass:
+Import ids: the `StorageClass` name, and `<namespace>/<release>` for the Helm release.
 
-```hcl
-module "rwx_storage" {
-  source                    = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/rwx-storage?ref=v0.13.0"
-  manage_provisioner_chart  = false           # consume the existing provisioner
-  storage_class_provisioner = "openebs.io/nfsrwx"
-  allow_volume_expansion    = false           # match the live class
-}
-```
-
-## Notes
-
-- The `helm` and `kubernetes` providers are configured by the **root/stack**,
-  not here (see [CONVENTIONS.md](../../../docs/CONVENTIONS.md)).
-- `manage_provisioner_chart` (default `true`) gates the Helm release; when
-  `false` the chart_* inputs are inert and only the StorageClass is created.
-- `chart_repository` / `chart_name` / `chart_version` / `namespace` /
-  `release_name` are all variables so adopters can swap the OpenEBS dynamic NFS
-  provisioner for `csi-driver-nfs` or any other RWX backend without forking the
-  module.
-- The StorageClass `depends_on` the Helm release so the provisioner is
-  registered before the class is created.
-
-## Importing
-
-- **StorageClass** — the import id is the StorageClass **name**:
-  ```
-  terraform import module.rwx_storage.kubernetes_storage_class_v1.this nfs-rwx-storage
-  ```
-- **Helm release** — the import id is `"<namespace>/<release>"`:
-  ```
-  terraform import module.rwx_storage.helm_release.this openebs/openebs-nfs-provisioner
-  ```
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `chart_repository`, `chart_name`, `chart_version` | no | which provisioner chart to install (defaults: OpenEBS dynamic NFS) |
-| `namespace`, `create_namespace`, `release_name` | no | Helm release placement |
-| `chart_values`, `chart_set` | no | Helm value overrides |
-| `storage_class_name` | no | StorageClass name (default `nfs-rwx-storage`) |
-| `storage_class_provisioner`, `storage_class_parameters` | no | provisioner id + params (must match the chart) |
-| `volume_binding_mode`, `reclaim_policy` | no | closed-set, validated (default `Immediate` / `Delete`) |
-| `allow_volume_expansion`, `is_default_class`, `storage_class_labels` | no | StorageClass behaviour + metadata |
+| `manage_provisioner_chart` | no | Whether this module installs/manages the NFS provisioner Helm release. |
+| `chart_repository` | no | Helm repository URL for the NFS provisioner chart. |
+| `chart_name` | no | Helm chart name for the NFS provisioner (e.g, "nfs-provisioner" or "csi-driver-nfs"). |
+| `chart_version` | no | Pinned Helm chart version. |
+| `namespace` | no | Namespace the NFS provisioner Helm release is installed into. |
+| `create_namespace` | no | Whether the Helm release should create its target namespace if it does not already exist. |
+| `release_name` | no | Helm release name for the NFS provisioner. |
+| `chart_values` | no | Inline Helm values for the provisioner chart, merged on top of chart defaults. |
+| `chart_set` | no | Scalar Helm --set overrides for the provisioner chart, keyed by value path (e.g, { "replicaCount" = "1"... |
+| `storage_class_name` | no | Name of the ReadWriteMany StorageClass to create. |
+| `storage_class_provisioner` | no | The provisioner field on the StorageClass. |
+| `storage_class_parameters` | no | Parameters passed to the StorageClass provisioner (provisioner-specific, e.g, the backing StorageClass / NF... |
+| `volume_binding_mode` | no | StorageClass volumeBindingMode. |
+| `reclaim_policy` | no | StorageClass reclaimPolicy. |
+| `allow_volume_expansion` | no | Whether PVCs bound to this StorageClass may be expanded. |
+| `is_default_class` | no | Mark this StorageClass as the cluster default (sets the storageclass.kubernetes.io/is-default-class annotat... |
+| `storage_class_labels` | no | Labels applied to the StorageClass metadata. |
 
 Outputs: `storage_class_name`, `release_name`, `namespace`.

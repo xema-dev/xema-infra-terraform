@@ -1,86 +1,29 @@
-# Example — the customer-owned consumer root
+# Example: customer-owned consumer root
 
-What a customer's **private** repository carries for the substrate, and all of
-it:
+What a customer's private repository carries for the substrate.
 
-| file | what |
+| File | Purpose |
 | --- | --- |
-| `main.tf` | `module "substrate"` pinned to a RELEASED version (`?ref=v0.6.0`) + the outputs BIND reads |
-| `variables.tf` | the inputs this deployment sets; everything else keeps the stack's default |
-| `terraform.tfvars` (from `.example`) | the values — neutral placeholders here, yours there |
-| `backend.hcl` (from `.example`) | where the state lives — the first binding a handoff moves |
+| `main.tf` | `module "substrate"` pinned to a released version, and the outputs `tooling/bind` reads |
+| `variables.tf` | the inputs this deployment sets, including the `platform_databases` and `workload_namespaces` rosters |
+| `terraform.tfvars.example` | placeholder values |
+| `backend.hcl.example` | where the state lives |
+| `ci/` | `source_override.tf.ci`, used by this repo's CI only |
 
-**Two onboarding questions decide the engine, and nothing else does:**
+A consumer root must declare `platform_databases` and `workload_namespaces` as its own variables and pass them into the module call.
 
-1. *Does the customer mandate Terraform / HCP?* — yes → run `terraform`;
-   no → run `tofu` (OpenTofu, the default engine).
-2. *Is future Terraform portability required?* — default **yes** for
-   customer-owned infrastructure. Every module here is `terraform-portable`
-   (standard HCL, no OpenTofu-only construct, a backend both engines read), so
-   the answer costs nothing today; it is recorded so a later `opentofu-native`
-   module is never adopted into this root by accident.
-
-The commands below say `tofu`; every one of them is the same with
-`terraform` in its place. Same files, same state, no wrapper — see
-`docs/CONTRACTS.md § Engine and authoring profile`.
-
-**A consumer root must declare the rosters too.** An `.auto.tfvars.json`
-carries the roster fine — it sets ROOT variables, so a consumer must ALSO
-declare `platform_databases` / `workload_namespaces` as root variables and
-pass them into the module call, or it fails with "The argument is required".
-This root declares both in `variables.tf` and passes both in `main.tf`'s
-module block; every other required input follows the same shape.
-
-**VENDOR the pinned release; never reference our repository from `init`.**
-`?ref=v0.6.0` against `github.com/xema-dev/xema-infra-terraform` is how THIS
-example stays readable, and it is NOT the day-one shape for a customer-owned
-root: that repository is private, and permanent read access to it is never the
-handoff shape (owner ruling, 2026-09-16). A customer root carries the module set
-VENDORED at the pinned version — the release tarball
-(`https://github.com/xema-dev/xema-infra-terraform/archive/refs/tags/v0.6.0.tar.gz`,
-or a mirror of this repository in the customer's own Git) unpacked to
-`vendor/xema-infra-terraform-v0.6.0/`, and
-`source = "./vendor/xema-infra-terraform-v0.6.0/stacks/<cloud>/xema-substrate"`.
-The stacks reference their modules by RELATIVE path (`../../../modules/…`), so
-vendoring the tree whole keeps every module resolvable and `init` needs nothing
-of ours — providers still come from the public registries as usual. An upgrade
-is a new vendored tree beside the old one and a one-line `source` change, with
-the same reviewed plan; the CHANGELOG still names every input a release adds.
-
-**Module version + tfvars. Never a forked stack.** Adopting a release is a
-one-line `?ref=` change, `terraform init -upgrade`, and a plan that is
-reviewed — the [CHANGELOG](../../CHANGELOG.md) names every input a release
-adds or requires. A fork is a stack nobody upgrades; a pin is one everybody can.
-
-## Run
+## Usage
 
 ```sh
-cp terraform.tfvars.example terraform.tfvars   # edit: every value is yours
-cp backend.hcl.example      backend.hcl        # edit: your state bucket
-export AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=…          # state backend
-export TF_VAR_do_token=… TF_VAR_keycloak_client_secret=…    # providers
+cp terraform.tfvars.example terraform.tfvars
+cp backend.hcl.example      backend.hcl
+export AWS_ACCESS_KEY_ID=...  AWS_SECRET_ACCESS_KEY=...
+export TF_VAR_do_token=...    TF_VAR_keycloak_client_secret=...
 tofu init -backend-config=backend.hcl
-tofu apply -target=module.substrate.module.cluster          # greenfield only: phase 1
-tofu apply                                                  # phase 2
+tofu apply -target=module.substrate.module.cluster   # greenfield only
+tofu apply
 ```
 
-Then BIND — the outputs into the deployment root's two input files, with no
-credential typed by hand. `--secret-inputs` MERGES into the committed file
-(every key you declared is kept; a disagreement with the stack is reported):
+`terraform` works the same in place of `tofu`. Then bind the outputs into the deployment root with [`tooling/bind`](../../tooling/bind).
 
-```sh
-tofu output -json | node <xema-infra-terraform>/tooling/bind/bind-outputs.mjs \
-  --secret-inputs <deployment root>/deployments/acme-prod/secret-inputs.yaml --externals "$HOME/.config/acme/externals.json"
-```
-
-See [`tooling/bind/README.md`](../../tooling/bind/README.md) for the mapping,
-and `docs/CONTRACTS.md § Three ownership modes` for who holds which of these
-files in each mode.
-
-## Validating this example offline
-
-`main.tf`'s git source needs the network. This repository's CI validates every
-root on BOTH engines with `-backend=false` and no network, so it first copies
-`ci/source_override.tf.ci` to `source_override.tf` (git-ignored), which points
-the module at the stack in the checkout under test. That override exists for
-CI only; a customer root has no such file.
+Pin a released version and upgrade by changing the `?ref=`; the [CHANGELOG](../../CHANGELOG.md) lists the inputs each release adds. To avoid a runtime dependency on this repository, vendor the release tarball and use a relative `source` into it; the stacks reference their modules by relative path.

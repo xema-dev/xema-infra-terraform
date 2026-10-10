@@ -1,10 +1,10 @@
-# `providers/azure/state-bucket`
+# providers/azure/state-bucket
 
-Azure implementation of the [`state-bucket` contract](../../../../docs/CONTRACTS.md#state-bucket-bootstrap-only).
-A storage account plus one private container dedicated to holding **Terraform
-state** — versioning and soft delete forced on. Kept separate from
-[`object-bucket`](../object-bucket/README.md) because its lifecycle and access
-policy differ (it holds state, so it must be private + versioned).
+A storage account and one private container that hold Terraform state, with versioning and soft delete forced on. Implements the [`state-bucket` contract](../../../../docs/CONTRACTS.md#state-bucket-bootstrap-only). Separate from [`object-bucket`](../object-bucket) because state must be private and versioned.
+
+## When to use it
+
+Use it once, to bootstrap the backend other roots store state in.
 
 ## Usage
 
@@ -21,40 +21,22 @@ output "backend_config_hint" {
 }
 ```
 
-## Bootstrap (the chicken-and-egg)
+1. Apply a bootstrap root containing only this module, with no `backend {}` block (state stays local).
+2. Put the `backend_config_hint` block, with a per-root `key`, in each root's `backend.hcl` and run `terraform init -migrate-state`.
 
-A backend cannot reference an account that does not exist yet, so this account
-is created **before** any root uses it as a backend:
+The `azurerm` backend locks with blob leases. Authenticate with Entra ID (`use_azuread_auth = true`); the principal needs Storage Blob Data Contributor on the container. Private access, versioning and soft delete are not configurable.
 
-1. **Create the account with LOCAL state** (or out-of-band): a tiny bootstrap
-   root consuming just this module, with **no** `backend {}` block.
-   `terraform apply` writes its own state to disk.
-2. **Read `backend_config_hint`** to get the exact `backend "azurerm" {}` block.
-3. **Point other roots at it**: drop that block (with a per-root `key`) into the
-   substrate root's `backend.hcl` and `terraform init -migrate-state`.
-
-The bootstrap root's own local state is small and rarely changes; commit nothing
-sensitive from it (see [CONVENTIONS.md § State & secrets](../../../../docs/CONVENTIONS.md)).
-
-## Notes
-
-- The `azurerm` backend locks natively with **blob leases** — no lock table.
-- Authenticate the backend with **Entra ID** (`use_azuread_auth = true`); the
-  running principal needs *Storage Blob Data Contributor* on the container. No
-  account key is ever committed or needed.
-- Private access, versioning and soft delete are **not** configurable here: a
-  state store that is public or unversioned is a footgun.
-- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
-  here.
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name` | yes | globally-unique storage account name (3-24 lowercase alphanumerics) |
-| `region` | yes | Azure location |
-| `container_name` | no | state container (default `tfstate`) |
-| `replication` | no | `LRS` (default), `ZRS`, `GRS`, `GZRS` |
-| `soft_delete_retention_days` | no | recovery window for deleted state blobs (default 30) |
-| `resource_group_name`, `tags` | no | use an existing resource group (else `"<name>-rg"`), tagging |
+| `name` | yes | Storage account name dedicated to Terraform state: 3-24 lowercase letters/digits, globally unique across Az... |
+| `region` | yes | Azure location (e.g, "westeurope"). |
+| `container_name` | no | Blob container holding the state objects. |
+| `replication` | no | Storage redundancy: one of "LRS", "ZRS", "GRS", "GZRS". |
+| `soft_delete_retention_days` | no | Days a deleted state blob (or blob version) stays recoverable. |
+| `shared_access_key_enabled` | no | Allow account-key access (default true). |
+| `resource_group_name` | no | Existing resource group to create the account in. |
+| `tags` | no | Tags applied to every created resource. |
 
-Outputs: `bucket`, `endpoint`, `container`, `resource_group_name`,
-`backend_config_hint` (the `backend "azurerm" {}` block).
+Outputs: `bucket`, `endpoint`, `container`, `resource_group_name`, `backend_config_hint`.

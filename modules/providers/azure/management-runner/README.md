@@ -1,43 +1,46 @@
-# `providers/azure/management-runner`
+# providers/azure/management-runner
 
-One small Linux VM inside the deployment's network: the deployment's
-**management runner**. There is no VPN.
+One small Linux VM inside the deployment's network, used to reach resources that are only reachable through the VNet.
 
-- **Why it exists.** With PostgreSQL, the cache, the storage account and the key
-  vault reachable only through the VNet, anything that writes INSIDE them —
-  PostgreSQL roles and grants, Key Vault secrets, the deployment engine — has to
-  run from inside the network. This is that place, and it is also restricted SSH
-  access for a human.
-- **Access.** SSH public keys only (password login disabled). Inbound SSH only
-  from `allowed_ssh_cidrs`, which is required and may not be the whole internet.
-  The NSG always carries an explicit inbound DenyAll (priority 4096) above
-  Azure's default AllowVnetInBound, so the VNet and any routed customer network
-  cannot reach the VM on any other port; only `AzureLoadBalancer` (110) and the
-  SSH allowlist (100) are allowed. There is no input to loosen this; add rules
-  through the `network_security_group_id` output (priorities 120-4095). Run
-  command needs no inbound.
-- **Identity.** A system-assigned managed identity, so Terraform and the engine
-  need no stored credential. What it may do is granted by the deployment
-  (`principal_id` output), never by this module.
-- **Base only.** cloud-init installs packages from signed distribution
-  repositories (git, jq, the PostgreSQL and Redis clients, the Azure CLI). The
-  deployment TOOLING is not installed here: it is pinned by the deployment's own
-  lock and installed from artifacts the customer controls, so rebuilding the VM
-  can never silently change a tool version.
-- **Ownership.** It belongs to the deployment. At handoff it stays where it is;
-  only `ssh_public_keys`, `allowed_ssh_cidrs` and the identity's grants change.
+## When to use it
 
-The default size, `Standard_B2als_v2` (2 vCPU / 4 GiB, burstable), is one of the
-cheapest sizes that runs Terraform and the engine comfortably.
+Use it when PostgreSQL, the cache, storage and the key vault are private and something must write inside them (roles and grants, Key Vault secrets, the deployment engine), or when a human needs restricted SSH access.
 
-**Zone pinning.** `zone` ("1", "2" or "3") is optional; empty lets Azure choose,
-which is the unchanged behaviour. Pin it when the subscription marks a zone
-`NotAvailableForSubscription` for the VM family: the placement then fails or
-lands somewhere unwanted. The resource SKUs API shows it
-(`az vm list-skus --location <region> --size <vm_size> --zone` and read the
-`restrictions`).
+## Usage
 
-Outputs: `public_ip_address` (the SSH target and the runner's egress address —
-add it to the cluster's `authorized_ip_ranges`), `private_ip_address`,
-`principal_id`, `admin_username`, `network_security_group_id`,
-`network_security_group_name`, `vm_id` (resource id of the runner VM).
+```hcl
+module "runner" {
+  source = "github.com/xema-dev/xema-infra-terraform//modules/providers/azure/management-runner?ref=v0.13.0"
+
+  name              = "acme-dev-runner"
+  region            = "westeurope"
+  resource_group_name = module.network.resource_group_name
+  subnet_id         = module.network.management_subnet_id
+  ssh_public_keys   = [var.ssh_public_key]
+  allowed_ssh_cidrs = ["203.0.113.0/24"]
+}
+```
+
+- SSH uses public keys only, and only from `allowed_ssh_cidrs`, which must be set and may not be the whole internet. The network security group denies all other inbound traffic; add rules through the `network_security_group_id` output (priorities 120-4095).
+- The VM has a system-assigned identity. Grant its permissions to `principal_id` yourself.
+- cloud-init installs only base packages; deployment tooling is not installed here.
+- `zone` is optional; pin it when your subscription restricts a zone for the VM size.
+
+## Configuration
+
+| Input | Required | Description |
+| --- | --- | --- |
+| `name` | yes | Name of the VM; prefixes its NIC, public IP and NSG. |
+| `region` | yes | Azure region (must be the VNet's). |
+| `resource_group_name` | yes | Resource group to create the runner in. |
+| `subnet_id` | yes | Subnet the runner lives in (providers/azure/network's management_subnet_id). |
+| `vm_size` | no | VM size. |
+| `zone` | no | Availability zone for the VM ("1", "2", "3"). |
+| `admin_username` | no | Login name on the VM. |
+| `ssh_public_keys` | yes | SSH public keys allowed to log in. |
+| `allowed_ssh_cidrs` | no | Source CIDRs allowed to reach SSH. |
+| `public_ip_enabled` | no | Give the VM a public IP (default true). |
+| `os_disk_size_gb` | no | OS disk size in GiB. |
+| `tags` | no | Tags applied to every taggable resource. |
+
+Outputs: `public_ip_address`, `private_ip_address`, `principal_id`, `admin_username`, `network_security_group_id`, `network_security_group_name`, `vm_id`.

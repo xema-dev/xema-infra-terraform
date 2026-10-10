@@ -1,11 +1,10 @@
-# `providers/azure/cluster`
+# providers/azure/cluster
 
-Azure implementation of the [`cluster` contract](../../../../docs/CONTRACTS.md#cluster).
-Provisions an AKS cluster with a default (system) node pool plus any number of
-additional user pools (autoscaling and taints supported), inside a virtual
-network the module creates — one subnet for the nodes and one **delegated** to
-PostgreSQL Flexible Server so [`managed-postgres`](../managed-postgres/README.md)
-can attach privately. OIDC issuer + **workload identity** are always on.
+An AKS cluster with a default node pool and any number of user pools (autoscaling and taints supported), plus the network it runs in: a node subnet and a subnet delegated to PostgreSQL Flexible Server. The OIDC issuer and workload identity are always on. Implements the [`cluster` contract](../../../../docs/CONTRACTS.md#cluster).
+
+## When to use it
+
+Use it to create the Kubernetes cluster of the Azure substrate.
 
 ## Usage
 
@@ -19,11 +18,7 @@ module "cluster" {
   default_pool_id    = "generic"
 
   node_pools = {
-    generic = {
-      size       = "Standard_D4s_v5"
-      node_count = 3
-      labels     = { serve_type = "generic" }
-    }
+    generic = { size = "Standard_D4s_v5", node_count = 3 }
     workers = {
       size      = "Standard_D8s_v5"
       min_nodes = 1
@@ -31,66 +26,42 @@ module "cluster" {
       taints    = [{ key = "workload", value = "workers", effect = "NoSchedule" }]
     }
   }
-
-  tags = { deployment = "acme-dev" }
 }
 ```
 
-## Notes
+- Credentials are client certificates; the `token` output is always `""`.
+- Pool keys are AKS agent pool names (`^[a-z][a-z0-9]{0,11}$`). The default pool cannot carry taints.
+- `kubernetes_version` is a prefix; patch upgrades do not produce a plan diff.
+- A NetworkPolicy engine is always enforced: `network_policy_engine` is `cilium` (default) or `calico`. Changing it on an existing cluster recreates it.
+- Each pool takes optional `zones`, `os_disk_size_gb` and `os_disk_type` (`Managed` or `Ephemeral`). Changing them on an existing pool replaces it.
+- The `azurerm` provider is configured by the root. To adopt an existing cluster, see [`import-runbook.md`](../../../../docs/import-runbook.md).
 
-- **No token.** AKS hands out client-certificate credentials, so the contract's
-  `token` output is always `""`; feed `client_certificate` + `client_key` to the
-  `kubernetes`/`helm` providers instead (the stack does this).
-- **Pool keys are AKS agent pool names** (`^[a-z][a-z0-9]{0,11}$`). The default
-  pool cannot carry taints — AKS refuses it — so the module fails fast with a
-  precondition rather than silently dropping them.
-- The cluster runs under a **user-assigned identity** with *Network Contributor*
-  on the VNet (granted before the cluster exists, which a system-assigned
-  identity cannot do). Its kubelet identity is exposed as `kubelet_identity_id`
-  for registry-pull grants.
-- `kubernetes_version` is a prefix resolved through
-  `azurerm_kubernetes_service_versions` and then `ignore_changes`d, so a new
-  patch does not force a plan diff; bump the variable deliberately to upgrade.
-- Networking is Azure CNI **overlay** with a standard load balancer; the three
-  CIDR inputs default to non-overlapping ranges.
-- **NetworkPolicy is always enforced.** `network_policy_engine` (`"cilium"` default |
-  `"calico"`) sets `network_data_plane` / `network_policy`; there is no
-  `"none"`, since AKS without an engine silently ignores every NetworkPolicy. Changing
-  it on an EXISTING cluster changes the network dataplane and **forces recreation**, so
-  settle it before the first apply. `cilium` requires AKS-managed Cilium and Linux node pools only.
-- The module always creates its own VNet; adopting an existing network is not
-  modelled (the delegated Postgres subnet is part of the contract this module
-  provides).
-- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
-  here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
-- Importing an existing cluster: see [import-runbook.md](../../../../docs/import-runbook.md).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name`, `region`, `kubernetes_version` | yes | cluster identity + version prefix |
-| `node_pools`, `default_pool_id` | yes | pools keyed by id; which is the default |
-| `resource_group_name` | no | use an existing resource group (else `"<name>-rg"` is created) |
-| `vnet_id`, `node_subnet_id` | yes | the network the nodes live in — CONSUMED from `providers/azure/network`, never created here |
-| `service_cidr`, `dns_service_ip`, `pod_cidr` | no | in-cluster address ranges |
-| `network_policy_engine` | no | `cilium` (default) \| `calico`; always one, never none |
-| `sku_tier`, `automatic_upgrade_channel`, `authorized_ip_ranges` | no | control-plane tier, upgrades, API allow-list |
-| `enable_log_analytics`, `log_analytics_retention_days`, `tags` | no | monitoring + tagging |
+| `name` | yes | Cluster name. |
+| `region` | yes | Azure location (e.g, "westeurope"). |
+| `kubernetes_version` | yes | AKS control-plane version prefix (e.g, "1.31"). |
+| `node_pools` | yes | Node pools keyed by a stable pool id. |
+| `default_pool_id` | yes | Which key in node_pools is the AKS default (system) pool. |
+| `resource_group_name` | no | Existing resource group to create the cluster in. |
+| `vnet_id` | yes | Virtual network the cluster's nodes live in (providers/azure/network's vnet_id). |
+| `node_subnet_id` | yes | Subnet the node pools are placed in (providers/azure/network's aks_subnet_id). |
+| `service_cidr` | no | Kubernetes Service CIDR. |
+| `dns_service_ip` | no | Cluster DNS service IP (inside service_cidr). |
+| `pod_cidr` | no | Pod CIDR for Azure CNI overlay. |
+| `network_policy_engine` | no | The NetworkPolicy engine enforcing every Kubernetes NetworkPolicy on the cluster (Azure CNI overlay): - "ci... |
+| `sku_tier` | no | AKS control-plane SKU tier: one of "Free", "Standard", "Premium". |
+| `automatic_upgrade_channel` | no | AKS automatic upgrade channel: one of "patch", "rapid", "node-image", "stable", or "" (empty) to... |
+| `authorized_ip_ranges` | no | CIDRs allowed to reach the Kubernetes API server. |
+| `outbound_type` | no | AKS egress: "loadBalancer" (default — AKS provisions its own public egress address), "userDefinedRouting... |
+| `route_table_id` | no | Id of the route table associated with node_subnet_id. |
+| `private_cluster_enabled` | no | Expose the Kubernetes API only on a private address inside the VNet (no public endpoint). |
+| `private_cluster_public_fqdn_enabled` | no | For a private cluster: also publish the API's PRIVATE address under a public DNS name, so clients on a VNet... |
+| `entra_rbac` | no | Microsoft Entra ID authentication with Azure RBAC for Kubernetes authorization. |
+| `enable_log_analytics` | no | Create a Log Analytics workspace and wire the AKS monitoring (oms_agent) add-on to it. |
+| `log_analytics_retention_days` | no | Log Analytics retention in days (used only when enable_log_analytics). |
+| `tags` | no | Tags applied to every created resource. |
 
-**Zone pinning.** Each node pool takes an optional `zones` list (each "1", "2" or
-"3"); unset leaves the choice to Azure, which is the unchanged behaviour. Pin it
-when the subscription marks a zone `NotAvailableForSubscription` for the pool's
-VM family, which the resource SKUs API shows
-(`az vm list-skus --location <region> --size <size> --zone`, read the
-`restrictions`). Changing `zones` on an existing pool replaces it.
-
-**OS disk.** Each node pool takes optional `os_disk_size_gb` and `os_disk_type`
-(`"Managed"` or `"Ephemeral"`); unset (`null`) keeps the provider and VM-size
-defaults, which is the unchanged behaviour. `Ephemeral` requires `os_disk_size_gb`
-(the disk must fit the VM cache or temp disk). Changing either on an existing
-pool replaces it.
-
-Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw` (sensitive),
-`cluster_ca_certificate` (sensitive), `token` (sensitive, always `""`),
-`client_certificate` / `client_key` (sensitive),
-`oidc_issuer_url`, `kubelet_identity_id`, `cluster_identity_principal_id`,
-`resource_group_name`, `node_resource_group`, `log_analytics_workspace_id`.
+Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw`, `cluster_ca_certificate`, `token`, `client_certificate`, `client_key`, `oidc_issuer_url`, `kubelet_identity_id`, `cluster_identity_principal_id`, `resource_group_name`, `node_resource_group`, `log_analytics_workspace_id`, `assigned_role_names`.

@@ -1,159 +1,90 @@
-# `xema-substrate` stack — DigitalOcean
+# stacks/digitalocean/xema-substrate
 
-Composes the full substrate on DigitalOcean from the per-cloud primitives and
-the cloud-agnostic addons. Nothing in this stack names a service or an
-application: the two rosters the substrate cannot know — which databases and
-which namespaces exist — are **required inputs with no default**,
-`platform_databases` and `workload_namespaces`, derived by the consumer from
-what it deploys (see
-[the boundary](../../../docs/CONTRACTS.md#the-boundary-capabilities-never-applications)).
+Composes the Xema substrate on DigitalOcean from the per-cloud primitives and the cloud-agnostic addons: a DOKS cluster, managed Postgres, DNS, ReadWriteMany storage, namespaces, the Keycloak realm and extension claims. DigitalOcean is being retired, so this stack is maintained as is.
 
-| Module | What it provisions |
-| --- | --- |
-| `module.cluster` | DOKS managed Kubernetes cluster + node pools |
-| `module.postgres` | DO managed Postgres + the `platform_databases` roster and `postgres_roles` |
-| `module.dns` | the managed DNS zone's records |
-| `module.rwx_storage` | a ReadWriteMany `StorageClass` (NFS provisioner) on the cluster |
-| `module.workload_namespaces` | the `workload_namespaces` roster the consumer supplies |
-| `module.identity_realm` | the Keycloak realm **container** (+ optional base clients/roles/mappers) |
-| `module.extension_bucket` | dedicated object buckets claimed by extensions (see below) |
+## When to use it
 
-> **Realm boundary:** when the consumer's own identity service reconciles the
-> realm's clients/roles/scopes/mappers on boot, leave `realm_clients` /
-> `realm_roles` / `realm_protocol_mappers` **empty** and let Terraform manage only
-> the realm container — see the
-> [`identity-realm` README](../../../modules/identity-realm/README.md#ownership-boundary--terraform-vs-identity-api-read-this).
-
-It configures all four providers (`digitalocean`, `kubernetes`, `helm`,
-`keycloak`) in `providers.tf` — reusable modules never declare a `provider {}`
-block, so the root owns provider config and passes it down.
-
-## Two modes — greenfield vs consume
-
-Every area of the substrate is **independently toggleable** via an `enable_*`
-input (all default to `true`). This lets the same stack run in two modes:
-
-1. **Greenfield (create everything — the default).** `enable_cluster`,
-   `enable_managed_postgres`, and `enable_dns` are all `true`, so the stack
-   **creates** the cluster, the managed Postgres, the DNS zone records, the
-   in-cluster addons, and the Keycloak realm — the complete substrate from
-   nothing.
-2. **Consume.** Set `enable_cluster = false`, `enable_managed_postgres = false`,
-   and `enable_dns = false` when a **separate "cloud substrate" Terraform**
-   (owned by another team/agent) already owns the cluster, managed database,
-   and DNS zone. In this mode the stack manages **only the in-cluster and
-   identity resources** — RWX storage, workload namespaces, the Keycloak realm,
-   and extension claims — and **consumes** the existing cluster: when
-   `enable_cluster = false` it reads the cluster by name (`var.cluster_name`) via
-   `data.digitalocean_kubernetes_cluster.existing` to configure the
-   `kubernetes`/`helm` providers, and extension `managed_databases` claims target
-   `var.existing_database_cluster_id`.
-
-A disabled cloud module is `count`-gated to zero — the stack **consumes** the
-existing resource instead of creating it; it never plans a destroy.
-
-### `enable_*` toggles
-
-| Input | Default | What it gates |
-| --- | --- | --- |
-| `enable_cluster` | `true` | Create the DOKS cluster. `false` ⇒ read the existing one by `var.cluster_name` for the in-cluster providers. |
-| `enable_managed_postgres` | `true` | Create the managed Postgres cluster. `false` ⇒ extension databases target `var.existing_database_cluster_id`. |
-| `enable_dns` | `true` | Manage the DNS zone + records. `false` ⇒ DNS owned elsewhere (extension `dns_records` then fail fast). |
-| `enable_rwx_storage` | `true` | Install the RWX `StorageClass` + NFS provisioner on the (created or consumed) cluster. |
-| `enable_workload_namespaces` | `true` | Ensure the workload namespaces exist on the (created or consumed) cluster. |
-| `enable_identity_realm` | `true` | Manage the Keycloak realm (realm + clients + roles + mappers). |
-
-In consume mode, `cluster_name` (to read the existing cluster) and
-`existing_database_cluster_id` (to host extension databases on the shared cluster)
-are the two extra inputs that replace the create-time cluster/DB inputs.
-
-### The two rosters — required, never defaulted
-
-| Input | What it is | Rule |
-| --- | --- | --- |
-| `platform_databases` | the logical databases to ensure on the CREATED cluster, by name, verbatim | `[]` when consuming a shared cluster — managing a subset there would plan to drop the rest |
-| `workload_namespaces` | the namespaces to ensure exist, by full name | DNS-1123 labels; ignored when `enable_workload_namespaces = false` |
-
-Both have **no default**: which databases and namespaces a deployment needs is
-a fact about what it deploys, derived by the consumer from its own
-distribution, and a stack invoked without them refuses to plan.
-
-## The `substrate` output — the binding contract
-
-One non-secret map a consumer binds to, with the key shape every cloud's stack
-shares — documented once in
-[`docs/CONTRACTS.md` § Binding contract](../../../docs/CONTRACTS.md#binding-contract).
-On DigitalOcean the keys this stack does not model (a derived
-`deployment_name`, `environment`, the secrets backend, the cache, platform
-object storage, the gateway addon, `dns_name_servers`) are always `null`; a
-consumer branches on `null`, never on the cloud. Credentials are the separate
-**sensitive** outputs (`postgres_uri`, `realm_client_secrets`,
-`kubeconfig_raw`), on purpose.
-
-## Extension claims
-
-`var.extensions` is a map keyed by a consumer-chosen extension id; each value
-may carry any subset of a **closed set** of three claim kinds — `object_buckets`,
-`managed_databases`, `dns_records`. `extensions.tf` flattens each kind into a
-`"<extension>/<claim>"`-keyed map and wires it to the cloud primitive:
-
-- `object_buckets` → `module.extension_bucket` (`for_each`).
-- `managed_databases` → a `digitalocean_database_db` (+ optional
-  `digitalocean_database_user`) on the **resolved** managed-Postgres cluster — the
-  created `module.postgres`, or `var.existing_database_cluster_id` when consuming a
-  shared cluster. It fails fast if neither resolves a cluster.
-- `dns_records` → merged into `module.dns.records` (requires `enable_dns`; fails
-  fast otherwise).
-
-This is an **escape hatch** for extensions that need DEDICATED, out-of-cluster
-substrate only. What a consumer provisions for itself at runtime (schemas on a
-shared database, in-cluster objects) needs no entry here. Full contract:
-[`../../../docs/extensions.md`](../../../docs/extensions.md).
-
-## CRITICAL — two-phase apply on a greenfield cluster (greenfield mode ONLY)
-
-This caveat applies **only when `enable_cluster = true`** (greenfield mode). In
-consume mode (`enable_cluster = false`) it does **not** apply — see the note at the
-end of this section.
-
-The `kubernetes` and `helm` providers are configured from
-`module.cluster`'s outputs (`endpoint`, `token`, `cluster_ca_certificate`). On a
-**greenfield** apply the cluster does not exist yet, so those provider arguments
-are unknown until the cluster is created. Terraform cannot configure a provider
-from a not-yet-known value in a single pass. Apply in two phases:
-
-```sh
-# Phase 1 — create the cluster (and anything it doesn't depend on the k8s/helm
-# providers for) first, so its outputs become known.
-terraform apply -target=module.cluster
-
-# Phase 2 — full apply; the kubernetes/helm providers now resolve from the live
-# cluster, and the addons (rwx_storage, workload_namespaces) provision.
-terraform apply
-```
-
-Alternatively, split into two root configurations — a "cluster" root and an
-"in-cluster" root that reads the cluster via a remote-state data source — if you
-prefer never to use `-target`. Either approach is valid; pick one per deployment
-and document it in the operator's private root.
-
-**Consume mode does not hit this caveat.** When `enable_cluster = false` the
-cluster is **read** via `data.digitalocean_kubernetes_cluster.existing` (by
-`var.cluster_name`), so its endpoint/token/CA are known before the
-`kubernetes`/`helm` providers configure — there is no not-yet-known ordering
-problem and the full apply runs in a single pass. This is the verified consume
-operating mode: with the cloud modules disabled the stack read a live DOKS
-cluster and adopted an existing namespace on a zero-change plan.
-
-**The IMPORT path also does not hit this caveat.** When the whole substrate
-already exists (greenfield resources adopted rather than created) every resource —
-including the cluster — is adopted via `import {}` blocks in a single plan/apply,
-so the cluster outputs are known from existing state and the providers configure
-cleanly. Follow [`../../../docs/import-runbook.md`](../../../docs/import-runbook.md)
-and gate on a zero-change plan.
+Use it to stand up (or, in consume mode, extend) a substrate on DigitalOcean. Consume it from a root such as [`examples/digitalocean`](../../../examples/digitalocean); the root owns the backend.
 
 ## Usage
 
-This stack is consumed by a root such as [`examples/digitalocean`](../../../examples/digitalocean).
-Reusable stacks carry no `backend {}` block — the consuming root owns the backend.
-See [`../../../docs/CONVENTIONS.md`](../../../docs/CONVENTIONS.md) for state & secret rules.
+Greenfield (all `enable_*` default to `true`): the `kubernetes` and `helm` providers are configured from the cluster's outputs, so apply in two phases.
+
+```sh
+terraform apply -target=module.cluster
+terraform apply
+```
+
+Consume: set `enable_cluster`, `enable_managed_postgres` and `enable_dns` to `false` when another Terraform owns them. The stack then manages only RWX storage, namespaces, the realm and extension claims, reading the existing cluster by `cluster_name`, and extension databases land on `existing_database_cluster_id`. One `terraform apply` is enough. The import path ([`docs/import-runbook.md`](../../../docs/import-runbook.md)) also needs no phases.
+
+`platform_databases` (verbatim names; `[]` when consuming a shared cluster) and `workload_namespaces` (full names) are required with no default.
+
+When your identity service reconciles the realm's clients, roles and mappers on boot, leave `realm_clients`, `realm_roles` and `realm_protocol_mappers` empty.
+
+## Extension claims
+
+`extensions` is a map keyed by an extension id. Each value may carry `object_buckets`, `managed_databases` and `dns_records`. `managed_databases` land on the created Postgres cluster or on `existing_database_cluster_id`; `dns_records` need `enable_dns`. See [`docs/extensions.md`](../../../docs/extensions.md).
+
+## Outputs
+
+The `substrate` output is a non-secret map with the same keys as the Azure stack, described in [`docs/CONTRACTS.md`](../../../docs/CONTRACTS.md#binding-contract). Keys this stack does not model are `null`. Credentials are separate sensitive outputs (`postgres_uri`, `realm_client_secrets`, `kubeconfig_raw`).
+
+## Configuration
+
+| Input | Required | Description |
+| --- | --- | --- |
+| `enable_cluster` | no | Create the DOKS cluster. |
+| `enable_managed_postgres` | no | Create the managed Postgres cluster. |
+| `enable_dns` | no | Manage the DNS zone + records in this cloud. |
+| `enable_rwx_storage` | no | Install the ReadWriteMany StorageClass + NFS provisioner on the (created or existing) cluster. |
+| `enable_workload_namespaces` | no | Ensure the workload namespaces exist on the (created or existing) cluster. |
+| `enable_identity_realm` | no | Manage the Keycloak realm (realm + clients + roles + mappers). |
+| `do_token` | yes | DigitalOcean API token used to manage/read the cluster, database, DNS, and Spaces buckets. |
+| `do_spaces_access_id` | no | DigitalOcean Spaces access key id (S3-compatible). |
+| `do_spaces_secret_key` | no | DigitalOcean Spaces secret key (S3-compatible). |
+| `keycloak_url` | no | Base URL of the Keycloak server (e.g, "https://id.example.com"). |
+| `keycloak_client_id` | no | Keycloak admin client id for the client-credentials grant. |
+| `keycloak_client_secret` | no | Keycloak admin client secret for the client-credentials grant. |
+| `keycloak_admin_realm` | no | Realm the admin client authenticates against (typically "master"). |
+| `region` | yes | DigitalOcean region slug shared by the cluster, database, and buckets (e.g, "fra1"). |
+| `tags` | no | Tags applied to created cloud resources (cluster, database), keyed by tag name. |
+| `cluster_name` | no | DOKS cluster name. |
+| `kubernetes_version` | no | DOKS control-plane version slug prefix (e.g, "1.31."). |
+| `node_pools` | no | Node pools keyed by a stable pool id (used only when enable_cluster). |
+| `default_pool_id` | no | Which key in node_pools is the DOKS default pool (used only when enable_cluster). |
+| `vpc_id` | no | Existing VPC uuid for a created cluster/database. |
+| `cluster_auto_upgrade` | no | Enable DOKS patch auto-upgrade (created cluster only). |
+| `cluster_surge_upgrade` | no | Enable DOKS surge upgrades (created cluster only). |
+| `postgres_name` | no | Managed Postgres cluster name (created cluster only). |
+| `postgres_engine_version` | no | Major Postgres version, e.g, "16" (created cluster only). |
+| `postgres_size` | no | DO managed-database size slug, e.g, "db-s-1vcpu-2gb" (created cluster only). |
+| `postgres_node_count` | no | Postgres node count (1 = single node, 2+ = primary plus standby replicas). |
+| `platform_databases` | yes | The logical databases to ensure on the CREATED cluster, by name, used verbatim. |
+| `postgres_roles` | no | Base logical roles on the CREATED cluster. |
+| `existing_database_cluster_id` | no | Provider id of an existing managed-Postgres cluster to host extension-claimed dedicated databases when enab... |
+| `dns_domain` | no | Managed DNS zone apex, e.g, "example.com" (used only when enable_dns). |
+| `dns_records` | no | Base DNS records keyed by a stable id (used only when enable_dns). |
+| `rwx_storage_class_name` | no | Name of the ReadWriteMany StorageClass to create. |
+| `rwx_chart_version` | no | Pinned Helm chart version for the NFS provisioner. |
+| `rwx_is_default_class` | no | Mark the RWX StorageClass as the cluster default. |
+| `rwx_manage_provisioner_chart` | no | Install/manage the NFS provisioner Helm release. |
+| `rwx_storage_provisioner` | no | The provisioner field on the RWX StorageClass (must match the installed provisioner). |
+| `rwx_allow_volume_expansion` | no | Whether PVCs bound to the RWX StorageClass may be expanded (match the live class when importing). |
+| `workload_namespaces` | yes | The roster of namespaces to ensure exist on the (created or consumed) cluster, by full name. |
+| `workload_namespace_labels` | no | Optional per-namespace labels, keyed by namespace name. |
+| `realm_name` | no | The single Keycloak realm this stack owns (e.g, "acme-prod"). |
+| `realm_display_name` | no | Human-readable realm display name shown on login screens. |
+| `realm_access_token_lifespan` | no | Access-token lifespan for the managed realm, as a Go duration string (e.g, "5m"). |
+| `realm_clients` | no | OpenID clients to create in the realm, keyed by a stable id. |
+| `realm_roles` | no | Realm-level roles to create. |
+| `realm_protocol_mappers` | no | Per-client user-attribute → token-claim protocol mappers, keyed by a stable id. |
+| `extensions` | no | Dedicated substrate claimed by extensions — consumers of this substrate that need a cloud resource of their... |
+| `enable_deployer_identity` | no | Manage the deployment's namespaces, its least-privileged deployer ServiceAccount, that account's token, and... |
+| `deployer_deployment_name` | no | The deployment this identity belongs to. |
+| `deployer_namespace` | no | The namespace the deployment's workloads run in — the one its own descriptor DECLARES. |
+| `deployer_additional_namespaces` | no | Every OTHER namespace the same identity deploys into — typically the deployment's infrastructure namespace. |
+| `deployer_service_account_name` | no | Name of the deployer ServiceAccount, its Role and its RoleBindings. |
+| `deployer_manage_namespaces` | no | Create the deployer's namespaces here. |
+| `deployer_context_name` | no | The alias written into the emitted kubeconfig's context/cluster/user. |
+
+Outputs: `cluster_id`, `cluster_endpoint`, `kubeconfig_raw`, `vpc_id`, `postgres_host`, `postgres_port`, `postgres_uri`, `dns_domain`, `dns_record_ids`, `storage_class_name`, `workload_namespaces`, `postgres_databases`, `realm_id`, `realm_client_secrets`, `extension_buckets`, `extension_databases`, `deployer_kubeconfig`, `substrate`.

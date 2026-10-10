@@ -1,9 +1,10 @@
-# `providers/azure/container-registry`
+# providers/azure/container-registry
 
-An Azure Container Registry (`azurerm_container_registry`): Premium SKU (the
-tier that supports private endpoints), admin user off, public network access
-off. Optional: a deployment that pulls images from a registry it already has does
-not need it.
+An Azure Container Registry (`azurerm_container_registry`): Premium SKU, admin user off, public network access off.
+
+## When to use it
+
+Optional. Use it when the deployment needs its own private registry. It is reachable only through a private endpoint, which the stack composes with `providers/azure/private-endpoint`.
 
 ## Usage
 
@@ -14,20 +15,20 @@ module "container_registry" {
   name   = "acmedevacr"
   region = "westeurope"
 
-  # AcrPull for the AKS kubelet identity, so the cluster can pull.
   pull_principal_ids = { kubelet = module.cluster.kubelet_identity_id }
 }
 ```
 
-## Notes
+`pull_principal_ids` grants `AcrPull` only. Grant `AcrPush` to your CI principal yourself, on the `id` output. The `azurerm` provider is configured by the root.
 
-- The registry is reachable only through a private endpoint, which the stack
-  composes with `providers/azure/private-endpoint` (`service = "acr"`, zone
-  `privatelink.azurecr.io` from `providers/azure/network`).
-- `pull_principal_ids` grants `AcrPull` only. **The CI identity that pushes images
-  is not created here**: the consumer grants `AcrPush` to its own CI principal on
-  the `id` output.
-- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
-  here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+## Configuration
 
-Outputs: `id`, `login_server`, `resource_group_name`.
+| Input | Required | Description |
+| --- | --- | --- |
+| `name` | yes | Registry name (5-50 lowercase letters and digits; globally unique as <name>.azurecr.io). |
+| `region` | yes | Azure location (e.g, "westeurope"). |
+| `pull_principal_ids` | no | Object ids of the identities granted AcrPull on the registry (e.g, the AKS kubelet identity). |
+| `resource_group_name` | no | Existing resource group to create the registry in. |
+| `tags` | no | Tags applied to every created resource. |
+
+Outputs: `id`, `login_server`, `resource_group_name`, `assigned_role_names`.

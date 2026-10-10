@@ -1,9 +1,6 @@
-# `providers/digitalocean/object-bucket`
+# providers/digitalocean/object-bucket
 
-DigitalOcean implementation of the [`object-bucket` contract](../../../../docs/CONTRACTS.md#object-bucket).
-A single DO Spaces bucket (`digitalocean_spaces_bucket`) for application/biome
-object storage — **not** for Terraform state (use
-[`state-bucket`](../state-bucket/README.md) for that).
+A DigitalOcean Spaces bucket for application object storage. Implements the [`object-bucket` contract](../../../../docs/CONTRACTS.md#object-bucket). For Terraform state use [`state-bucket`](../state-bucket).
 
 ## Usage
 
@@ -13,28 +10,19 @@ module "bucket" {
 
   name       = "acme-prod-artifacts"
   region     = "fra1"
-  acl        = "private"
   versioning = true
 }
 ```
 
-## Notes
+`acl` is `private` (default) or `public-read`. `endpoint` is `https://<region>.digitaloceanspaces.com`. `region` is not validated against a fixed list. The `digitalocean` provider is configured by the root.
 
-- `acl` is a closed set validated to `private` | `public-read`.
-- `region` is intentionally **not** validated against a fixed list so new DO
-  Spaces regions work without a module change. Supported at time of writing:
-  `nyc3`, `ams3`, `sgp1`, `sfo2`, `sfo3`, `fra1`, `syd1`, `blr1`.
-- `endpoint` is derived as `https://<region>.digitaloceanspaces.com` (the
-  S3-compatible endpoint); the bucket is then addressed as a path or
-  virtual-hosted prefix per your client.
-- The provider (`digitalocean/digitalocean`) is configured by the **root/stack**,
-  not here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name` | yes | globally-unique bucket name |
-| `region` | yes | Spaces region slug |
-| `acl` | no | `private` (default) or `public-read` |
-| `versioning` | no | enable object versioning (default `false`) |
+| `name` | yes | Globally-unique Spaces bucket name. |
+| `region` | yes | DO Spaces region slug. |
+| `acl` | no | Canned ACL: one of "private" or "public-read". |
+| `versioning` | no | Enable object versioning on the bucket. |
 
 Outputs: `bucket`, `endpoint`.

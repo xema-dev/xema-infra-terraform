@@ -1,9 +1,10 @@
-# `providers/azure/managed-postgres`
+# providers/azure/managed-postgres
 
-Azure implementation of the [`managed-postgres` contract](../../../../docs/CONTRACTS.md#managed-postgres).
-Provisions an Azure Database for PostgreSQL **Flexible Server** plus any number
-of logical databases and login roles, with `CONNECT` granted to every role on
-every database and revoked from `PUBLIC`.
+An Azure Database for PostgreSQL Flexible Server. Databases, roles and grants are applied inside the server by [`postgres-tenancy`](../../../postgres-tenancy). Implements the [`managed-postgres` contract](../../../../docs/CONTRACTS.md#managed-postgres).
+
+## When to use it
+
+Use it to create the database server of the Azure substrate.
 
 ## Usage
 
@@ -15,89 +16,53 @@ module "postgres" {
   region         = "westeurope"
   engine_version = "16"
   size           = "B_Standard_B2s"
-  node_count     = 1
 
   network_access      = "private"
   vpc_id              = module.cluster.vpc_id
   delegated_subnet_id = module.cluster.delegated_subnet_id
 
-  databases       = ["acme_dev_mcp_gateway", "acme_dev_biomes"]
-  database_owners = { acme_dev_mcp_gateway = "acme_dev", acme_dev_biomes = "acme_dev" }
-  roles           = ["acme_dev", "acme_dev_provisioner"]
-  role_options = {
-    acme_dev_provisioner = { create_database = true }
-  }
-
-  tags = { deployment = "acme-dev" }
+  databases       = ["acme_dev_app"]
+  database_owners = { acme_dev_app = "acme_dev" }
+  roles           = ["acme_dev"]
 }
 ```
 
-## Notes
+- Roles and grants need the `postgresql` provider, configured by the root from the `host`, `administrator_login` and `administrator_password` outputs, with `superuser = false` and `sslmode = "require"`.
+- A `private` server answers only inside the VNet, so `terraform apply` must run from inside it (a VPN, bastion or runner). `network_access = "public"` needs explicit `public_firewall_rules`.
+- `node_count` is `1`, or `2` for zone-redundant HA.
+- `ca_certificate` is always `""`: the chain is anchored on public roots.
+- Passwords are generated and kept in state. Set `generate_administrator_password = false` to supply your own.
+- The `azurerm` provider is configured by the root.
 
-- **Roles need the `postgresql` provider, configured by the stack.** Azure's
-  control plane has no logical-role resource, so roles and grants are applied
-  *inside* the server through `cyrilgdn/postgresql`. The root configures that
-  provider from this module's `host` / `administrator_login` /
-  `administrator_password` outputs, with `superuser = false` (the Azure admin is
-  not a superuser) and `sslmode = "require"`.
-- **The in-server tenancy is [`postgres-tenancy`](../../../postgres-tenancy/README.md).**
-  Databases, roles, the PUBLIC revoke and the grants are applied there — one
-  implementation for a created server and a consumed one, including its
-  PostgreSQL 16 handling (the admin is granted every managed role) and the
-  provider floor `>= 1.24`. The databases are created over SQL so that
-  `database_owners` can make the application's role their OWNER: on
-  PostgreSQL 15+ only the owner may CREATE in schema `public`, so that is
-  what lets a migration run with Terraform alone.
-
-### Migrating a state created before databases moved to SQL
-
-Such a state holds `azurerm_postgresql_flexible_server_database.this[...]`.
-That resource is now a FENCE (no instances, `prevent_destroy = true`), so a
-plan REFUSES with `Instance cannot be destroyed` instead of dropping the
-databases. Re-address each database once, from the root:
-
-```sh
-tofu state rm 'module.postgres[0].azurerm_postgresql_flexible_server_database.this["<db>"]'
-tofu import   'module.postgres[0].module.tenancy[0].postgresql_database.this["<db>"]' <db>
-```
-
-The roles and grants re-address themselves (`moved` blocks). The next plan is
-the ownership rule arriving: `owner` changing in place on each database and
-the owner's grant widening to `CONNECT, TEMPORARY, CREATE` — nothing created
-or destroyed.
-- **Reachability.** A `private` server answers only inside the linked VNet, so
-  the machine running `terraform apply` must reach it (VPN, bastion, or a runner
-  in the VNet). `network_access = "public"` with explicit `public_firewall_rules`
-  is the alternative — a closed-set choice, never inferred.
-- **CA certificate.** `ca_certificate` is always `""`, and unlike DigitalOcean
-  that is not a gap: the server chain is anchored on public roots (DigiCert
-  Global Root G2 / Microsoft RSA Root CA 2017) already in every OS trust store,
-  so `sslmode=verify-full` needs nothing exported.
-- `node_count` is `1` or `2` only — `2` enables zone-redundant HA with one
-  standby. `zone` (and the standby zone) are `ignore_changes`d so Azure's
-  placement never reads as drift.
-- Passwords (admin by default, and every role) are generated with
-  `random_password` and exposed as sensitive outputs; they live in state, as any
-  managed-database credential does. Set `generate_administrator_password =
-  false` and supply `administrator_password` (via `TF_VAR_*`) to own it instead
-  — a boolean, not "empty means generate", so a caller may pass a password that
-  is itself unknown until apply.
-- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
-  here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name`, `region`, `engine_version`, `size` | yes | server identity + version + SKU |
-| `node_count` | no | `1` single zone (default) or `2` zone-redundant HA |
-| `network_access`, `delegated_subnet_id`, `vpc_id`, `private_dns_zone_name`, `public_firewall_rules` | no | private (default) or public reachability |
-| `storage_mb`, `auto_grow_enabled`, `backup_retention_days`, `geo_redundant_backup_enabled`, `zone` | no | storage, backups, placement |
-| `administrator_login`, `generate_administrator_password`, `administrator_password` | no | admin credentials (password generated by default) |
-| `databases`, `roles`, `role_options` | no | logical databases / roles / per-role CREATEDB + connection limit |
-| `database_owners` | no | `database => role` owning it — the role a migration runs as must own its database to CREATE in `public` |
-| `extensions` | no | extensions to allow-list (`azure.extensions`), lowercase identifiers `^[a-z][a-z0-9_]*$`; written sorted and distinct. Empty (default) writes no parameter |
-| `resource_group_name`, `tags` | no | use an existing resource group (else `"<name>-rg"`), tagging |
+| `name` | yes | Flexible Server name (3-63 chars, lowercase letters, digits, hyphens; globally unique as <name>.postgres.da... |
+| `region` | yes | Azure location (e.g, "westeurope"). |
+| `engine_version` | yes | Major Postgres version (e.g, "16"). |
+| `size` | yes | Flexible Server SKU name (e.g, "B_Standard_B2s", "GP_Standard_D2ds_v5"). |
+| `node_count` | no | 1 = single zone; 2 = zone-redundant high availability with one standby. |
+| `vpc_id` | no | Virtual network id to link the private DNS zone to (the network the clients live in). |
+| `network_access` | no | How the server is reached: "private" (VNet-injected via delegated_subnet_id + a private DNS zone; no publ... |
+| `delegated_subnet_id` | no | Id of a subnet delegated to Microsoft.DBforPostgreSQL/flexibleServers (providers/azure/cluster exposes one... |
+| `private_dns_zone_name` | no | Name of the private DNS zone created for a private server. |
+| `private_dns_zone_id` | no | Id of an EXISTING private DNS zone for a private server, owned outside this module (e.g, by an enterprise l... |
+| `public_firewall_rules` | no | Firewall rules for a PUBLIC server, keyed by a stable id: { start_ip_address, end_ip_address }. |
+| `storage_mb` | no | Provisioned storage in MB (Azure accepts fixed steps: 32768, 65536, 131072, …). |
+| `auto_grow_enabled` | no | Let Azure grow storage automatically when it fills. |
+| `backup_retention_days` | no | Backup retention in days (7-35). |
+| `geo_redundant_backup_enabled` | no | Replicate backups to the paired region. |
+| `zone` | no | Availability zone for the primary ("1", "2", "3"). |
+| `administrator_login` | no | Server administrator login. |
+| `generate_administrator_password` | no | Generate the administrator password with random_password (exposed as the sensitive administrator_password o... |
+| `administrator_password` | no | Server administrator password, used when generate_administrator_password = false. |
+| `databases` | no | Logical databases to ensure exist on the server. |
+| `database_owners` | no | The role that OWNS each database, as `database => role` (both must be in `databases` / `roles`). |
+| `roles` | no | Logical login roles to ensure exist on the server, created through the cyrilgdn/postgresql provider (module... |
+| `role_options` | no | Optional per-role settings keyed by role name: create_database (CREATEDB), connection_limit (-1 = unlimited). |
+| `extensions` | no | PostgreSQL extensions to allow-list on the server (the azure.extensions server parameter, which CREATE EXTE... |
+| `resource_group_name` | no | Existing resource group to create the server in. |
+| `tags` | no | Tags applied to every created resource. |
 
-Outputs: `cluster_id`, `host`, `port`, `uri` (sensitive), `ca_certificate`
-(sensitive, always `""` — see note), `administrator_login`,
-`administrator_password` (sensitive), `role_passwords` (sensitive),
-`databases`, `resource_group_name`, `private_dns_zone_id`.
+Outputs: `cluster_id`, `host`, `port`, `uri`, `ca_certificate`, `administrator_login`, `administrator_password`, `role_passwords`, `databases`, `resource_group_name`, `private_dns_zone_id`.

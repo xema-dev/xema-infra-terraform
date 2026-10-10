@@ -1,9 +1,10 @@
-# `providers/azure/cache`
+# providers/azure/cache
 
-Azure implementation of the [`cache` contract](../../../../docs/CONTRACTS.md#cache-optional).
-An Azure Cache for Redis instance (`azurerm_redis_cache`) — TLS only, minimum
-TLS 1.2. Optional: the platform's default topology runs valkey **in-cluster** via
-Helm; reach for this only when a deployment wants the managed offering.
+Azure Cache for Redis (`azurerm_redis_cache`), TLS only, minimum TLS 1.2.
+
+## When to use it
+
+Optional. Use it when a deployment wants a managed Redis instead of the in-cluster one. Implements the [`cache` contract](../../../../docs/CONTRACTS.md#cache-optional).
 
 ## Usage
 
@@ -18,24 +19,19 @@ module "cache" {
 }
 ```
 
-## Notes
+`sku` is `Basic`, `Standard` or `Premium` (Premium below P1 is refused). The non-TLS port is never enabled; clients connect to `port` (6380) with `rediss://`. The `azurerm` provider is configured by the root.
 
-- `sku` is a closed set (`Basic | Standard | Premium`); the family (`C`/`P`) is
-  derived from it and `capacity` is the size step within it. A Premium cache
-  below P1 is refused by a precondition.
-- The non-TLS port is never enabled; `port` is the TLS port (6380). Clients
-  connect with `rediss://`.
-- Private-endpoint reachability is not modelled here (`public_network_access_enabled`
-  is the only knob).
-- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
-  here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name`, `region` | yes | cache identity + location |
-| `sku`, `capacity`, `redis_version` | no | `Basic` (default) / `Standard` / `Premium`; size step; engine major |
-| `public_network_access_enabled` | no | reachability |
-| `resource_group_name`, `tags` | no | use an existing resource group (else `"<name>-rg"`), tagging |
+| `name` | yes | Cache name (1-63 chars, letters/digits/hyphens; globally unique as <name>.redis.cache.windows.net). |
+| `region` | yes | Azure location (e.g, "westeurope"). |
+| `sku` | no | Azure Cache for Redis SKU: one of "Basic", "Standard", "Premium". |
+| `capacity` | no | Size step within the SKU: 0-6 for Basic/Standard (C0-C6), 1-5 for Premium (P1-P5). |
+| `redis_version` | no | Redis major version offered by Azure ("6"). |
+| `public_network_access_enabled` | no | Whether the cache accepts traffic from the public internet (TLS + access key). |
+| `resource_group_name` | no | Existing resource group to create the cache in. |
+| `tags` | no | Tags applied to every created resource. |
 
-Outputs: `host`, `port`, `primary_key` (sensitive), `cache_id`,
-`resource_group_name`.
+Outputs: `host`, `port`, `primary_key`, `cache_id`, `resource_group_name`, `id`.

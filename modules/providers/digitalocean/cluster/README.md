@@ -1,8 +1,6 @@
-# `providers/digitalocean/cluster`
+# providers/digitalocean/cluster
 
-DigitalOcean implementation of the [`cluster` contract](../../../../docs/CONTRACTS.md#cluster).
-Provisions a DOKS cluster with a default node pool plus any number of additional
-node pools (autoscaling and taints supported — e.g. a tainted `workers` pool).
+A DigitalOcean Kubernetes (DOKS) cluster with a default node pool and any number of extra pools (autoscaling and taints supported). Implements the [`cluster` contract](../../../../docs/CONTRACTS.md#cluster).
 
 ## Usage
 
@@ -16,36 +14,30 @@ module "cluster" {
   default_pool_id    = "generic"
 
   node_pools = {
-    generic = {
-      size       = "s-4vcpu-8gb"
-      node_count = 3
-      labels     = { serve_type = "generic" }
-    }
+    generic = { size = "s-4vcpu-8gb", node_count = 3 }
     workers = {
-      size      = "s-8vcpu-16gb"
+      size       = "s-8vcpu-16gb"
       node_count = 2
-      taints    = [{ key = "workload", value = "workers", effect = "NoSchedule" }]
+      taints     = [{ key = "workload", value = "workers", effect = "NoSchedule" }]
     }
   }
-
-  tags = { deployment = "acme-prod" }
 }
 ```
 
-## Notes
+`version` is ignored after create, so a new patch slug does not produce a plan diff; change `kubernetes_version` to upgrade. The `digitalocean` provider is configured by the root. To adopt an existing cluster, see [`import-runbook.md`](../../../../docs/import-runbook.md).
 
-- `version` is `ignore_changes`d so DO publishing a new patch slug does not force a
-  plan diff; bump `kubernetes_version` deliberately to upgrade.
-- The provider (`digitalocean/digitalocean`) is configured by the **root/stack**,
-  not here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
-- Importing an existing cluster: see [import-runbook.md](../../../../docs/import-runbook.md).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name`, `region`, `kubernetes_version` | yes | cluster identity + version prefix |
-| `node_pools`, `default_pool_id` | yes | pools keyed by id; which is the default |
-| `vpc_id` | no | place in an existing VPC (else region default) |
-| `auto_upgrade`, `surge_upgrade`, `tags` | no | lifecycle + tagging |
+| `name` | yes | Cluster name. |
+| `region` | yes | DigitalOcean region slug (e.g, "fra1"). |
+| `kubernetes_version` | yes | DOKS control-plane version slug prefix (e.g, "1.31."). |
+| `node_pools` | yes | Node pools keyed by a stable pool id (e.g, "generic", "workers"). |
+| `default_pool_id` | yes | Which key in node_pools is the DOKS default pool. |
+| `vpc_id` | no | Existing VPC uuid to place the cluster in. |
+| `auto_upgrade` | no | Enable DOKS patch auto-upgrade. |
+| `surge_upgrade` | no | Enable DOKS surge upgrades. |
+| `tags` | no | Tags applied to the cluster. |
 
-Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw` (sensitive),
-`cluster_ca_certificate` (sensitive), `token` (sensitive), `vpc_id`.
+Outputs: `cluster_id`, `endpoint`, `kubeconfig_raw`, `cluster_ca_certificate`, `token`, `vpc_id`.

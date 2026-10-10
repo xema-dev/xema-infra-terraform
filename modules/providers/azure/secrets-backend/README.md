@@ -1,10 +1,10 @@
-# `providers/azure/secrets-backend`
+# providers/azure/secrets-backend
 
-Azure implementation of the [`secrets-backend` contract](../../../../docs/CONTRACTS.md#secrets-backend-optional).
-An **RBAC-authorized Key Vault**, optionally seeded with secrets, plus a
-user-assigned identity federated to the External Secrets Operator's service
-account so the cluster reads secrets through **workload identity** — no stored
-credential anywhere.
+An RBAC-authorized Azure Key Vault, optionally seeded with secrets, plus an optional user-assigned identity federated to the External Secrets Operator. Implements the [`secrets-backend` contract](../../../../docs/CONTRACTS.md#secrets-backend-optional).
+
+## When to use it
+
+Optional. Use it to give the cluster secrets from Key Vault through workload identity, with no stored credential.
 
 ## Usage
 
@@ -16,49 +16,32 @@ module "secrets" {
   region = "westeurope"
 
   secret_names  = ["postgres-app-password"]
-  secret_values = var.key_vault_secrets # sensitive map, from TF_VAR_* — never a file in git
-
-  workload_identity = {
-    enabled         = true
-    oidc_issuer_url = module.cluster.oidc_issuer_url
-  }
+  secret_values = var.key_vault_secrets
 }
 ```
 
-## Notes
+- `secret_values` is sensitive and has no default; pass it through `TF_VAR_*`. A name in `secret_names` without a value fails the plan.
+- The vault uses RBAC. The deployer gets Key Vault Secrets Officer to seed secrets (after `rbac_propagation_wait`, default 30s); readers get Secrets User only.
+- Feed `key_vault_id` and `vault_uri` to the [`external-secrets`](../../../cluster-addons/external-secrets) addon and leave `workload_identity.enabled = false`; that addon creates its own reader identities.
+- `purge_protection_enabled` defaults to off here because it is irreversible. The substrate stack always enables it.
+- The `azurerm` provider is configured by the root.
 
-- **`secret_values` has no default.** It is the one input that carries
-  credential material, so it must be supplied every time; a name in
-  `secret_names` with no value fails the plan naming the missing secret.
-  Terraform forbids `for_each` over a sensitive map, which is why names and
-  values are two inputs.
-- The vault uses **RBAC** (`rbac_authorization_enabled`), never access
-  policies. The deployer is granted *Key Vault Secrets Officer* to write the
-  seeded secrets; the reader identity holds *Key Vault Secrets User* only.
-- **`rbac_propagation_wait`** (`time_sleep`, default 30s) sits between the
-  deployer grant and the first secret write. Azure RBAC is eventually
-  consistent, so this is a wait on an external system's documented lag — the
-  alternative is a failed first apply and a manual retry.
-- Feed `key_vault_id` and `vault_uri` to the
-  [`external-secrets`](../../../cluster-addons/external-secrets/README.md) addon's
-  `secret_stores`, one boundary per vault; the addon creates each boundary's own reader identity,
-  so leave `workload_identity.enabled = false`.
-- `purge_protection_enabled` defaults **off** in the module because it is irreversible and
-  reserves the vault name after deletion; the substrate stack always enables it.
-- **`seed_prerequisites`** orders the seeded secrets after resources composed from the vault (the
-  stack passes the vault's private endpoint id), so seeding never races the endpoint.
-- The provider (`hashicorp/azurerm`) is configured by the **root/stack**, not
-  here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `name`, `region` | yes | vault identity + location |
-| `secret_values` | yes (sensitive, no default) | values for the seeded secrets |
-| `secret_names` | no | which secrets to seed (default none) |
-| `workload_identity` | no | mint the External Secrets reader identity |
-| `grant_deployer_secrets_officer`, `rbac_propagation_wait` | no | deployer write access + its propagation wait |
-| `purge_protection_enabled`, `soft_delete_retention_days`, `public_network_access_enabled` | no | vault lifecycle + reachability |
-| `resource_group_name`, `tags` | no | use an existing resource group (else `"<name>-rg"`), tagging |
+| `name` | yes | Key Vault name: 3-24 chars, letters/digits/hyphens, starting with a letter, globally unique as <name>.vault... |
+| `region` | yes | Azure location (e.g, "westeurope"). |
+| `secret_names` | no | Secrets to SEED at provisioning time, by name (Key Vault secret names: letters, digits, hyphens). |
+| `secret_values` | yes | Values for every name in secret_names, keyed by name. |
+| `workload_identity` | no | Federate the cluster's OIDC issuer to a user-assigned identity that may READ secrets (Key Vault Secrets Use... |
+| `grant_deployer_secrets_officer` | no | Grant the principal running Terraform "Key Vault Secrets Officer" on the vault so it can write the seeded... |
+| `rbac_propagation_wait` | no | How long to wait after granting the deployer role before writing secrets. |
+| `seed_prerequisites` | no | Opaque values (e.g, ids) the seeded secrets must wait for: resources the caller composes AFTER the vault, s... |
+| `purge_protection_enabled` | no | Key Vault purge protection. |
+| `soft_delete_retention_days` | no | Soft-delete retention (7-90 days). |
+| `public_network_access_enabled` | no | Whether the vault accepts (authenticated) traffic from the public internet. |
+| `resource_group_name` | no | Existing resource group to create the vault in. |
+| `tags` | no | Tags applied to every created resource. |
 
-Outputs: `vault_uri`, `client_id`, `tenant_id`, `key_vault_id`, `secret_ids`,
-`resource_group_name`.
+Outputs: `vault_uri`, `client_id`, `tenant_id`, `key_vault_id`, `secret_ids`, `resource_group_name`, `assigned_role_names`.

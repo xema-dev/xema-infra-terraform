@@ -1,8 +1,6 @@
-# `providers/digitalocean/dns`
+# providers/digitalocean/dns
 
-DigitalOcean implementation of the [`dns` contract](../../../../docs/CONTRACTS.md#dns).
-Manages a DO DNS zone (`digitalocean_domain`) and its records
-(`digitalocean_record`).
+A DigitalOcean DNS zone (`digitalocean_domain`) and its records. Implements the [`dns` contract](../../../../docs/CONTRACTS.md#dns).
 
 ## Usage
 
@@ -13,39 +11,19 @@ module "dns" {
   domain = "example.com"
 
   records = {
-    apex = {
-      name  = "@"
-      type  = "A"
-      value = "203.0.113.10"
-    }
-    www = {
-      name  = "www"
-      type  = "CNAME"
-      value = "example.com." # CNAME value MUST be an FQDN with a trailing dot
-    }
-    spf = {
-      name  = "@"
-      type  = "TXT"
-      value = "v=spf1 -all"
-    }
+    apex = { name = "@", type = "A", value = "203.0.113.10" }
+    www  = { name = "www", type = "CNAME", value = "example.com." }
   }
 }
 ```
 
-## Notes
+A CNAME value must be a fully qualified name with a trailing dot; the module does not add it. `record_ids` maps each input key to the record id. The `digitalocean` provider is configured by the root.
 
-- **CNAME values must be FQDNs with a trailing dot** (e.g. `"target.example.com."`).
-  DigitalOcean stores the value verbatim; this module does **not** mutate or
-  append the dot, so the caller is responsible for supplying a fully-qualified
-  value. A missing trailing dot makes DO treat the value as relative to the zone.
-- `record_ids` maps each input `records` key to the provider record id, so callers
-  can reference a specific record without depending on iteration order.
-- The provider (`digitalocean/digitalocean`) is configured by the **root/stack**,
-  not here (see [CONVENTIONS.md](../../../../docs/CONVENTIONS.md)).
+## Configuration
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `domain` | yes | managed zone apex |
-| `records` | no | records keyed by a stable id (name, type, value, ttl) |
+| `domain` | yes | Managed zone apex (e.g, "example.com"). |
+| `records` | no | DNS records keyed by a stable id. |
 
-Outputs: `domain`, `record_ids` (map of input key → record id).
+Outputs: `domain`, `record_ids`.
