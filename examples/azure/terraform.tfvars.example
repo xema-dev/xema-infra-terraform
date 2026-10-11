@@ -42,7 +42,7 @@ enable_cache               = false # valkey runs in-cluster by default
 enable_rwx_storage         = true
 enable_workload_namespaces = true
 enable_gateway_tls         = true
-enable_identity_realm      = false # flip to true once Keycloak answers at keycloak_url (phase 3)
+enable_identity_realm      = false # flip to true once Keycloak answers at keycloak_url
 
 # --- provider credentials (FAKE placeholders) ---
 azure_subscription_id = "00000000-0000-0000-0000-000000000000"

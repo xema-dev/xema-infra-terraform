@@ -122,7 +122,7 @@ consumer such as a Temporal server's database that never provisions databases at
 granted, the role is absent from the `postgres_roles` and `postgres_role_passwords` outputs, and
 `substrate.postgres_provisioner_role` is `null`. In `tooling/bind/bind-outputs.mjs`, a deployment with no entry in
 `custody_vault_urls` / `custody_broker_client_ids` is now skipped for that row (omitted loudly) instead of refused, so a root
-with no custody (e.g. aura-shared) binds; a non-map, a sensitive output or a malformed entry is still refused.
+with no custody (e.g. example-shared) binds; a non-map, a sensitive output or a malformed entry is still refused.
 
 ## v0.14.2 — BIND binds per-deployment credential custody
 
@@ -493,7 +493,7 @@ tofu output -raw deployer_kubeconfig   # or: terraform output -raw
 | `substrate.cluster_identity` | non-secret: `server`, `ca_certificate_sha256` (sha256 of the DECODED CA), `kube_system_namespace_uid` |
 
 `cluster_identity` carries no context name on purpose. A context name is a local
-kubeconfig ALIAS — the same cluster is `owl-k8s` in one operator's file and
+kubeconfig ALIAS — the same cluster is `cluster-a` in one operator's file and
 `default` in another's — so a consumer comparing aliases refuses a correct
 cluster and admits a wrong one that happens to share the name. The three facts
 above cannot be satisfied by a rename.

@@ -20,7 +20,7 @@ variable "namespace" {
     The namespace the deployment's workloads run in — the one its own
     descriptor DECLARES. REQUIRED, no default, and deliberately not derivable:
     a namespace inferred from a directory name is the defect this input exists
-    to refuse (measured: a resolver required a namespace `owl-xema-prod` for a
+    to refuse (measured: a resolver required a namespace `example-deployment` for a
     deployment that declares `xema-prod`).
 
     The ServiceAccount and its token Secret live here.

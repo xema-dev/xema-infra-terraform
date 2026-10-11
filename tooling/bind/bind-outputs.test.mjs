@@ -379,10 +379,10 @@ test('custody: absent or null maps are omitted loudly; a sensitive one is refuse
 });
 
 test('custody: a deployment absent from a per-deployment map is skipped with the omitted notice', () => {
-  const { fragment, report } = bind(withCustody(), { deployment: 'aura-shared' });
+  const { fragment, report } = bind(withCustody(), { deployment: 'example-shared' });
   assert.equal(fragment.credentialCustody, undefined);
-  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl') && l.includes("no entry for deployment 'aura-shared'")));
-  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId') && l.includes("no entry for deployment 'aura-shared'")));
+  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl') && l.includes("no entry for deployment 'example-shared'")));
+  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId') && l.includes("no entry for deployment 'example-shared'")));
 });
 
 test('custody: a present entry is emitted; one map may skip while the other emits', () => {
