@@ -50,7 +50,7 @@ The Azure stack derives every other name from `deployment_name` (3-20 characters
 | [`modules/postgres-tenancy/`](modules/postgres-tenancy), [`modules/assigned-roles/`](modules/assigned-roles) | database tenancy and role assignment |
 | [`modules/providers/`](modules/providers) | Azure, DigitalOcean and Cloudflare implementations of the substrate contracts |
 | [`stacks/azure/xema-substrate`](stacks/azure/xema-substrate) | the Azure substrate |
-| [`stacks/digitalocean/xema-substrate`](stacks/digitalocean/xema-substrate) | the DigitalOcean substrate (being retired) |
+| [`stacks/digitalocean/xema-substrate`](stacks/digitalocean/xema-substrate) | the DigitalOcean substrate |
 | [`tooling/bind`](tooling/bind) | turns stack outputs into deploy bindings |
 | [`examples/`](examples) | runnable examples with placeholder values |
 

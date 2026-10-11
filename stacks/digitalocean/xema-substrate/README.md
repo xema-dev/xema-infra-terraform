@@ -1,6 +1,6 @@
 # stacks/digitalocean/xema-substrate
 
-Composes the Xema substrate on DigitalOcean from the per-cloud primitives and the cloud-agnostic addons: a DOKS cluster, managed Postgres, DNS, ReadWriteMany storage, namespaces, the Keycloak realm and extension claims. DigitalOcean is being retired, so this stack is maintained as is.
+Composes the Xema substrate on DigitalOcean from the per-cloud primitives and the cloud-agnostic addons: a DOKS cluster, managed Postgres, DNS, ReadWriteMany storage, namespaces, the Keycloak realm and extension claims.
 
 ## When to use it
 
