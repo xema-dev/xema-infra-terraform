@@ -9,7 +9,7 @@ was committed, but what a `main.tf` + tfvars have to say differently.
 BREAKING, no shim. `modules/identity-realm` keeps only the realm shell (`realm_name`, `enabled`, `display_name`) and its
 clients/roles/mappers. The inputs `access_token_lifespan`, `login_with_email_allowed`, `registration_allowed`, `reset_password_allowed`,
 `ssl_required`, `sso_session_idle_timeout` and `sso_session_max_lifespan` are removed, and the `keycloak_realm` ignores those attributes (`lifecycle.ignore_changes`). identity-api is the single owner of realm policy: it
-reconciles `realmSettings.accessTokenLifespanSeconds` (default 300) and `realmSettings.loginWithEmailAllowed` at boot. The pass-through
+reconciles seven settings at boot, holding the realm at the default when a key is unset: `accessTokenLifespanSeconds` (default 300), `loginWithEmailAllowed` (true), `registrationAllowed` (false), `resetPasswordAllowed` (true), `sslRequired` (`external`), `ssoSessionIdleTimeoutSeconds` (1800) and `ssoSessionMaxLifespanSeconds` (36000). They are set in identity-api's configuration at `REALM_POLICIES.<realm>.realmSettings.<key>`. The values are integer seconds, not Go durations (`5m` is `300`). Minimum version: the first identity-api release that contains develop commit c31d929e. The pass-through
 variable `realm_access_token_lifespan` is removed from `stacks/digitalocean/xema-substrate`, `stacks/azure/xema-substrate` and
 `examples/customer`. A consumer root must delete `realm_access_token_lifespan` (and any of the removed inputs passed to the module) from its `main.tf` and tfvars, and set the values in identity-api's configuration
 instead. Terraform no longer plans a change for any of these settings.
