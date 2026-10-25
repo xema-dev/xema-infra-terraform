@@ -364,6 +364,13 @@ variable "cluster_outbound_type" {
   default     = "loadBalancer"
 }
 
+variable "cluster_custom_ca_trust_certificates" {
+  description = "PEM CA certificates the created cluster's nodes trust (one per entry, at most 10). Empty (default) adds none. Passed to modules/providers/azure/cluster's custom_ca_trust_certificates, which validates them."
+  type        = list(string)
+  default     = []
+  nullable    = false
+}
+
 variable "cluster_private" {
   description = <<-EOT
     Kubernetes API reachability for the created cluster. null (default) keeps a

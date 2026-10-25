@@ -65,6 +65,7 @@ module "cluster" {
   tags                 = local.tags
 
   outbound_type                       = var.cluster_outbound_type
+  custom_ca_trust_certificates        = var.cluster_custom_ca_trust_certificates
   route_table_id                      = var.network == null ? "" : var.network.route_table_id
   private_cluster_enabled             = var.cluster_private != null
   private_cluster_public_fqdn_enabled = var.cluster_private != null ? var.cluster_private.public_fqdn : false
