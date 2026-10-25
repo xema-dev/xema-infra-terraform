@@ -35,7 +35,7 @@ jobs:
   # rather than a green step that planned nothing.
   validate:
     name: ${{ matrix.engine }} — fmt / validate
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -108,7 +108,7 @@ jobs:
 
   checks:
     name: profile / tflint / leak-scan / readability / bind tests
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -117,7 +117,7 @@ jobs:
       # Self-contained (node builtins only): no install, nothing to lock.
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        timeout-minutes: 5  # setup-node stalls indefinitely on this fleet; fail loudly instead of masking later steps
+        timeout-minutes: 5  # fail loudly if setup-node stalls instead of masking later steps
         with:
           node-version-file: .node-version
 
