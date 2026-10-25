@@ -34,7 +34,7 @@ module "cluster" {
 - `kubernetes_version` is a prefix; patch upgrades do not produce a plan diff.
 - A NetworkPolicy engine is always enforced: `network_policy_engine` is `cilium` (default) or `calico`. Changing it on an existing cluster recreates it.
 - Each pool takes optional `zones`, `os_disk_size_gb` and `os_disk_type` (`Managed` or `Ephemeral`). Changing them on an existing pool replaces it.
-- Private CA trust: `custom_ca_trust_certificates` (PEM, one per entry, at most 10) is added to every Linux node's trust store, not to pods. Changing the set replaces every node, one at a time.
+- Private CA trust: `custom_ca_trust_certificates` (PEM, one per entry, at most 10) is added to every Linux node's trust store, not to pods. Changing the set replaces every node, one at a time. A CA in the node OS trust store is trusted for every TLS name the node reaches: container registries, public image hosts, and the control plane through the kubelet. Whoever holds its private key can intercept any of that traffic on every node. Use a CA created only for this purpose and name-constrained to what the nodes must trust: X.509 `nameConstraints` with a permitted DNS subtree, or an IP range, that covers only the private registry or endpoint.
 - The `azurerm` provider is configured by the root. To adopt an existing cluster, see [`import-runbook.md`](../../../../docs/import-runbook.md).
 
 ## Configuration

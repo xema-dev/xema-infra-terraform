@@ -10,8 +10,10 @@ Additive; nothing to change to adopt. A root that leaves the new inputs unset pl
 **Module `providers/azure/cluster`:** new `custom_ca_trust_certificates = list(string)`, default `[]`. It holds PEM CA certificates, which are added to every
 Linux node's OS trust store through AKS custom CA trust (`custom_ca_trust_certificates_base64`). Pods do not see them. Each entry holds one certificate, and the list holds at most 10.
 Changing the set replaces every node, one at a time. The node-pool `custom_ca_trust_enabled` flag is not used: AKS retired it, and azurerm 5.x removed it.
-Refused at plan (provider-free, `providers/azure/node-ca-trust/tests`): more than 10 certificates, more than 35 KB in total, or an entry that is not
+Refused at plan (provider-free, `providers/azure/node-ca-trust/tests`): more than 10 certificates, more than 35000 bytes of PEM content in total, or an entry that is not
 exactly one LF-terminated PEM certificate (a bundle, a key, CRLF).
+**Security:** A CA in the node OS trust store is trusted for every TLS name the node reaches: container registries, public image hosts, and the control plane through the kubelet. Whoever holds its private key can intercept any of that traffic on every node. Use a CA created only for this purpose and name-constrained to what the nodes must trust: X.509 `nameConstraints` with a permitted DNS subtree, or an IP range, that covers only the private registry or endpoint.
+The 35 KB limit is the one AKS documents for the PEM certificate content (https://learn.microsoft.com/azure/aks/custom-certificate-authority), counted as 35000 bytes with entries joined by a blank line.
 **Stack `stacks/azure/xema-substrate`:** pass-through input `cluster_custom_ca_trust_certificates`, default `[]`.
 
 ## Unreleased — identity-api owns all realm policy; identity-realm keeps only the shell (BREAKING for module consumers)
