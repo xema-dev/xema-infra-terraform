@@ -193,6 +193,13 @@ variable "route_table_id" {
   default     = ""
 }
 
+variable "custom_ca_trust_certificates" {
+  description = "PEM CA certificates added to every node's OS trust store (AKS custom CA trust; Linux nodes; NOT visible inside pods). One certificate per entry, at most 10, 35 KB in total; validated by providers/azure/node-ca-trust. Empty (default) adds none. Changing the set on an existing cluster replaces every node, rolling."
+  type        = list(string)
+  default     = []
+  nullable    = false
+}
+
 variable "private_cluster_enabled" {
   description = "Expose the Kubernetes API only on a private address inside the VNet (no public endpoint). Default false."
   type        = bool

@@ -87,6 +87,13 @@ module "network_policy_engine" {
   engine = var.network_policy_engine
 }
 
+# Private CAs the nodes trust: validated and mapped provider-free, so the rules
+# are tested on both engines (node-ca-trust/tests).
+module "node_ca_trust" {
+  source       = "../node-ca-trust"
+  certificates = var.custom_ca_trust_certificates
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = var.name
   location            = var.region
@@ -123,6 +130,11 @@ resource "azurerm_kubernetes_cluster" "this" {
   # (External Secrets, cert-manager) hold Azure roles without a stored secret.
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
+
+  # Private CAs every node trusts (e.g. a TLS-inspecting egress proxy, a private
+  # registry). null when none are given, so existing clusters plan no change.
+  # Changing the set rolls every node (AKS replaces them with the new trust).
+  custom_ca_trust_certificates_base64 = module.node_ca_trust.custom_ca_trust_certificates_base64
 
   identity {
     type         = "UserAssigned"
