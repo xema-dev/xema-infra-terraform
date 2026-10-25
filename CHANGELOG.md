@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — private CA trust on AKS nodes (Azure)
+
+Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change. The `azurerm >= 5.0` floor is unchanged, because 5.0.0 already has the field.
+**Module `providers/azure/cluster`:** new `custom_ca_trust_certificates = list(string)`, default `[]`. It holds PEM CA certificates, which are added to every
+Linux node's OS trust store through AKS custom CA trust (`custom_ca_trust_certificates_base64`). Pods do not see them. Each entry holds one certificate, and the list holds at most 10.
+Changing the set replaces every node, one at a time. The node-pool `custom_ca_trust_enabled` flag is not used: AKS retired it, and azurerm 5.x removed it.
+Refused at plan (provider-free, `providers/azure/node-ca-trust/tests`): more than 10 certificates, more than 35 KB in total, or an entry that is not
+exactly one LF-terminated PEM certificate (a bundle, a key, CRLF).
+**Stack `stacks/azure/xema-substrate`:** pass-through input `cluster_custom_ca_trust_certificates`, default `[]`.
+
 ## Unreleased — identity-api owns all realm policy; identity-realm keeps only the shell (BREAKING for module consumers)
 
 BREAKING, no shim. `modules/identity-realm` keeps only the realm shell (`realm_name`, `enabled`, `display_name`) and its
