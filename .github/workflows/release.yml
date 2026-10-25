@@ -42,8 +42,8 @@ jobs:
       - name: Build the release artifacts
         run: tooling/release/build-release.sh "${TAG}" dist
 
-      # actions/github-script, not the gh CLI: the self-hosted runners carry no
-      # gh, and a release must not depend on what a runner image happens to hold.
+      # actions/github-script, not the gh CLI: a release must not depend on
+      # what a runner image happens to hold.
       - name: Publish the release
         uses: actions/github-script@v7
         with:
