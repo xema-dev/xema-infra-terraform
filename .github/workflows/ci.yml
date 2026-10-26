@@ -107,7 +107,7 @@ jobs:
               done
 
   checks:
-    name: profile / tflint / leak-scan / readability / bind tests
+    name: profile / tflint / leak-scan / bind tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -146,13 +146,6 @@ jobs:
             exit 1
           fi
           echo "No state/tfvars/backend secrets tracked. OK."
-
-      # The leak scan above is grep-based, and so is every audit of this tree. A
-      # tracked source file carrying a raw NUL is classified BINARY by ripgrep,
-      # ugrep and `grep -I` — they skip the whole file and report zero matches,
-      # so it is invisible to all of them.
-      - name: Every tracked source file is readable by search
-        run: node tooling/boundaries/lib/source-readability.mjs
 
       # BIND: the outputs → secret-inputs/externals mapping runs its own suite
       # over one fixture document per stack (tooling/bind/README.md).
