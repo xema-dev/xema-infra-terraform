@@ -30,8 +30,6 @@ Import ids: the `StorageClass` name, and `<namespace>/<release>` for the Helm re
 | `create_namespace` | no | Whether the Helm release should create its target namespace if it does not already exist. |
 | `release_name` | no | Helm release name for the NFS provisioner. |
 | `chart_values` | no | Inline Helm values for the provisioner chart, merged on top of chart defaults. |
-
-The provisioner chart is caller-chosen, so this module has no image inputs: set the chart's own image keys (repository and digest) through `chart_values` or `chart_set`; `chart_repository` already accepts an `oci://` path.
 | `chart_set` | no | Scalar Helm --set overrides for the provisioner chart, keyed by value path (e.g, { "replicaCount" = "1"... |
 | `storage_class_name` | no | Name of the ReadWriteMany StorageClass to create. |
 | `storage_class_provisioner` | no | The provisioner field on the StorageClass. |
@@ -41,5 +39,7 @@ The provisioner chart is caller-chosen, so this module has no image inputs: set 
 | `allow_volume_expansion` | no | Whether PVCs bound to this StorageClass may be expanded. |
 | `is_default_class` | no | Mark this StorageClass as the cluster default (sets the storageclass.kubernetes.io/is-default-class annotat... |
 | `storage_class_labels` | no | Labels applied to the StorageClass metadata. |
+
+The provisioner chart is caller-chosen, so this module has no image inputs: set the chart's own image keys (repository and digest) through `chart_values` or `chart_set`; `chart_repository` already accepts an `oci://` path.
 
 Outputs: `storage_class_name`, `release_name`, `namespace`.

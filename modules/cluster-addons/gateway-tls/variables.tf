@@ -79,25 +79,8 @@ variable "ngf_images" {
   nullable = false
   default  = {}
 
-  validation {
-    condition     = alltrue([for k in keys(var.ngf_images) : contains(["controller", "nginx"], k)])
-    error_message = "ngf_images keys must be among: controller, nginx."
-  }
 
-  validation {
-    condition     = alltrue([for v in values(var.ngf_images) : can(regex("^sha256:[0-9a-f]{64}$", v.digest))])
-    error_message = "ngf_images: every entry needs a digest of the form sha256:<64 lowercase hex characters>; tag-only image overrides are refused."
-  }
 
-  validation {
-    condition     = alltrue([for v in values(var.ngf_images) : can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?(/[a-z0-9._-]+)+$", v.repository))])
-    error_message = "ngf_images: repository must be a registry host (optional port) and path such as 10.0.0.1/proj/image, without a scheme, tag or digest."
-  }
-
-  validation {
-    condition     = alltrue([for v in values(var.ngf_images) : can(regex("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$", v.tag))])
-    error_message = "ngf_images: tag must be a valid image tag (it is rendered as <tag>@<digest>)."
-  }
 }
 
 variable "ngf_namespace" {
@@ -259,25 +242,8 @@ variable "cert_manager_images" {
   nullable = false
   default  = {}
 
-  validation {
-    condition     = alltrue([for k in keys(var.cert_manager_images) : contains(["controller", "webhook", "cainjector", "acmesolver", "startupapicheck"], k)])
-    error_message = "cert_manager_images keys must be among: controller, webhook, cainjector, acmesolver, startupapicheck."
-  }
 
-  validation {
-    condition     = alltrue([for v in values(var.cert_manager_images) : can(regex("^sha256:[0-9a-f]{64}$", v.digest))])
-    error_message = "cert_manager_images: every entry needs a digest of the form sha256:<64 lowercase hex characters>; tag-only image overrides are refused."
-  }
 
-  validation {
-    condition     = alltrue([for v in values(var.cert_manager_images) : can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?(/[a-z0-9._-]+)+$", v.repository))])
-    error_message = "cert_manager_images: repository must be a registry host (optional port) and path such as 10.0.0.1/proj/image, without a scheme, tag or digest."
-  }
-
-  validation {
-    condition     = alltrue([for v in values(var.cert_manager_images) : can(regex("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$", v.tag))])
-    error_message = "cert_manager_images: tag must be a valid image tag (it is rendered as <tag>@<digest>)."
-  }
 }
 
 variable "cert_manager_namespace" {

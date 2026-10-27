@@ -15,6 +15,15 @@ module "tls_plan" {
   dns01_zones                          = try(var.dns01_azure.hosted_zone_names, [])
 }
 
+# Image-override rules and the Helm values they render to, validated without a provider
+# (./images-plan/tests).
+module "images_plan" {
+  source = "./images-plan"
+
+  ngf_images          = var.ngf_images
+  cert_manager_images = var.cert_manager_images
+}
+
 locals {
   dns01 = var.tls_solver == "dns01-azure"
   ngf   = var.gateway_implementation == "nginx-gateway-fabric"
@@ -49,21 +58,8 @@ locals {
     }
   })
 
-  # Empty by default, so the rendered values are unchanged. NGINX Gateway Fabric has no digest key:
-  # the tag value carries "<tag>@<digest>" and the chart renders repository:tag.
-  ngf_images_values = length(var.ngf_images) == 0 ? [] : [yamlencode({
-    for k, v in var.ngf_images : (k == "controller" ? "nginxGateway" : "nginx") => {
-      image = { repository = v.repository, tag = "${v.tag}@${v.digest}" }
-    }
-  })]
-
-  # cert-manager takes repository, tag and digest separately; the controller's image is top-level.
-  cert_manager_images_values = length(var.cert_manager_images) == 0 ? [] : [yamlencode(merge(
-    { for k, v in var.cert_manager_images : "image" => { repository = v.repository, tag = v.tag, digest = v.digest } if k == "controller" },
-    { for k, v in var.cert_manager_images : k => {
-      image = { repository = v.repository, tag = v.tag, digest = v.digest }
-    } if k != "controller" },
-  ))]
+  ngf_images_values          = module.images_plan.ngf_values
+  cert_manager_images_values = module.images_plan.cert_manager_values
 
   # enableGatewayAPI turns on cert-manager's HTTP-01 gatewayHTTPRoute solver. The Gateway carries no
   # cert-manager.io/cluster-issuer annotation, so the gateway-shim issues nothing: each managed

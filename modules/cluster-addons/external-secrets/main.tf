@@ -24,14 +24,15 @@ locals {
     serviceAccount = { name = "external-secrets" }
   })
 
-  # Empty by default, so the rendered values are unchanged. The chart has no digest key: the tag
-  # value carries "<tag>@<digest>" and the chart renders repository:tag.
-  images_values = length(var.images) == 0 ? [] : [yamlencode(merge(
-    { for k, v in var.images : "image" => { repository = v.repository, tag = "${v.tag}@${v.digest}" } if k == "controller" },
-    { for k, v in var.images : (k == "webhook" ? "webhook" : "certController") => {
-      image = { repository = v.repository, tag = "${v.tag}@${v.digest}" }
-    } if k != "controller" },
-  ))]
+  images_values = module.images_plan.values
+}
+
+# Image-override rules and the Helm values they render to, validated without a provider
+# (./images-plan/tests).
+module "images_plan" {
+  source = "./images-plan"
+
+  images = var.images
 }
 
 resource "helm_release" "external_secrets" {

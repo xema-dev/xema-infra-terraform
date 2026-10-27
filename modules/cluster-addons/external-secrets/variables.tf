@@ -116,23 +116,6 @@ variable "images" {
   nullable = false
   default  = {}
 
-  validation {
-    condition     = alltrue([for k in keys(var.images) : contains(["controller", "webhook", "cert_controller"], k)])
-    error_message = "images keys must be among: controller, webhook, cert_controller."
-  }
 
-  validation {
-    condition     = alltrue([for v in values(var.images) : can(regex("^sha256:[0-9a-f]{64}$", v.digest))])
-    error_message = "images: every entry needs a digest of the form sha256:<64 lowercase hex characters>; tag-only image overrides are refused."
-  }
 
-  validation {
-    condition     = alltrue([for v in values(var.images) : can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?(/[a-z0-9._-]+)+$", v.repository))])
-    error_message = "images: repository must be a registry host (optional port) and path such as 10.0.0.1/proj/image, without a scheme, tag or digest."
-  }
-
-  validation {
-    condition     = alltrue([for v in values(var.images) : can(regex("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$", v.tag))])
-    error_message = "images: tag must be a valid image tag (it is rendered as <tag>@<digest>)."
-  }
 }
