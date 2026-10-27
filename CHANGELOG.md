@@ -4,14 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
-## v0.18.1 — private DNS for AKS on custom-DNS networks (HAM-5)
+## v0.19.0 — private DNS for AKS on custom-DNS networks (HAM-5)
 
 Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change.
 **Module `providers/azure/cluster`:** new `private_dns_zone_id` (null, `"System"`, `"None"` or a private DNS zone resource id; default null keeps the AKS default). `"None"` needs `private_cluster_enabled` and `private_cluster_public_fqdn_enabled`: the nodes then use the API's public name, whose public record holds the private IP. A network on custom DNS otherwise fails node bootstrap with `VMExtensionError_K8SAPIServerDNSLookupFail` (NXDOMAIN for `<name>.privatelink.<region>.azmk8s.io`), even with the public FQDN enabled. The rules are in the provider-free `providers/azure/private-dns-zone` helper, with tests.
 **Stack `stacks/azure/xema-substrate`:** `cluster_private` gains `private_dns_zone` (optional string), passed to `private_dns_zone_id`.
 **Module `cluster-addons/coredns-custom` (new), stack `cluster_dns_forward_zones`:** a list of DNS zones (default `[]`, creates nothing). A `coredns-custom` ConfigMap in `kube-system` gives CoreDNS one server block per zone, forwarding to Azure DNS (`168.63.129.16`), so pods resolve private endpoints (`privatelink.vaultcore.azure.net`, `privatelink.postgres.database.azure.com`, `privatelink.blob.core.windows.net`) when the network's own DNS cannot. Each zone must be linked to the cluster's network. Rendering and zone rules are in the provider-free `server-blocks` submodule, with tests.
 
-## Unreleased — overridable chart and image sources for offline registries (HAM-80)
+## v0.18.0 — overridable chart and image sources for offline registries (HAM-80)
 
 Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change: the defaults are the repositories and versions that were hard-coded, and no values are added.
 **Module `cluster-addons/external-secrets`:** `chart_repository` (default `https://charts.external-secrets.io`) and `images` (map keyed `controller`, `webhook`, `cert_controller` of `{ repository, tag, digest }`, default `{}`).

@@ -5,9 +5,12 @@ module "server_blocks" {
   forwarder = var.forwarder
 }
 
-# AKS reads the coredns-custom ConfigMap in kube-system and adds every "*.server"
-# key to CoreDNS (reloaded within about a minute; no restart needed).
-resource "kubernetes_config_map_v1" "coredns_custom" {
+# AKS owns the kube-system/coredns-custom ConfigMap: it pre-creates it empty and
+# keeps it present. This module owns only its data key, so it never collides with
+# that object and destroy removes just the key. CoreDNS picks up the change as
+# Microsoft documents: after a change, restart it with
+# `kubectl -n kube-system rollout restart deployment coredns` (not automated here).
+resource "kubernetes_config_map_v1_data" "coredns_custom" {
   count = length(module.server_blocks.data) == 0 ? 0 : 1
 
   metadata {
@@ -15,5 +18,7 @@ resource "kubernetes_config_map_v1" "coredns_custom" {
     namespace = "kube-system"
   }
 
-  data = module.server_blocks.data
+  data          = module.server_blocks.data
+  force         = true
+  field_manager = "xema-infra-terraform"
 }

@@ -386,7 +386,8 @@ variable "cluster_private" {
                       the privatelink zone (node bootstrap fails with
                       VMExtensionError_K8SAPIServerDNSLookupFail); or the
                       resource id of your own private DNS zone. Validated by
-                      modules/providers/azure/private-dns-zone.
+                      modules/providers/azure/private-dns-zone. Changing it on
+                      an EXISTING cluster REPLACES the cluster.
     A private API is reached from inside the network — the management runner.
   EOT
   type = object({

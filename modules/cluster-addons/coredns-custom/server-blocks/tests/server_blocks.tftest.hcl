@@ -61,3 +61,52 @@ run "duplicate_zone_is_refused" {
   }
   expect_failures = [var.zones]
 }
+
+run "cluster_local_is_refused" {
+  command = plan
+  variables {
+    zones = ["cluster.local"]
+  }
+  expect_failures = [var.zones]
+}
+
+run "cluster_subdomain_is_refused" {
+  command = plan
+  variables {
+    zones = ["svc.cluster.local"]
+  }
+  expect_failures = [var.zones]
+}
+
+run "in_addr_arpa_is_refused" {
+  command = plan
+  variables {
+    zones = ["in-addr.arpa"]
+  }
+  expect_failures = [var.zones]
+}
+
+run "in_addr_arpa_subdomain_is_refused" {
+  command = plan
+  variables {
+    zones = ["10.in-addr.arpa"]
+  }
+  expect_failures = [var.zones]
+}
+
+run "ip6_arpa_is_refused" {
+  command = plan
+  variables {
+    zones = ["ip6.arpa"]
+  }
+  expect_failures = [var.zones]
+}
+
+run "out_of_range_forwarder_is_refused" {
+  command = plan
+  variables {
+    zones     = ["a.example.com"]
+    forwarder = "999.1.1.1"
+  }
+  expect_failures = [var.forwarder]
+}

@@ -12,6 +12,15 @@ variable "zones" {
     error_message = "Each zone must be a lowercase DNS name of two or more labels (letters, digits, hyphens), without a trailing dot, e.g. privatelink.vaultcore.azure.net."
   }
 
+  # These would override the kubernetes plugin's own zones and break in-cluster DNS.
+  validation {
+    condition = alltrue([
+      for z in var.zones :
+      !anytrue([for r in ["cluster.local", "in-addr.arpa", "ip6.arpa"] : z == r || endswith(z, ".${r}")])
+    ])
+    error_message = "zones must not include cluster.local, in-addr.arpa or ip6.arpa, or a subdomain of them: they would override CoreDNS's own cluster and reverse zones."
+  }
+
   validation {
     condition     = length(distinct(var.zones)) == length(var.zones)
     error_message = "zones must not repeat a zone: CoreDNS refuses two server blocks for the same zone."
@@ -24,7 +33,7 @@ variable "forwarder" {
   default     = "168.63.129.16"
 
   validation {
-    condition     = can(regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", var.forwarder))
+    condition     = can(regex("^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", var.forwarder))
     error_message = "forwarder must be an IPv4 address."
   }
 }
