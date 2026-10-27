@@ -69,6 +69,7 @@ module "cluster" {
   route_table_id                      = var.network == null ? "" : var.network.route_table_id
   private_cluster_enabled             = var.cluster_private != null
   private_cluster_public_fqdn_enabled = var.cluster_private != null ? var.cluster_private.public_fqdn : false
+  private_dns_zone_id                 = var.cluster_private != null ? var.cluster_private.private_dns_zone : null
   entra_rbac                          = var.cluster_entra_rbac
   network_policy_engine               = var.cluster_network_policy_engine
 
@@ -390,6 +391,15 @@ module "rwx_storage" {
   storage_class_parameters  = var.rwx_storage_class_parameters
   is_default_class          = var.rwx_is_default_class
   allow_volume_expansion    = var.rwx_allow_volume_expansion
+}
+
+# Pods resolve through the node's resolvers; on a VNet with custom DNS those
+# cannot answer the private endpoints' zones, so CoreDNS forwards them to Azure DNS.
+module "coredns_custom" {
+  source = "../../../modules/cluster-addons/coredns-custom"
+  count  = length(var.cluster_dns_forward_zones) > 0 ? 1 : 0
+
+  zones = var.cluster_dns_forward_zones
 }
 
 module "workload_namespaces" {

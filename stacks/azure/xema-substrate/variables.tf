@@ -379,12 +379,28 @@ variable "cluster_private" {
       - public_fqdn : also publish that private address under a public DNS name,
                       for resolvers that cannot see Azure private DNS zones (a
                       network on custom DNS). The endpoint stays private.
+      - private_dns_zone : the API's private DNS zone: unset keeps the AKS
+                      default ("System"); "None" makes the nodes use the API's
+                      public name (needs public_fqdn = true) and is the fix for a
+                      network on custom DNS whose resolvers answer NXDOMAIN for
+                      the privatelink zone (node bootstrap fails with
+                      VMExtensionError_K8SAPIServerDNSLookupFail); or the
+                      resource id of your own private DNS zone. Validated by
+                      modules/providers/azure/private-dns-zone.
     A private API is reached from inside the network — the management runner.
   EOT
   type = object({
-    public_fqdn = optional(bool, false)
+    public_fqdn      = optional(bool, false)
+    private_dns_zone = optional(string)
   })
   default = null
+}
+
+variable "cluster_dns_forward_zones" {
+  description = "DNS zones the cluster's CoreDNS forwards to Azure DNS (168.63.129.16), through a coredns-custom ConfigMap in kube-system, so pods resolve private endpoints when the network uses custom DNS (e.g. privatelink.vaultcore.azure.net, privatelink.postgres.database.azure.com, privatelink.blob.core.windows.net). Each zone must be linked to the cluster's network. Empty (default) creates nothing. Validated by modules/cluster-addons/coredns-custom."
+  type        = list(string)
+  default     = []
+  nullable    = false
 }
 
 variable "cluster_entra_rbac" {

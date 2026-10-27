@@ -63,6 +63,8 @@ Main inputs. All are in [`variables.tf`](variables.tf).
 | `enable_cache`, `enable_container_registry`, `enable_deployer_identity` | no (default `false`) | optional areas |
 | `cluster_name`, `cluster_resource_group_name` | consume mode | the existing cluster to read |
 | `kubernetes_version`, `node_pools`, `default_pool_id`, `cluster_authorized_ip_ranges`, `cluster_network_policy_engine` | no | cluster shape |
+| `cluster_private` | no | `{ public_fqdn, private_dns_zone }`: a private API. `private_dns_zone = "None"` with `public_fqdn = true` is the fix for a network on custom DNS (nodes use the API's public name) |
+| `cluster_dns_forward_zones` | no | zones CoreDNS forwards to Azure DNS (`coredns-custom` ConfigMap), so pods resolve private endpoints on a custom-DNS network; see [`coredns-custom`](../../../modules/cluster-addons/coredns-custom) |
 | `postgres_engine_version`, `postgres_network_access`, `postgres_extensions`, `postgres_zone`, `postgres_provisioner_role` | no | database server shape; `postgres_zone` must be set before the first apply |
 | `existing_postgres_server_id`, `existing_postgres_host`, `existing_postgres_admin_login`, `existing_postgres_admin_password_key_vault_id` | consume mode | the existing server |
 | `backing_services_network_access` | no | `private` (default) turns off public endpoints of cache, storage and vault and adds private endpoints |

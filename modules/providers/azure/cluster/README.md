@@ -61,6 +61,7 @@ module "cluster" {
 | `custom_ca_trust_certificates` | no | PEM CA certificates added to every node's OS trust store. |
 | `private_cluster_enabled` | no | Expose the Kubernetes API only on a private address inside the VNet (no public endpoint). |
 | `private_cluster_public_fqdn_enabled` | no | For a private cluster: also publish the API's PRIVATE address under a public DNS name, so clients on a VNet... |
+| `private_dns_zone_id` | no | For a private cluster: the API's private DNS zone. null keeps the AKS default; "None" uses the API's public name (custom-DNS VNets); or a zone resource id. |
 | `entra_rbac` | no | Microsoft Entra ID authentication with Azure RBAC for Kubernetes authorization. |
 | `enable_log_analytics` | no | Create a Log Analytics workspace and wire the AKS monitoring (oms_agent) add-on to it. |
 | `log_analytics_retention_days` | no | Log Analytics retention in days (used only when enable_log_analytics). |

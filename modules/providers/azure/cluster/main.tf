@@ -87,6 +87,15 @@ module "network_policy_engine" {
   engine = var.network_policy_engine
 }
 
+# The API's private DNS zone: validated and mapped provider-free, so the rules
+# are tested on both engines (private-dns-zone/tests).
+module "private_dns_zone" {
+  source                  = "../private-dns-zone"
+  private_cluster_enabled = var.private_cluster_enabled
+  public_fqdn_enabled     = var.private_cluster_public_fqdn_enabled
+  private_dns_zone_id     = var.private_dns_zone_id
+}
+
 # Private CAs the nodes trust: validated and mapped provider-free, so the rules
 # are tested on both engines (node-ca-trust/tests).
 module "node_ca_trust" {
@@ -110,8 +119,18 @@ resource "azurerm_kubernetes_cluster" "this" {
   # publishes that private address under a PUBLIC DNS name, so clients whose
   # resolvers cannot see Azure private DNS zones (a VNet on custom DNS) still
   # resolve it — the endpoint stays private either way.
+  #
+  # private_dns_zone_id picks the private zone the API name lives in. The AKS
+  # default ("System") creates a privatelink zone linked to the VNet; a VNet on
+  # custom DNS (an AD DNS that cannot see Azure private zones) then fails node
+  # bootstrap with VMExtensionError_K8SAPIServerDNSLookupFail (NXDOMAIN for
+  # <name>.privatelink.<region>.azmk8s.io), even with the public FQDN enabled,
+  # because the nodes still use the private name. "None" (with the public FQDN)
+  # is Microsoft's fix: the nodes use the public name, whose public record holds
+  # the private IP. Rules: ../private-dns-zone.
   private_cluster_enabled             = var.private_cluster_enabled
   private_cluster_public_fqdn_enabled = var.private_cluster_enabled ? var.private_cluster_public_fqdn_enabled : null
+  private_dns_zone_id                 = module.private_dns_zone.private_dns_zone_id
 
   # Local (certificate) accounts off means every human and machine reaches the
   # API through Microsoft Entra ID, and Kubernetes authorization is Azure RBAC.

@@ -212,6 +212,19 @@ variable "private_cluster_public_fqdn_enabled" {
   default     = false
 }
 
+variable "private_dns_zone_id" {
+  description = "For a private cluster: the API's private DNS zone. null (default) keeps the AKS default (\"System\"). \"None\" makes the nodes use the API's PUBLIC name (needs private_cluster_public_fqdn_enabled = true): the fix for a VNet on custom DNS that cannot resolve the Azure private zone (VMExtensionError_K8SAPIServerDNSLookupFail). Or the resource id of your own private DNS zone. Ignored when private_cluster_enabled = false."
+  type        = string
+  default     = null
+
+  validation {
+    condition = var.private_dns_zone_id == null || contains(["System", "None"], coalesce(var.private_dns_zone_id, "-")) || can(regex(
+      "(?i)^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.Network/privateDnsZones/[^/]+$", coalesce(var.private_dns_zone_id, "-")
+    ))
+    error_message = "private_dns_zone_id must be null, \"System\", \"None\" or the resource id of an Azure private DNS zone."
+  }
+}
+
 variable "entra_rbac" {
   description = <<-EOT
     Microsoft Entra ID authentication with Azure RBAC for Kubernetes authorization.
