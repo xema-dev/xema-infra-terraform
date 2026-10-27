@@ -10,7 +10,7 @@ Use it when the VNet uses custom DNS and pods must reach private endpoints. Each
 
 ```hcl
 module "coredns_custom" {
-  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/coredns-custom?ref=v0.18.1"
+  source = "github.com/xema-dev/xema-infra-terraform//modules/cluster-addons/coredns-custom?ref=v0.19.0"
 
   zones = [
     "privatelink.vaultcore.azure.net",
