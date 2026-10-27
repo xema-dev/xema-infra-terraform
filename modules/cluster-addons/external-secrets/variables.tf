@@ -1,7 +1,20 @@
 variable "chart_version" {
   description = "Pinned external-secrets chart version (https://charts.external-secrets.io)."
   type        = string
+  nullable    = false
   default     = "2.10.0"
+}
+
+variable "chart_repository" {
+  description = "Helm repository of the external-secrets chart: an HTTPS repository or an oci:// registry path (e.g. oci://10.0.0.1/charts, holding the chart external-secrets). Override to pull from a private mirror."
+  type        = string
+  nullable    = false
+  default     = "https://charts.external-secrets.io"
+
+  validation {
+    condition     = can(regex("^(https?|oci)://[^[:space:]]+$", var.chart_repository))
+    error_message = "chart_repository must be an https://, http:// or oci:// URL."
+  }
 }
 
 variable "namespace" {
@@ -87,4 +100,39 @@ variable "known_namespaces" {
   description = "When set, the namespaces the caller creates; every boundary namespace must be one of them (the SecretStores are installed without creating their namespace). null skips the check, for namespaces owned elsewhere."
   type        = set(string)
   default     = null
+}
+
+variable "images" {
+  description = <<-EOT
+    Image overrides for the three External Secrets Operator images, keyed by component (`controller`, `webhook`, `cert_controller`); empty (the default) keeps the chart's own images.
+    Each entry sets the full image repository (registry host and path, no tag or digest), a tag, and a REQUIRED
+    sha256 digest, so a registry override can never be tags-only. Rendered into the chart as image.repository / image.tag (the chart has no digest key, so the tag value is `<tag>@<digest>`), webhook.image.* and certController.image.*. Leave the chart's `flavour` unset.
+  EOT
+  type = map(object({
+    repository = string
+    tag        = string
+    digest     = string
+  }))
+  nullable = false
+  default  = {}
+
+  validation {
+    condition     = alltrue([for k in keys(var.images) : contains(["controller", "webhook", "cert_controller"], k)])
+    error_message = "images keys must be among: controller, webhook, cert_controller."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.images) : can(regex("^sha256:[0-9a-f]{64}$", v.digest))])
+    error_message = "images: every entry needs a digest of the form sha256:<64 lowercase hex characters>; tag-only image overrides are refused."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.images) : can(regex("^[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]+)?(/[a-z0-9._-]+)+$", v.repository))])
+    error_message = "images: repository must be a registry host (optional port) and path such as 10.0.0.1/proj/image, without a scheme, tag or digest."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.images) : can(regex("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$", v.tag))])
+    error_message = "images: tag must be a valid image tag (it is rendered as <tag>@<digest>)."
+  }
 }

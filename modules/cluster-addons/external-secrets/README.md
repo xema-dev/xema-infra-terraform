@@ -33,6 +33,8 @@ For each boundary and namespace the module creates a user-assigned identity with
 | Input | Required | Description |
 | --- | --- | --- |
 | `chart_version` | no | Pinned external-secrets chart version (https://charts.external-secrets.io). |
+| `chart_repository` | no | Helm repository of the chart: HTTPS or `oci://` (default `https://charts.external-secrets.io`). |
+| `images` | no | Image overrides keyed `controller`, `webhook`, `cert_controller`, each `{ repository, tag, digest }`; the `sha256:<64 hex>` digest is required (tag-only is refused). Rendered as `image.tag = "<tag>@<digest>"` because the chart has no digest key. Default `{}` keeps the chart's images. |
 | `namespace` | no | Namespace the operator is installed into (created if absent). |
 | `values` | no | Extra inline Helm values for external-secrets, merged AFTER the module's own. |
 | `secret_stores` | no | One entry per secret trust boundary, keyed by a boundary name of the caller's choosing. |

@@ -70,6 +70,9 @@ Main inputs. All are in [`variables.tf`](variables.tf).
 | `key_vault_secrets` | no | sensitive; secrets seeded into the operator vault (pass via `TF_VAR_*`) |
 | `gateway_listeners`, `acme_email`, `tls_solver`, `gateway_implementation`, `customer_gateway` | with `enable_gateway_tls` | one HTTPS listener per hostname; see [`gateway-tls`](../../../modules/cluster-addons/gateway-tls) |
 | `cluster_issuer_name`, `secret_store_name` | no | in-cluster names (defaults `letsencrypt`, `platform`), returned as outputs of the same name |
+| `external_secrets_chart_repository`, `external_secrets_chart_version`, `external_secrets_images` | no | Offline sources for the External Secrets Operator: chart repository (HTTPS or `oci://`), version, and per-image `{ repository, tag, digest }` (digest required). Null/empty keeps the module defaults. |
+| `ngf_chart_repository`, `ngf_chart_version`, `ngf_images` | no | The same for NGINX Gateway Fabric (images `controller`, `nginx`). |
+| `cert_manager_chart_repository`, `cert_manager_chart_version`, `cert_manager_images` | no | The same for cert-manager (images `controller`, `webhook`, `cainjector`, `acmesolver`, `startupapicheck`). |
 | `keycloak_url`, `keycloak_client_id`, `keycloak_client_secret` | with `enable_identity_realm` | Keycloak connection |
 | `realm_clients`, `realm_roles`, `realm_protocol_mappers` | no | leave empty when your identity service reconciles them on boot |
 | `extensions` | no | claims for dedicated resources: `object_buckets`, `managed_databases`, `dns_records` (see [`docs/extensions.md`](../../../docs/extensions.md)) |

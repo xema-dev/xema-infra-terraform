@@ -46,6 +46,8 @@ Routes attach with `module.gateway_tls.gateway_parent_refs`, one parent ref per 
 | `customer_gateway` | no | The existing Gateway, for gateway_implementation = "customer-managed" (null otherwise): - name, namespace :... |
 | `gateway_api_crds_namespace` | no | Namespace the Helm release holding the vendored Gateway API CRDs lives in (created if absent). |
 | `ngf_chart_version` | no | Pinned NGINX Gateway Fabric chart version (oci://ghcr.io/nginx/charts/nginx-gateway-fabric). |
+| `ngf_chart_repository` | no | Helm repository of the NGINX Gateway Fabric chart: `oci://` or HTTPS (default `oci://ghcr.io/nginx/charts`). |
+| `ngf_images` | no | Image overrides keyed `controller`, `nginx` (the data plane), each `{ repository, tag, digest }`, digest required. Rendered as `tag = "<tag>@<digest>"` (the chart has no digest key). Default `{}`. |
 | `ngf_namespace` | no | Namespace the NGINX Gateway Fabric controller is installed into (created if absent). |
 | `ngf_release_name` | no | Helm release name of NGINX Gateway Fabric. |
 | `ngf_values` | no | Extra inline Helm values for NGINX Gateway Fabric, merged AFTER the module's own. |
@@ -61,6 +63,8 @@ Routes attach with `module.gateway_tls.gateway_parent_refs`, one parent ref per 
 | `data_plane_load_balancer_ip` | no | Pin the data-plane LoadBalancer to a pre-allocated static IP. |
 | `data_plane_node_ports` | no | Fixed NodePorts for the data-plane Service (service type NodePort): each maps a node port to a Gateway list... |
 | `cert_manager_chart_version` | no | Pinned cert-manager chart version (https://charts.jetstack.io). |
+| `cert_manager_chart_repository` | no | Helm repository of the cert-manager chart: HTTPS or `oci://` (default `https://charts.jetstack.io`). |
+| `cert_manager_images` | no | Image overrides keyed `controller`, `webhook`, `cainjector`, `acmesolver`, `startupapicheck`, each `{ repository, tag, digest }`, digest required; rendered with the chart's own `digest` key. Default `{}`. |
 | `cert_manager_namespace` | no | Namespace cert-manager is installed into (created if absent). |
 | `cert_manager_service_account_name` | no | cert-manager controller service account name — the subject a dns01-azure workload identity is federated to. |
 | `cert_manager_values` | no | Extra inline Helm values for cert-manager, merged AFTER the module's own. |

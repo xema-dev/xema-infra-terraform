@@ -1027,3 +1027,69 @@ variable "deployer_context_name" {
   type        = string
   default     = "default"
 }
+
+variable "external_secrets_chart_repository" {
+  description = "Helm repository of the External Secrets Operator chart (HTTPS or oci://). Null keeps the module default (https://charts.external-secrets.io). Set to the in-network registry when the cluster cannot reach the internet."
+  type        = string
+  default     = null
+}
+
+variable "external_secrets_chart_version" {
+  description = "Pinned External Secrets Operator chart version. Null keeps the module default."
+  type        = string
+  default     = null
+}
+
+variable "external_secrets_images" {
+  description = "Image overrides for External Secrets Operator, keyed by component (controller, webhook, cert_controller); each entry is { repository, tag, digest } and the digest (sha256:<64 hex>) is required, validated by the module. Empty keeps the chart's images."
+  type = map(object({
+    repository = string
+    tag        = string
+    digest     = string
+  }))
+  default = {}
+}
+
+variable "ngf_chart_repository" {
+  description = "Helm repository of the NGINX Gateway Fabric chart (HTTPS or oci://). Null keeps the module default (oci://ghcr.io/nginx/charts). Set to the in-network registry when the cluster cannot reach the internet."
+  type        = string
+  default     = null
+}
+
+variable "ngf_chart_version" {
+  description = "Pinned NGINX Gateway Fabric chart version. Null keeps the module default."
+  type        = string
+  default     = null
+}
+
+variable "ngf_images" {
+  description = "Image overrides for NGINX Gateway Fabric, keyed by component (controller, nginx); each entry is { repository, tag, digest } and the digest (sha256:<64 hex>) is required, validated by the module. Empty keeps the chart's images."
+  type = map(object({
+    repository = string
+    tag        = string
+    digest     = string
+  }))
+  default = {}
+}
+
+variable "cert_manager_chart_repository" {
+  description = "Helm repository of the cert-manager chart (HTTPS or oci://). Null keeps the module default (https://charts.jetstack.io). Set to the in-network registry when the cluster cannot reach the internet."
+  type        = string
+  default     = null
+}
+
+variable "cert_manager_chart_version" {
+  description = "Pinned cert-manager chart version. Null keeps the module default."
+  type        = string
+  default     = null
+}
+
+variable "cert_manager_images" {
+  description = "Image overrides for cert-manager, keyed by component (controller, webhook, cainjector, acmesolver, startupapicheck); each entry is { repository, tag, digest } and the digest (sha256:<64 hex>) is required, validated by the module. Empty keeps the chart's images."
+  type = map(object({
+    repository = string
+    tag        = string
+    digest     = string
+  }))
+  default = {}
+}

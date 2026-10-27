@@ -49,6 +49,22 @@ locals {
     }
   })
 
+  # Empty by default, so the rendered values are unchanged. NGINX Gateway Fabric has no digest key:
+  # the tag value carries "<tag>@<digest>" and the chart renders repository:tag.
+  ngf_images_values = length(var.ngf_images) == 0 ? [] : [yamlencode({
+    for k, v in var.ngf_images : (k == "controller" ? "nginxGateway" : "nginx") => {
+      image = { repository = v.repository, tag = "${v.tag}@${v.digest}" }
+    }
+  })]
+
+  # cert-manager takes repository, tag and digest separately; the controller's image is top-level.
+  cert_manager_images_values = length(var.cert_manager_images) == 0 ? [] : [yamlencode(merge(
+    { for k, v in var.cert_manager_images : "image" => { repository = v.repository, tag = v.tag, digest = v.digest } if k == "controller" },
+    { for k, v in var.cert_manager_images : k => {
+      image = { repository = v.repository, tag = v.tag, digest = v.digest }
+    } if k != "controller" },
+  ))]
+
   # enableGatewayAPI turns on cert-manager's HTTP-01 gatewayHTTPRoute solver. The Gateway carries no
   # cert-manager.io/cluster-issuer annotation, so the gateway-shim issues nothing: each managed
   # listener gets an explicit Certificate, and a customer_supplied listener none.
@@ -138,13 +154,13 @@ resource "helm_release" "nginx_gateway_fabric" {
   count = local.ngf ? 1 : 0
 
   name             = var.ngf_release_name
-  repository       = "oci://ghcr.io/nginx/charts"
+  repository       = var.ngf_chart_repository
   chart            = "nginx-gateway-fabric"
   version          = var.ngf_chart_version
   namespace        = var.ngf_namespace
   create_namespace = true
 
-  values = concat([local.ngf_values], var.ngf_values)
+  values = concat([local.ngf_values], local.ngf_images_values, var.ngf_values)
 
   depends_on = [helm_release.gateway_api_crds]
 }
@@ -155,13 +171,13 @@ resource "helm_release" "cert_manager" {
   count = local.issuer ? 1 : 0
 
   name             = "cert-manager"
-  repository       = "https://charts.jetstack.io"
+  repository       = var.cert_manager_chart_repository
   chart            = "cert-manager"
   version          = var.cert_manager_chart_version
   namespace        = var.cert_manager_namespace
   create_namespace = true
 
-  values = concat([local.cert_manager_values], var.cert_manager_values)
+  values = concat([local.cert_manager_values], local.cert_manager_images_values, var.cert_manager_values)
 
   # cert-manager's controller fails to start with enableGatewayAPI when the Gateway API CRDs are absent.
   depends_on = [helm_release.gateway_api_crds]

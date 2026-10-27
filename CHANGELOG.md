@@ -4,6 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — overridable chart and image sources for offline registries (HAM-80)
+
+Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change: the defaults are the repositories and versions that were hard-coded, and no values are added.
+**Module `cluster-addons/external-secrets`:** `chart_repository` (default `https://charts.external-secrets.io`) and `images` (map keyed `controller`, `webhook`, `cert_controller` of `{ repository, tag, digest }`, default `{}`).
+**Module `cluster-addons/gateway-tls`:** `ngf_chart_repository` (default `oci://ghcr.io/nginx/charts`), `ngf_images` (keys `controller`, `nginx`), `cert_manager_chart_repository` (default `https://charts.jetstack.io`), `cert_manager_images` (keys `controller`, `webhook`, `cainjector`, `acmesolver`, `startupapicheck`).
+The chart repository may be an `oci://` path. Every image entry needs a `sha256:<64 hex>` digest and a tag: a tags-only override is refused at plan. cert-manager renders the chart's `digest` key; External Secrets and NGINX Gateway Fabric have no digest key, so the module sets the tag value to `<tag>@<digest>` (the charts render `repository:tag`).
+**Stack `stacks/azure/xema-substrate`:** pass-through `external_secrets_*`, `ngf_*` and `cert_manager_*` (`chart_repository`, `chart_version`, `images`); null/empty keeps the module defaults. `rwx-storage` is unchanged (its chart is caller-chosen; use `chart_values`).
+
 ## Unreleased — private CA trust on AKS nodes (Azure)
 
 Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change. The `azurerm >= 5.0` floor is unchanged, because 5.0.0 already has the field.

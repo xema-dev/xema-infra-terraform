@@ -23,17 +23,26 @@ locals {
     # Identity comes from each SecretStore's own service account, never from the operator's.
     serviceAccount = { name = "external-secrets" }
   })
+
+  # Empty by default, so the rendered values are unchanged. The chart has no digest key: the tag
+  # value carries "<tag>@<digest>" and the chart renders repository:tag.
+  images_values = length(var.images) == 0 ? [] : [yamlencode(merge(
+    { for k, v in var.images : "image" => { repository = v.repository, tag = "${v.tag}@${v.digest}" } if k == "controller" },
+    { for k, v in var.images : (k == "webhook" ? "webhook" : "certController") => {
+      image = { repository = v.repository, tag = "${v.tag}@${v.digest}" }
+    } if k != "controller" },
+  ))]
 }
 
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
-  repository       = "https://charts.external-secrets.io"
+  repository       = var.chart_repository
   chart            = "external-secrets"
   version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
 
-  values = concat([local.external_secrets_values], var.values)
+  values = concat([local.external_secrets_values], local.images_values, var.values)
 }
 
 # One identity per (boundary, namespace): Azure refuses concurrent federated-credential writes on a

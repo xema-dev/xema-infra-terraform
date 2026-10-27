@@ -432,6 +432,13 @@ module "gateway_tls" {
   gateway_infrastructure_annotations = var.gateway_infrastructure_annotations
   data_plane_load_balancer_ip        = var.gateway_load_balancer_ip
 
+  ngf_chart_repository          = var.ngf_chart_repository
+  ngf_chart_version             = var.ngf_chart_version
+  ngf_images                    = var.ngf_images
+  cert_manager_chart_repository = var.cert_manager_chart_repository
+  cert_manager_chart_version    = var.cert_manager_chart_version
+  cert_manager_images           = var.cert_manager_images
+
   dns01_azure = local.dns01 && var.enable_dns ? {
     subscription_id     = module.dns[0].subscription_id
     resource_group_name = module.dns[0].resource_group_name
@@ -454,6 +461,10 @@ module "external_secrets" {
     vault_uri    = module.boundary_vault[k].vault_uri
   } }
   secret_store_name = var.secret_store_name
+
+  chart_repository = var.external_secrets_chart_repository
+  chart_version    = var.external_secrets_chart_version
+  images           = var.external_secrets_images
 
   # "<deployment_name>-eso-<boundary>-<namespace>": one identity per boundary namespace.
   identity_name_prefix = "${local.dep}-eso"
