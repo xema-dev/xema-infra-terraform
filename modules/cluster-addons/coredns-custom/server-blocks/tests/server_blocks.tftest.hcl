@@ -3,7 +3,7 @@
 run "no_zones_render_no_data" {
   command = plan
   assert {
-    condition     = output.data == {}
+    condition     = length(output.data) == 0
     error_message = "an empty zone list must render no data, so no ConfigMap is created."
   }
 }
