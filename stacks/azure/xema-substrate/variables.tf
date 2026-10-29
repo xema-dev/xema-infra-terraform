@@ -296,9 +296,75 @@ variable "cluster_resource_group_name" {
 }
 
 variable "kubernetes_version" {
-  description = "AKS control-plane version prefix (e.g. \"1.31\"). Used only when creating the cluster."
+  description = "AKS control-plane version: a minor alias (e.g. \"1.31\") or a full version. Changing it upgrades the cluster; patches follow cluster_automatic_upgrade_channel."
   type        = string
   default     = "1.31"
+}
+
+variable "cluster_automatic_upgrade_channel" {
+  description = "AKS automatic upgrade channel: one of \"patch\", \"rapid\", \"stable\", \"node-image\", \"none\", or null (default) to leave it to Azure (no automatic upgrade)."
+  type        = string
+  default     = null
+}
+
+variable "cluster_node_os_upgrade_channel" {
+  description = "AKS node OS upgrade channel: one of \"NodeImage\", \"SecurityPatch\", \"Unmanaged\", \"None\", or null (default) for Azure's own default (NodeImage). SecurityPatch needs node egress to the OS package mirrors."
+  type        = string
+  default     = null
+}
+
+variable "cluster_maintenance_window_auto_upgrade" {
+  description = <<-EOT
+    Maintenance window of the cluster (control-plane) automatic upgrades.
+    null (default) sets no window and Azure may run it at any time. Fields follow azurerm: frequency
+    (Daily, Weekly, AbsoluteMonthly, RelativeMonthly), interval, duration (hours, 4-24), day_of_week
+    (Weekly, RelativeMonthly), day_of_month (AbsoluteMonthly), week_index (RelativeMonthly: First,
+    Second, Third, Fourth, Last), start_time (HH:mm), utc_offset (+HH:mm), start_date (RFC 3339) and
+    not_allowed (blackout periods, RFC 3339 start/end).
+  EOT
+  type = object({
+    frequency    = string
+    interval     = number
+    duration     = number
+    day_of_week  = optional(string)
+    day_of_month = optional(number)
+    week_index   = optional(string)
+    start_time   = optional(string)
+    utc_offset   = optional(string)
+    start_date   = optional(string)
+    not_allowed = optional(list(object({
+      start = string
+      end   = string
+    })), [])
+  })
+  default = null
+}
+
+variable "cluster_maintenance_window_node_os" {
+  description = <<-EOT
+    Maintenance window of the node OS upgrades.
+    null (default) sets no window and Azure may run it at any time. Fields follow azurerm: frequency
+    (Daily, Weekly, AbsoluteMonthly, RelativeMonthly), interval, duration (hours, 4-24), day_of_week
+    (Weekly, RelativeMonthly), day_of_month (AbsoluteMonthly), week_index (RelativeMonthly: First,
+    Second, Third, Fourth, Last), start_time (HH:mm), utc_offset (+HH:mm), start_date (RFC 3339) and
+    not_allowed (blackout periods, RFC 3339 start/end).
+  EOT
+  type = object({
+    frequency    = string
+    interval     = number
+    duration     = number
+    day_of_week  = optional(string)
+    day_of_month = optional(number)
+    week_index   = optional(string)
+    start_time   = optional(string)
+    utc_offset   = optional(string)
+    start_date   = optional(string)
+    not_allowed = optional(list(object({
+      start = string
+      end   = string
+    })), [])
+  })
+  default = null
 }
 
 variable "node_pools" {

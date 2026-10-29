@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — Azure-managed upgrades, ESO identities independent of Kubernetes (XEMA-3782)
+
+Needs a change in a root that sets `kubernetes_version` to a value other than the cluster's current minor, or passes `automatic_upgrade_channel = ""`. Otherwise a root plans no change except one new built-in `terraform_data.namespaces_ready` (creates nothing). No resource address moves; no state migration.
+**Module `providers/azure/cluster`:**
+- `kubernetes_version` reaches the cluster as given (a minor alias such as `"1.34"`, or a full version) and is no longer ignored after create, nor is the default pool's `orchestrator_version`: a bump is a real upgrade. Set it to the cluster's current minor before the first plan, or the plan tries to move the cluster to that version. The `azurerm_kubernetes_service_versions` lookup is gone.
+- `automatic_upgrade_channel` defaults to `null` (Azure's default, no automatic upgrade) and no longer accepts `""`; it also accepts `"none"`. New: `node_os_upgrade_channel` (`null` = Azure's NodeImage), `maintenance_window_auto_upgrade` and `maintenance_window_node_os` (default `null`, no window). Rules live in the provider-free `providers/azure/cluster-upgrades` submodule, with tests.
+- `upgrade_settings` of the default pool and of extra pools is in `ignore_changes`: azurerm reads Azure's 10% default into state and sends nil, so every apply planned a cluster update.
+**Module `cluster-addons/external-secrets`:** new `namespaces_ready` (any, default `null`). Only the `helm_release.secret_store` releases wait for it; the identities, federated credentials and role assignments depend on nothing in Kubernetes. **Stack `stacks/azure/xema-substrate`:** the module-level `depends_on = [module.workload_namespaces]` is replaced by `namespaces_ready`; new `cluster_automatic_upgrade_channel`, `cluster_node_os_upgrade_channel`, `cluster_maintenance_window_auto_upgrade`, `cluster_maintenance_window_node_os`.
+**Module `providers/azure/secrets-backend`:** `soft_delete_retention_days` defaults to `null` (Azure's 90 days) for new vaults; an existing vault keeps its value (the field is in `ignore_changes`, since Azure cannot update it).
+
 ## v0.19.0 — private DNS for AKS on custom-DNS networks (HAM-5)
 
 Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change.

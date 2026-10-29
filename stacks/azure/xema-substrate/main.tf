@@ -51,18 +51,22 @@ module "cluster" {
   source = "../../../modules/providers/azure/cluster"
   count  = var.enable_cluster ? 1 : 0
 
-  name                 = local.cluster_name
-  region               = var.region
-  kubernetes_version   = var.kubernetes_version
-  node_pools           = var.node_pools
-  default_pool_id      = var.default_pool_id
-  resource_group_name  = local.cluster_resource_group_name
-  vnet_id              = local.vpc_id
-  node_subnet_id       = var.network == null ? "" : var.network.aks_subnet_id
-  sku_tier             = var.azure_sizing.aks_sku_tier
-  authorized_ip_ranges = var.cluster_authorized_ip_ranges
-  enable_log_analytics = var.cluster_enable_log_analytics
-  tags                 = local.tags
+  name                            = local.cluster_name
+  region                          = var.region
+  kubernetes_version              = var.kubernetes_version
+  node_pools                      = var.node_pools
+  default_pool_id                 = var.default_pool_id
+  resource_group_name             = local.cluster_resource_group_name
+  vnet_id                         = local.vpc_id
+  node_subnet_id                  = var.network == null ? "" : var.network.aks_subnet_id
+  sku_tier                        = var.azure_sizing.aks_sku_tier
+  automatic_upgrade_channel       = var.cluster_automatic_upgrade_channel
+  node_os_upgrade_channel         = var.cluster_node_os_upgrade_channel
+  maintenance_window_auto_upgrade = var.cluster_maintenance_window_auto_upgrade
+  maintenance_window_node_os      = var.cluster_maintenance_window_node_os
+  authorized_ip_ranges            = var.cluster_authorized_ip_ranges
+  enable_log_analytics            = var.cluster_enable_log_analytics
+  tags                            = local.tags
 
   outbound_type                       = var.cluster_outbound_type
   custom_ca_trust_certificates        = var.cluster_custom_ca_trust_certificates
@@ -478,8 +482,8 @@ module "external_secrets" {
 
   # "<deployment_name>-eso-<boundary>-<namespace>": one identity per boundary namespace.
   identity_name_prefix = "${local.dep}-eso"
-  # The SecretStores are installed WITHOUT creating their namespace, so they wait for the roster
-  # this stack creates; a roster owned elsewhere (enable_workload_namespaces = false) is not checked.
+  # The SecretStores are installed WITHOUT creating their namespace; a roster owned elsewhere
+  # (enable_workload_namespaces = false) is not checked.
   known_namespaces = var.enable_workload_namespaces ? var.workload_namespaces : null
 
   region              = var.region
@@ -487,7 +491,8 @@ module "external_secrets" {
   oidc_issuer_url     = local.oidc_issuer_url
   tags                = local.tags
 
-  depends_on = [module.workload_namespaces]
+  # Only the in-cluster SecretStore releases wait for the namespaces; the Azure identities do not.
+  namespaces_ready = one(module.workload_namespaces[*].namespaces)
 }
 
 module "identity_realm" {

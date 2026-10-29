@@ -29,6 +29,12 @@ resource "azurerm_key_vault" "this" {
   purge_protection_enabled      = var.purge_protection_enabled
   soft_delete_retention_days    = var.soft_delete_retention_days
   public_network_access_enabled = var.public_network_access_enabled
+
+  lifecycle {
+    # Azure sets the retention when the vault is created and cannot update it, so a vault
+    # created with another value (the old default was 7) must not plan a move to Azure's 90.
+    ignore_changes = [soft_delete_retention_days]
+  }
 }
 
 # ---------------------------------------------------------------------------

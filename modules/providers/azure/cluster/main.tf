@@ -77,11 +77,6 @@ resource "azurerm_log_analytics_workspace" "this" {
   tags                = var.tags
 }
 
-data "azurerm_kubernetes_service_versions" "this" {
-  location       = var.region
-  version_prefix = var.kubernetes_version
-}
-
 module "network_policy_engine" {
   source = "../network-policy-engine"
   engine = var.network_policy_engine
@@ -103,16 +98,75 @@ module "node_ca_trust" {
   certificates = var.custom_ca_trust_certificates
 }
 
+# Version, channel and maintenance-window rules, provider-free so they are tested on both engines
+# (cluster-upgrades/tests).
+module "upgrades" {
+  source                          = "../cluster-upgrades"
+  kubernetes_version              = var.kubernetes_version
+  automatic_upgrade_channel       = var.automatic_upgrade_channel
+  node_os_upgrade_channel         = var.node_os_upgrade_channel
+  maintenance_window_auto_upgrade = var.maintenance_window_auto_upgrade
+  maintenance_window_node_os      = var.maintenance_window_node_os
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = var.name
   location            = var.region
   resource_group_name = local.resource_group_name
   dns_prefix          = var.name
-  kubernetes_version  = data.azurerm_kubernetes_service_versions.this.latest_version
+  kubernetes_version  = module.upgrades.kubernetes_version
   sku_tier            = var.sku_tier
   tags                = var.tags
 
-  automatic_upgrade_channel = var.automatic_upgrade_channel != "" ? var.automatic_upgrade_channel : null
+  # null leaves both channels to Azure's own defaults (no automatic upgrade; NodeImage).
+  automatic_upgrade_channel = module.upgrades.automatic_upgrade_channel
+  node_os_upgrade_channel   = module.upgrades.node_os_upgrade_channel
+
+  dynamic "maintenance_window_auto_upgrade" {
+    for_each = module.upgrades.maintenance_window_auto_upgrade
+    content {
+      frequency    = maintenance_window_auto_upgrade.value.frequency
+      interval     = maintenance_window_auto_upgrade.value.interval
+      duration     = maintenance_window_auto_upgrade.value.duration
+      day_of_week  = maintenance_window_auto_upgrade.value.day_of_week
+      day_of_month = maintenance_window_auto_upgrade.value.day_of_month
+      week_index   = maintenance_window_auto_upgrade.value.week_index
+      start_time   = maintenance_window_auto_upgrade.value.start_time
+      utc_offset   = maintenance_window_auto_upgrade.value.utc_offset
+      start_date   = maintenance_window_auto_upgrade.value.start_date
+
+      dynamic "not_allowed" {
+        for_each = maintenance_window_auto_upgrade.value.not_allowed
+        content {
+          start = not_allowed.value.start
+          end   = not_allowed.value.end
+        }
+      }
+    }
+  }
+
+  dynamic "maintenance_window_node_os" {
+    for_each = module.upgrades.maintenance_window_node_os
+    content {
+      frequency    = maintenance_window_node_os.value.frequency
+      interval     = maintenance_window_node_os.value.interval
+      duration     = maintenance_window_node_os.value.duration
+      day_of_week  = maintenance_window_node_os.value.day_of_week
+      day_of_month = maintenance_window_node_os.value.day_of_month
+      week_index   = maintenance_window_node_os.value.week_index
+      start_time   = maintenance_window_node_os.value.start_time
+      utc_offset   = maintenance_window_node_os.value.utc_offset
+      start_date   = maintenance_window_node_os.value.start_date
+
+      dynamic "not_allowed" {
+        for_each = maintenance_window_node_os.value.not_allowed
+        content {
+          start = not_allowed.value.start
+          end   = not_allowed.value.end
+        }
+      }
+    }
+  }
 
   # API server reachability. A PRIVATE cluster exposes its API only on a private
   # address inside the VNet. private_cluster_public_fqdn_enabled additionally
@@ -222,9 +276,12 @@ resource "azurerm_kubernetes_cluster" "this" {
   depends_on = [azurerm_role_assignment.cluster_network, azurerm_role_assignment.cluster_route_table]
 
   lifecycle {
-    # The control-plane version is upgraded deliberately, not on every plan as
-    # Azure publishes new patches. Manage upgrades via a tracked variable bump.
-    ignore_changes = [kubernetes_version, default_node_pool[0].orchestrator_version]
+    # The versions are NOT ignored: kubernetes_version is the minor alias the caller sets, so a
+    # minor bump is a real variable change and patches follow automatic_upgrade_channel.
+    # upgrade_settings is Optional, not Computed, in azurerm: the provider reads Azure's own
+    # default (10% max surge) into state and sends nil, so every plan would update the cluster.
+    # The module exposes no input for it, so nothing configured is hidden.
+    ignore_changes = [default_node_pool[0].upgrade_settings]
 
     precondition {
       condition     = !(var.private_cluster_enabled && length(var.authorized_ip_ranges) > 0)
@@ -263,6 +320,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "additional" {
   tags                  = var.tags
 
   lifecycle {
-    ignore_changes = [orchestrator_version]
+    # Same provider behaviour as the default pool: Azure's default is read into state, nil is sent.
+    ignore_changes = [upgrade_settings]
   }
 }

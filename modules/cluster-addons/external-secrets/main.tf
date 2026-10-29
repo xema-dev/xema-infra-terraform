@@ -77,6 +77,12 @@ resource "azurerm_role_assignment" "store" {
   principal_type       = "ServicePrincipal"
 }
 
+# Carries var.namespaces_ready into the in-cluster releases below. A module-level depends_on would
+# instead make the identities above wait for Kubernetes too.
+resource "terraform_data" "namespaces_ready" {
+  input = var.namespaces_ready
+}
+
 # SecretStore is a custom resource whose CRD does not exist until the release above is installed,
 # so it ships as a tiny LOCAL chart rather than kubernetes_manifest — which needs the CRD at PLAN
 # time and therefore cannot survive a first apply on a fresh cluster. One release per boundary
@@ -100,5 +106,5 @@ resource "helm_release" "secret_store" {
     }
   })]
 
-  depends_on = [helm_release.external_secrets, azurerm_federated_identity_credential.store, azurerm_role_assignment.store]
+  depends_on = [helm_release.external_secrets, azurerm_federated_identity_credential.store, azurerm_role_assignment.store, terraform_data.namespaces_ready]
 }
