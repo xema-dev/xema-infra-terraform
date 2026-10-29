@@ -4,7 +4,7 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
-## Unreleased — Azure-managed upgrades, ESO identities independent of Kubernetes (XEMA-3782)
+## v0.20.0 — Azure-managed upgrades, ESO identities independent of Kubernetes (XEMA-3782)
 
 Needs a change in a root whose `kubernetes_version` differs from the version in state (see below), or passes `automatic_upgrade_channel = ""`. Otherwise a root plans no change except one new built-in `terraform_data.namespaces_ready` (a state entry only; it touches neither Azure nor Kubernetes). No resource address moves; no state migration.
 **Module `providers/azure/cluster`:**
