@@ -84,7 +84,7 @@ jobs:
         if: matrix.engine == 'opentofu'
         run: |
           set -euo pipefail
-          for dir in $(find modules -type d -name tests-mock -exec dirname {} \;); do
+          for dir in $(find modules stacks -type d -name tests-mock -exec dirname {} \;); do
             ${{ matrix.bin }} -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
             ${{ matrix.bin }} -chdir="$dir" test -test-directory=tests-mock -no-color
           done
