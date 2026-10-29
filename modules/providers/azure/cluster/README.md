@@ -31,7 +31,7 @@ module "cluster" {
 
 - Credentials are client certificates; the `token` output is always `""`.
 - Pool keys are AKS agent pool names (`^[a-z][a-z0-9]{0,11}$`). The default pool cannot carry taints.
-- `kubernetes_version` is a minor alias (`"1.34"`) or a full version and is not ignored after create: changing it upgrades the cluster. Patches follow `automatic_upgrade_channel`; node images follow `node_os_upgrade_channel`. Both are `null` by default, which is Azure's own behaviour. Rules: [`cluster-upgrades`](../cluster-upgrades).
+- `kubernetes_version` is a minor alias (`"1.34"`) or a full version and is not ignored after create: changing it upgrades the control plane (extra node pools keep their version). Patches follow `automatic_upgrade_channel`; node images follow `node_os_upgrade_channel`. Both are `null` by default, which is Azure's own behaviour. Rules: [`cluster-upgrades`](../cluster-upgrades).
 - `upgrade_settings` of the node pools are left to Azure and ignored in plans.
 - A NetworkPolicy engine is always enforced: `network_policy_engine` is `cilium` (default) or `calico`. Changing it on an existing cluster recreates it.
 - Each pool takes optional `zones`, `os_disk_size_gb` and `os_disk_type` (`Managed` or `Ephemeral`). Changing them on an existing pool replaces it.
