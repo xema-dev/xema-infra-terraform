@@ -302,7 +302,7 @@ variable "kubernetes_version" {
 }
 
 variable "cluster_automatic_upgrade_channel" {
-  description = "AKS automatic upgrade channel: one of \"patch\", \"rapid\", \"stable\", \"node-image\", \"none\", or null (default) to leave it to Azure (no automatic upgrade)."
+  description = "AKS automatic upgrade channel: one of \"patch\", \"rapid\", \"stable\", \"node-image\", or null (default) to leave it to Azure (no automatic upgrade)."
   type        = string
   default     = null
 }

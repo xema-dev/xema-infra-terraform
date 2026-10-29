@@ -29,7 +29,7 @@ terraform apply                       # in-cluster resources and roles
 terraform apply                       # again with enable_identity_realm = true, once Keycloak answers at keycloak_url
 ```
 
-The External Secrets identities need no Kubernetes: `-target=module.external_secrets[0].azurerm_role_assignment.store` (it brings the identities and federated credentials) can join the first phase.
+The External Secrets identities need no Kubernetes: `-target=module.external_secrets[0].azurerm_role_assignment.store` (the identities come with it) and `...azurerm_federated_identity_credential.store` can join the first phase.
 
 With the default `postgres_network_access = "private"`, apply from inside the VNet (the runner), or use `"public"` with `postgres_public_firewall_rules`. Consume mode and the import path ([`docs/import-runbook.md`](../../../docs/import-runbook.md)) skip the phases.
 

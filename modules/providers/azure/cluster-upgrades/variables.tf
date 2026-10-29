@@ -14,8 +14,8 @@ variable "automatic_upgrade_channel" {
   default     = null
 
   validation {
-    condition     = var.automatic_upgrade_channel == null ? true : contains(["patch", "rapid", "stable", "node-image", "none"], var.automatic_upgrade_channel)
-    error_message = "automatic_upgrade_channel must be null or one of patch, rapid, stable, node-image, none."
+    condition     = var.automatic_upgrade_channel == null ? true : contains(["patch", "rapid", "stable", "node-image"], var.automatic_upgrade_channel)
+    error_message = "automatic_upgrade_channel must be null or one of patch, rapid, stable, node-image."
   }
 }
 

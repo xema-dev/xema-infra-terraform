@@ -80,7 +80,7 @@ run "version_prefix_with_trailing_dot_is_refused" {
 run "unknown_upgrade_channel_is_refused" {
   command = plan
   variables {
-    automatic_upgrade_channel = "weekly"
+    automatic_upgrade_channel = "none"
   }
   expect_failures = [var.automatic_upgrade_channel]
 }

@@ -55,7 +55,7 @@ module "cluster" {
 | `pod_cidr` | no | Pod CIDR for Azure CNI overlay. |
 | `network_policy_engine` | no | The NetworkPolicy engine enforcing every Kubernetes NetworkPolicy on the cluster (Azure CNI overlay): - "ci... |
 | `sku_tier` | no | AKS control-plane SKU tier: one of "Free", "Standard", "Premium". |
-| `automatic_upgrade_channel` | no | `patch`, `rapid`, `stable`, `node-image`, `none`, or null (Azure's default). |
+| `automatic_upgrade_channel` | no | `patch`, `rapid`, `stable`, `node-image`, or null (no automatic upgrade) (Azure's default). |
 | `node_os_upgrade_channel` | no | `NodeImage`, `SecurityPatch`, `Unmanaged`, `None`, or null (Azure's NodeImage). |
 | `maintenance_window_auto_upgrade` | no | Window for automatic cluster upgrades; null sets none. |
 | `maintenance_window_node_os` | no | Window for node OS upgrades; null sets none. |
