@@ -26,7 +26,7 @@ module "external_secrets" {
 }
 ```
 
-For each boundary and namespace the module creates a user-assigned identity with one federated credential, a `Key Vault Secrets User` assignment on that boundary's vault only, a service account and a `SecretStore` named `secret_store_name`. `ExternalSecret`s reference it with `secretStoreRef: { kind: SecretStore, name: platform }`. The namespaces must already exist. No two boundaries may share a namespace or a key vault.
+For each boundary and namespace the module creates a user-assigned identity with one federated credential, a `Key Vault Secrets User` assignment on that boundary's vault only, a service account and a `SecretStore` named `secret_store_name`. `ExternalSecret`s reference it with `secretStoreRef: { kind: SecretStore, name: platform }`. The namespaces must already exist before the `SecretStore` releases: pass a value derived from the resources that create them as `namespaces_ready`. The identities, federated credentials and role assignments depend on nothing in Kubernetes, so they can be applied first (a federated credential to a service account that does not exist yet is valid). No two boundaries may share a namespace or a key vault.
 
 ## Configuration
 
@@ -45,6 +45,7 @@ For each boundary and namespace the module creates a user-assigned identity with
 | `resource_group_name` | yes | Existing resource group the identities are created in. |
 | `oidc_issuer_url` | yes | The cluster's OIDC issuer URL (providers/azure/cluster output) the identities are federated to. |
 | `tags` | no | Tags applied to every created Azure resource. |
+| `namespaces_ready` | no | Opaque value from the namespace resources; only the SecretStore releases wait for it. |
 | `known_namespaces` | no | When set, the namespaces the caller creates; every boundary namespace must be one of them (the SecretStores... |
 
 Outputs: `assigned_role_names`, `secret_store_name`, `namespace`, `secret_stores`.

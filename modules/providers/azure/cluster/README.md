@@ -31,7 +31,8 @@ module "cluster" {
 
 - Credentials are client certificates; the `token` output is always `""`.
 - Pool keys are AKS agent pool names (`^[a-z][a-z0-9]{0,11}$`). The default pool cannot carry taints.
-- `kubernetes_version` is a prefix; patch upgrades do not produce a plan diff.
+- `kubernetes_version` is a minor alias (`"1.34"`) or a full version and is not ignored after create: changing it upgrades the control plane (extra node pools keep their version). Patches follow `automatic_upgrade_channel`; node images follow `node_os_upgrade_channel`. Both are `null` by default, which is Azure's own behaviour. Rules: [`cluster-upgrades`](../cluster-upgrades).
+- `upgrade_settings` of the node pools are left to Azure and ignored in plans.
 - A NetworkPolicy engine is always enforced: `network_policy_engine` is `cilium` (default) or `calico`. Changing it on an existing cluster recreates it.
 - Each pool takes optional `zones`, `os_disk_size_gb` and `os_disk_type` (`Managed` or `Ephemeral`). Changing them on an existing pool replaces it.
 - Private CA trust: `custom_ca_trust_certificates` (PEM, one per entry, at most 10) is added to every Linux node's trust store, not to pods. Changing the set replaces every node, one at a time. A CA in the node OS trust store is trusted for every TLS name the node reaches: container registries, public image hosts, and the control plane through the kubelet. Whoever holds its private key can intercept any of that traffic on every node. Use a CA created only for this purpose and name-constrained to what the nodes must trust: X.509 `nameConstraints` with a permitted DNS subtree, or an IP range, that covers only the private registry or endpoint.
@@ -43,7 +44,7 @@ module "cluster" {
 | --- | --- | --- |
 | `name` | yes | Cluster name. |
 | `region` | yes | Azure location (e.g, "westeurope"). |
-| `kubernetes_version` | yes | AKS control-plane version prefix (e.g, "1.31"). |
+| `kubernetes_version` | yes | AKS control-plane version: a minor alias (e.g, "1.31") or a full version. |
 | `node_pools` | yes | Node pools keyed by a stable pool id. |
 | `default_pool_id` | yes | Which key in node_pools is the AKS default (system) pool. |
 | `resource_group_name` | no | Existing resource group to create the cluster in. |
@@ -54,7 +55,10 @@ module "cluster" {
 | `pod_cidr` | no | Pod CIDR for Azure CNI overlay. |
 | `network_policy_engine` | no | The NetworkPolicy engine enforcing every Kubernetes NetworkPolicy on the cluster (Azure CNI overlay): - "ci... |
 | `sku_tier` | no | AKS control-plane SKU tier: one of "Free", "Standard", "Premium". |
-| `automatic_upgrade_channel` | no | AKS automatic upgrade channel: one of "patch", "rapid", "node-image", "stable", or "" (empty) to... |
+| `automatic_upgrade_channel` | no | `patch`, `rapid`, `stable`, `node-image`, or null (no automatic upgrade) (Azure's default). |
+| `node_os_upgrade_channel` | no | `NodeImage`, `SecurityPatch`, `Unmanaged`, `None`, or null (Azure's NodeImage). |
+| `maintenance_window_auto_upgrade` | no | Window for automatic cluster upgrades; null sets none. |
+| `maintenance_window_node_os` | no | Window for node OS upgrades; null sets none. |
 | `authorized_ip_ranges` | no | CIDRs allowed to reach the Kubernetes API server. |
 | `outbound_type` | no | AKS egress: "loadBalancer" (default — AKS provisions its own public egress address), "userDefinedRouting... |
 | `route_table_id` | no | Id of the route table associated with node_subnet_id. |

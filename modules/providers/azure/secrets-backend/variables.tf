@@ -82,12 +82,12 @@ variable "purge_protection_enabled" {
 }
 
 variable "soft_delete_retention_days" {
-  description = "Soft-delete retention (7-90 days)."
+  description = "Soft-delete retention (7-90 days). null (default) leaves it to Azure (90 days). Immutable once the vault exists."
   type        = number
-  default     = 7
+  default     = null
 
   validation {
-    condition     = var.soft_delete_retention_days >= 7 && var.soft_delete_retention_days <= 90
+    condition     = var.soft_delete_retention_days == null ? true : (var.soft_delete_retention_days >= 7 && var.soft_delete_retention_days <= 90)
     error_message = "soft_delete_retention_days must be between 7 and 90."
   }
 }

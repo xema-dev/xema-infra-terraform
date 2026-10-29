@@ -119,3 +119,9 @@ variable "images" {
 
 
 }
+
+variable "namespaces_ready" {
+  description = "Opaque value the caller derives from the resources that create the boundary namespaces (e.g. their names). Only the in-cluster SecretStore releases wait for it; the Azure identities, federated credentials and role assignments depend on nothing in Kubernetes. null when the namespaces are owned elsewhere."
+  type        = any
+  default     = null
+}

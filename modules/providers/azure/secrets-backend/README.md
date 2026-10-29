@@ -39,7 +39,7 @@ module "secrets" {
 | `rbac_propagation_wait` | no | How long to wait after granting the deployer role before writing secrets. |
 | `seed_prerequisites` | no | Opaque values (e.g, ids) the seeded secrets must wait for: resources the caller composes AFTER the vault, s... |
 | `purge_protection_enabled` | no | Key Vault purge protection. |
-| `soft_delete_retention_days` | no | Soft-delete retention (7-90 days). |
+| `soft_delete_retention_days` | no | Soft-delete retention (7-90 days); null (default) is Azure's 90. Fixed at vault creation. |
 | `public_network_access_enabled` | no | Whether the vault accepts (authenticated) traffic from the public internet. |
 | `resource_group_name` | no | Existing resource group to create the vault in. |
 | `tags` | no | Tags applied to every created resource. |
