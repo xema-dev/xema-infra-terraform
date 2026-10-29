@@ -70,7 +70,9 @@ Main inputs. All are in [`variables.tf`](variables.tf).
 | `cluster_dns_forward_zones` | no | zones CoreDNS forwards to Azure DNS (`coredns-custom` ConfigMap), so pods resolve private endpoints on a custom-DNS network; see [`coredns-custom`](../../../modules/cluster-addons/coredns-custom) |
 | `postgres_engine_version`, `postgres_network_access`, `postgres_extensions`, `postgres_zone`, `postgres_provisioner_role` | no | database server shape; `postgres_zone` must be set before the first apply |
 | `existing_postgres_server_id`, `existing_postgres_host`, `existing_postgres_admin_login`, `existing_postgres_admin_password_key_vault_id` | consume mode | the existing server |
-| `backing_services_network_access` | no | `private` (default) turns off public endpoints of cache, storage and vault and adds private endpoints |
+| `backing_services_network_access` | no | `private` (default) turns off the public endpoints of cache and storage and adds private endpoints; `public`; or `service_endpoint` (opt-in): the storage account gets no private endpoint, public access on, network rules `Deny` admitting only `service_endpoint_subnet_ids`; the cache keeps its private endpoint |
+| `key_vault_network_access` | no | `private` (default): one private endpoint per key vault, public access off; `service_endpoint` (opt-in): no vault private endpoint, public access on, ACL `Deny` / bypass `None` admitting only `service_endpoint_subnet_ids`. Terraform must then run from an admitted subnet |
+| `service_endpoint_subnet_ids` | with `service_endpoint` | subnet ids admitted in `service_endpoint` mode (cluster + management subnet). The stack does not manage them: enable the `Microsoft.KeyVault` / `Microsoft.Storage` service endpoints on each subnet first. Postgres, the cache and the registry are unaffected |
 | `secret_store_boundaries` | no | map of boundary name to `{ namespaces, vault_name? }`; each gets its own vault, identity and `SecretStore` |
 | `key_vault_secrets` | no | sensitive; secrets seeded into the operator vault (pass via `TF_VAR_*`) |
 | `gateway_listeners`, `acme_email`, `tls_solver`, `gateway_implementation`, `customer_gateway` | with `enable_gateway_tls` | one HTTPS listener per hostname; see [`gateway-tls`](../../../modules/cluster-addons/gateway-tls) |
@@ -86,7 +88,7 @@ A consumer root must also declare `platform_databases` and `workload_namespaces`
 
 ## Secret boundaries and the operator vault
 
-Each `secret_store_boundaries` entry gets its own Key Vault (RBAC, purge protection, public access off) with a private endpoint, and `cluster-addons/external-secrets` creates the per-namespace identities and `SecretStore`s. A namespace may belong to one boundary only.
+Each `secret_store_boundaries` entry gets its own Key Vault (RBAC, purge protection, public access off) with a private endpoint (or, with `key_vault_network_access = "service_endpoint"`, the service-endpoint ACL instead), and `cluster-addons/external-secrets` creates the per-namespace identities and `SecretStore`s. A namespace may belong to one boundary only.
 
 The operator vault holds break-glass and infrastructure secrets (`key_vault_secrets`, the created Postgres admin password). It is never projected into the cluster, has no identity or `SecretStore`, and only the principal running Terraform can write to it. Because every vault is private, run Terraform from inside the foundation's network.
 

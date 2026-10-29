@@ -110,17 +110,31 @@ locals {
   kube_entra_auth = var.cluster_entra_rbac != null ? var.cluster_entra_rbac.local_account_disabled : false
 
   private_backing_services = var.backing_services_network_access == "private"
+  # Opt-in VNet service endpoints (never the default): the service keeps its
+  # public endpoint switched on, and its network ACL admits only
+  # service_endpoint_subnet_ids. The cache has no service endpoint, so in that
+  # mode it stays private (its endpoint below), never public.
+  storage_service_endpoint   = var.backing_services_network_access == "service_endpoint"
+  cache_private              = var.backing_services_network_access != "public"
+  key_vault_service_endpoint = var.key_vault_network_access == "service_endpoint"
+  # null without subnets: the input guard then fails the plan, and no service
+  # is switched to public access without its ACL in the meantime.
+  service_endpoint_network_rules = length(var.service_endpoint_subnet_ids) == 0 ? null : {
+    virtual_network_subnet_ids = var.service_endpoint_subnet_ids
+  }
+  key_vault_public_access = local.key_vault_service_endpoint && local.service_endpoint_network_rules != null
+  storage_public_access = (var.backing_services_network_access == "public"
+  || (local.storage_service_endpoint && local.service_endpoint_network_rules != null))
   # Which private endpoints this stack needs: one per CREATED backing service.
   # WANTED is what the input guard checks; BUILT is the same list only once a
   # network exists, so a root that omits `network` gets the guard's message
   # instead of a null-attribute error.
-  private_endpoint_services_wanted = compact(concat(local.private_backing_services ? [
-    var.enable_object_storage ? "blob" : "",
-    var.enable_cache ? "redis" : "",
-    ] : [], [
-    # The key vaults have no public endpoint at all, so theirs does not follow
+  private_endpoint_services_wanted = compact(concat([
+    local.private_backing_services && var.enable_object_storage ? "blob" : "",
+    local.cache_private && var.enable_cache ? "redis" : "",
+    # The key vaults follow key_vault_network_access, not
     # backing_services_network_access.
-    var.enable_secrets_backend ? "vault" : "",
+    !local.key_vault_service_endpoint && var.enable_secrets_backend ? "vault" : "",
     # The registry has no public endpoint at all, so its endpoint does not
     # follow backing_services_network_access.
     var.enable_container_registry ? "acr" : "",

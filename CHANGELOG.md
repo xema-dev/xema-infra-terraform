@@ -4,6 +4,12 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — opt-in VNet service endpoints for the key vaults and storage account (HAM-92)
+
+Additive; nothing to change to adopt. A root that leaves the new inputs unset plans no change: the default stays private endpoints.
+**Stack `stacks/azure/xema-substrate`:** new `key_vault_network_access` (`"private"` default, or `"service_endpoint"`), new value `"service_endpoint"` for `backing_services_network_access`, and new `service_endpoint_subnet_ids` (list of subnet ids, default `[]`, required when either mode is `service_endpoint`). In `service_endpoint` mode the operator vault, every `secret_store_boundaries` vault and the storage account get no private endpoint and no `privatelink` DNS zone need. Their `public_network_access_enabled` is `true`, because service endpoints are evaluated on the public endpoint. Their network ACL is `default_action = Deny`, bypass `None`, with only `service_endpoint_subnet_ids` admitted. The stack does not manage those subnets: the caller enables the `Microsoft.KeyVault` and `Microsoft.Storage` service endpoints on them (typically the cluster and management subnets) before applying, and runs Terraform from an admitted subnet. The cache (no VNet service endpoint) keeps its private endpoint under `backing_services_network_access = "service_endpoint"`; PostgreSQL (`postgres_network_access`) and the registry are unaffected. Switching an existing deployment destroys the affected private endpoints.
+**Modules `providers/azure/secrets-backend` / `providers/azure/object-bucket`:** new `network_acls` / `network_rules` (`{ virtual_network_subnet_ids }`, default `null` = no ACL block). Set, they need `public_network_access_enabled = true` (refused at plan otherwise). Tests: `tests-mock/` in both modules and in the stack (CI now also runs stack `tests-mock/`).
+
 ## v0.20.0 — Azure-managed upgrades, ESO identities independent of Kubernetes (XEMA-3782)
 
 Needs a change in a root whose `kubernetes_version` differs from the version in state (see below), or passes `automatic_upgrade_channel = ""`. Otherwise a root plans no change except one new built-in `terraform_data.namespaces_ready` (a state entry only; it touches neither Azure nor Kubernetes). No resource address moves; no state migration.

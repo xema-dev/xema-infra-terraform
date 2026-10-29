@@ -21,6 +21,10 @@ resource "terraform_data" "input_guards" {
       error_message = "A private backing service needs its private DNS zone: the foundation's private_link_services must include every one of ${jsonencode(local.private_endpoint_services_wanted)}."
     }
     precondition {
+      condition     = !(var.key_vault_network_access == "service_endpoint" || var.backing_services_network_access == "service_endpoint") || length(var.service_endpoint_subnet_ids) > 0
+      error_message = "key_vault_network_access or backing_services_network_access = \"service_endpoint\" requires service_endpoint_subnet_ids (the cluster and management subnets, with the Microsoft.KeyVault / Microsoft.Storage service endpoints enabled by their owner)."
+    }
+    precondition {
       condition     = !var.enable_dns || var.apex_domain != ""
       error_message = "enable_dns = true requires apex_domain."
     }
@@ -225,7 +229,10 @@ module "blob" {
   replication = var.azure_sizing.blob_replication
   containers  = local.blob_containers
 
-  public_network_access_enabled = !local.private_backing_services
+  # service_endpoint mode keeps the public endpoint ON (service endpoints need
+  # it) and closes it with the network rules: deny, admit only the subnets.
+  public_network_access_enabled = local.storage_public_access
+  network_rules                 = local.storage_service_endpoint ? local.service_endpoint_network_rules : null
   resource_group_name           = var.resource_group_name
   tags                          = local.tags
 }
@@ -255,12 +262,15 @@ module "secrets_backend" {
   # identity, no SecretStore, never handed to the external-secrets add-on; only the principal
   # running Terraform gets Secrets Officer (module default).
   purge_protection_enabled      = true
-  public_network_access_enabled = false
+  public_network_access_enabled = local.key_vault_public_access
+  network_acls                  = local.key_vault_service_endpoint ? local.service_endpoint_network_rules : null
   resource_group_name           = var.resource_group_name
   tags                          = local.tags
 
   # Seeding is a data-plane write: it needs the vault's private endpoint (which carries its DNS
   # record), not only the role grant. The endpoint (with its DNS record) is composed below from this vault's id.
+  # With key_vault_network_access = "service_endpoint" there is none: the write goes through the
+  # caller's subnet service endpoint, so Terraform must run from an admitted subnet.
   seed_prerequisites = module.operator_vault_private_endpoint[*].id
 }
 
@@ -278,7 +288,8 @@ module "boundary_vault" {
   grant_deployer_secrets_officer = false
 
   purge_protection_enabled      = true
-  public_network_access_enabled = false
+  public_network_access_enabled = local.key_vault_public_access
+  network_acls                  = local.key_vault_service_endpoint ? local.service_endpoint_network_rules : null
   resource_group_name           = var.resource_group_name
   tags                          = merge(local.tags, { secret-boundary = each.key })
 }
@@ -292,7 +303,7 @@ module "cache" {
   sku      = var.azure_sizing.redis_sku
   capacity = var.azure_sizing.redis_capacity
 
-  public_network_access_enabled = !local.private_backing_services
+  public_network_access_enabled = !local.cache_private
   resource_group_name           = var.resource_group_name
   tags                          = local.tags
 }
@@ -314,7 +325,9 @@ module "container_registry" {
 
 # ---------------------------------------------------------------------------
 # Private endpoints — one per created backing service when
-# backing_services_network_access = "private", and always one for the registry. Each service module only turns
+# backing_services_network_access = "private" (the cache also under
+# "service_endpoint"), one per key vault unless key_vault_network_access =
+# "service_endpoint", and always one for the registry. Each service module only turns
 # its public endpoint off; the network side is composed here, in the network
 # the foundation owns.
 # ---------------------------------------------------------------------------
@@ -333,7 +346,7 @@ locals {
 # is a dependency cycle.
 module "operator_vault_private_endpoint" {
   source = "../../../modules/providers/azure/private-endpoint"
-  count  = var.network != null && var.enable_secrets_backend ? 1 : 0
+  count  = var.network != null && var.enable_secrets_backend && !local.key_vault_service_endpoint ? 1 : 0
 
   name                = "${local.dep}-vault"
   region              = var.region
@@ -353,7 +366,7 @@ moved {
 
 module "boundary_vault_private_endpoint" {
   source   = "../../../modules/providers/azure/private-endpoint"
-  for_each = var.network == null ? {} : module.boundary_vault
+  for_each = var.network == null || local.key_vault_service_endpoint ? {} : module.boundary_vault
 
   name                = "${local.dep}-vault-${each.key}"
   region              = var.region

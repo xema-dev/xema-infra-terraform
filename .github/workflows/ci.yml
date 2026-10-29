@@ -80,7 +80,7 @@ jobs:
             ${{ matrix.bin }} -chdir="$dir" test -no-color
           done
 
-      - name: tofu test with mock providers (modules with tests-mock/)
+      - name: tofu test with mock providers (modules and stacks with tests-mock/)
         if: matrix.engine == 'opentofu'
         run: |
           set -euo pipefail

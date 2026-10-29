@@ -30,7 +30,22 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days    = var.soft_delete_retention_days
   public_network_access_enabled = var.public_network_access_enabled
 
+  # Opt-in only: absent (default) leaves the vault's ACL as Azure sets it.
+  dynamic "network_acls" {
+    for_each = var.network_acls == null ? [] : [var.network_acls]
+    content {
+      default_action             = "Deny"
+      bypass                     = "None"
+      virtual_network_subnet_ids = network_acls.value.virtual_network_subnet_ids
+    }
+  }
+
   lifecycle {
+    precondition {
+      condition     = var.network_acls == null || var.public_network_access_enabled
+      error_message = "network_acls (VNet service endpoints) needs public_network_access_enabled = true: Key Vault evaluates service-endpoint rules on its public endpoint."
+    }
+
     # Azure sets the retention when the vault is created and cannot update it, so a vault
     # created with another value (the old default was 7) must not plan a move to Azure's 90.
     ignore_changes = [soft_delete_retention_days]

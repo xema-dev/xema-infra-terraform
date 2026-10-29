@@ -98,6 +98,26 @@ variable "public_network_access_enabled" {
   default     = true
 }
 
+variable "network_acls" {
+  description = <<-EOT
+    Opt-in VNet service-endpoint access: null (default) sets no ACL. When set,
+    the vault denies by default, bypasses nothing, and admits only
+    virtual_network_subnet_ids (full subnet resource ids). Needs
+    public_network_access_enabled = true — service-endpoint rules are evaluated
+    on the public endpoint — and each subnet must have the Microsoft.KeyVault
+    service endpoint enabled by its owner (this module does not manage subnets).
+  EOT
+  type = object({
+    virtual_network_subnet_ids = list(string)
+  })
+  default = null
+
+  validation {
+    condition     = var.network_acls == null || length(try(var.network_acls.virtual_network_subnet_ids, [])) > 0
+    error_message = "network_acls.virtual_network_subnet_ids must name at least one subnet."
+  }
+}
+
 variable "resource_group_name" {
   description = "Existing resource group to create the vault in. Empty string creates a dedicated resource group named \"<name>-rg\"."
   type        = string

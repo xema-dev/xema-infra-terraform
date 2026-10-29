@@ -530,13 +530,69 @@ variable "network" {
 }
 
 variable "backing_services_network_access" {
-  description = "How the created cache and storage account are reached (the key vaults are always private): \"private\" (public endpoint OFF, one private endpoint each in var.network) or \"public\" (public endpoint, TLS + key). The same closed set as postgres_network_access, and the same default."
+  description = <<-EOT
+    How the created cache and storage account are reached (the key vaults
+    follow key_vault_network_access instead). One of:
+      - "private" (default): public endpoint OFF, one private endpoint each in
+        var.network.
+      - "public": public endpoint, TLS + key.
+      - "service_endpoint": the storage account gets NO private endpoint; its
+        network rules deny by default and admit only service_endpoint_subnet_ids
+        (VNet service endpoints, no bypass). public_network_access_enabled must
+        be (and is set) true for that: the ACL, not the switch, closes the
+        account. The cache has no VNet service endpoint, so it keeps its
+        private endpoint in this mode.
+    The default is private; "public" and "service_endpoint" are opt-in only.
+  EOT
   type        = string
   default     = "private"
 
   validation {
-    condition     = contains(["private", "public"], var.backing_services_network_access)
-    error_message = "backing_services_network_access must be one of private, public."
+    condition     = contains(["private", "public", "service_endpoint"], var.backing_services_network_access)
+    error_message = "backing_services_network_access must be one of private, public, service_endpoint."
+  }
+}
+
+variable "key_vault_network_access" {
+  description = <<-EOT
+    How the operator vault and every secret_store_boundaries vault are reached.
+    One of:
+      - "private" (default): public network access OFF, one private endpoint
+        per vault in var.network (privatelink.vaultcore.azure.net).
+      - "service_endpoint": NO private endpoint; each vault's network ACL is
+        default_action Deny, bypass None, admitting only
+        service_endpoint_subnet_ids. public_network_access_enabled must be (and
+        is set) true for that: Key Vault evaluates service-endpoint rules on its
+        public endpoint, and the ACL, not the switch, closes it.
+    There is no "public" value: a vault is never left open.
+  EOT
+  type        = string
+  default     = "private"
+
+  validation {
+    condition     = contains(["private", "service_endpoint"], var.key_vault_network_access)
+    error_message = "key_vault_network_access must be one of private, service_endpoint."
+  }
+}
+
+variable "service_endpoint_subnet_ids" {
+  description = <<-EOT
+    The subnets admitted by the network ACL of every service in
+    "service_endpoint" mode (key_vault_network_access,
+    backing_services_network_access) — typically the cluster subnet and the
+    management (runner) subnet, as full subnet resource ids. Required
+    (non-empty) when either mode is "service_endpoint"; ignored otherwise.
+    This stack does NOT manage these subnets: the caller must enable the
+    matching service endpoints on each of them before applying —
+    Microsoft.KeyVault for the vaults, Microsoft.Storage for the storage
+    account — or Azure rejects the ACL.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for id in var.service_endpoint_subnet_ids : can(regex("(?i)^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft.Network/virtualNetworks/[^/]+/subnets/[^/]+$", id))])
+    error_message = "Each service_endpoint_subnet_ids entry must be a subnet resource id: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>."
   }
 }
 

@@ -29,6 +29,23 @@ resource "azurerm_storage_account" "this" {
   public_network_access_enabled   = var.public_network_access_enabled
   shared_access_key_enabled       = var.shared_access_key_enabled
 
+  # Opt-in only: absent (default) leaves the account's rules as Azure sets them.
+  dynamic "network_rules" {
+    for_each = var.network_rules == null ? [] : [var.network_rules]
+    content {
+      default_action             = "Deny"
+      bypass                     = ["None"]
+      virtual_network_subnet_ids = network_rules.value.virtual_network_subnet_ids
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.network_rules == null || var.public_network_access_enabled
+      error_message = "network_rules (VNet service endpoints) needs public_network_access_enabled = true: storage evaluates service-endpoint rules on its public endpoint."
+    }
+  }
+
   blob_properties {
     versioning_enabled = var.versioning
   }

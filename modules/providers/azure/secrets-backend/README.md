@@ -41,6 +41,7 @@ module "secrets" {
 | `purge_protection_enabled` | no | Key Vault purge protection. |
 | `soft_delete_retention_days` | no | Soft-delete retention (7-90 days); null (default) is Azure's 90. Fixed at vault creation. |
 | `public_network_access_enabled` | no | Whether the vault accepts (authenticated) traffic from the public internet. |
+| `network_acls` | no | Opt-in VNet service-endpoint access, `{ virtual_network_subnet_ids }`; null (default) sets no ACL. When set: `default_action = Deny`, `bypass = None`, only those subnets. Needs `public_network_access_enabled = true` and the `Microsoft.KeyVault` service endpoint on each subnet (not managed here). |
 | `resource_group_name` | no | Existing resource group to create the vault in. |
 | `tags` | no | Tags applied to every created resource. |
 

@@ -58,6 +58,26 @@ variable "public_network_access_enabled" {
   default     = true
 }
 
+variable "network_rules" {
+  description = <<-EOT
+    Opt-in VNet service-endpoint access: null (default) sets no rules. When
+    set, the account denies by default, bypasses nothing, and admits only
+    virtual_network_subnet_ids (full subnet resource ids). Needs
+    public_network_access_enabled = true — service-endpoint rules are evaluated
+    on the public endpoint — and each subnet must have the Microsoft.Storage
+    service endpoint enabled by its owner (this module does not manage subnets).
+  EOT
+  type = object({
+    virtual_network_subnet_ids = list(string)
+  })
+  default = null
+
+  validation {
+    condition     = var.network_rules == null || length(try(var.network_rules.virtual_network_subnet_ids, [])) > 0
+    error_message = "network_rules.virtual_network_subnet_ids must name at least one subnet."
+  }
+}
+
 variable "shared_access_key_enabled" {
   description = "Allow account-key (shared key) authentication — what the platform's blob-storage adapter uses today. Disable only once every consumer authenticates with Entra identities."
   type        = bool
