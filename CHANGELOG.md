@@ -4,7 +4,7 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
-## Unreleased — optional extra cloud-init for the management runner
+## v0.22.0 — optional extra cloud-init for the management runner
 
 Additive; nothing to change to adopt. A root that leaves the new input unset plans no change: `custom_data` stays byte-identical.
 **Module `providers/azure/management-runner`:** new `extra_cloud_init` (string, default `""`), a cloud-config document merged with the module's own at first boot; lists such as `bootcmd`, `write_files` and `packages` are appended. Setting or changing it changes `custom_data` and replaces the VM. The module now requires the `hashicorp/cloudinit` provider (`>= 2.4.1`); a root running `terraform init` picks it up.
