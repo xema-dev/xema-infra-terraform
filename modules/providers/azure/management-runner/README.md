@@ -40,6 +40,7 @@ module "runner" {
 | `ssh_public_keys` | yes | SSH public keys allowed to log in. |
 | `allowed_ssh_cidrs` | no | Source CIDRs allowed to reach SSH. |
 | `public_ip_enabled` | no | Give the VM a public IP (default true). |
+| `extra_cloud_init` | no | An extra cloud-config document merged with the module's own at first boot (default empty: the module's alone). Lists such as `bootcmd`, `write_files` and `packages` are appended; keys the module already sets are kept. Changing it changes `custom_data` and replaces the VM. |
 | `os_disk_size_gb` | no | OS disk size in GiB. |
 | `tags` | no | Tags applied to every taggable resource. |
 
