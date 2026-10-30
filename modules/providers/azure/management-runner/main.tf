@@ -98,6 +98,27 @@ resource "azurerm_network_interface_security_group_association" "this" {
   network_security_group_id = azurerm_network_security_group.this.id
 }
 
+# With no extra_cloud_init the VM gets the module's file alone, byte for byte as
+# before (a custom_data change can replace the VM). With one, the two documents
+# are merged by cloud-init at first boot.
+data "cloudinit_config" "this" {
+  count = var.extra_cloud_init != "" ? 1 : 0
+
+  gzip          = false
+  base64_encode = true
+
+  part {
+    content_type = "text/cloud-config"
+    content      = file("${path.module}/cloud-init.yaml")
+  }
+
+  part {
+    content_type = "text/cloud-config"
+    content      = var.extra_cloud_init
+    merge_type   = "list(append)+dict(no_replace,recurse_list)+str()"
+  }
+}
+
 resource "azurerm_linux_virtual_machine" "this" {
   name                  = var.name
   location              = var.region
@@ -109,7 +130,7 @@ resource "azurerm_linux_virtual_machine" "this" {
   tags                  = var.tags
 
   disable_password_authentication = true
-  custom_data                     = base64encode(file("${path.module}/cloud-init.yaml"))
+  custom_data                     = var.extra_cloud_init != "" ? data.cloudinit_config.this[0].rendered : base64encode(file("${path.module}/cloud-init.yaml"))
 
   dynamic "admin_ssh_key" {
     for_each = toset(var.ssh_public_keys)

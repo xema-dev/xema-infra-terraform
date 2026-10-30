@@ -58,6 +58,12 @@ variable "public_ip_enabled" {
   default     = true
 }
 
+variable "extra_cloud_init" {
+  description = "An extra cloud-config document merged with the module's own at first boot. Lists (bootcmd, write_files, packages, runcmd) are appended to the module's; keys the module sets are kept. Changing it changes custom_data and replaces the VM."
+  type        = string
+  default     = ""
+}
+
 variable "os_disk_size_gb" {
   description = "OS disk size in GiB."
   type        = number
