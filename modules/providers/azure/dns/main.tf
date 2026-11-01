@@ -118,6 +118,7 @@ locals {
     scope                = azurerm_dns_zone.this.id
     role_definition_name = "DNS Zone Contributor"
     principal_id         = i.principal_id
+    principal_type       = "ServicePrincipal"
   }]
 }
 

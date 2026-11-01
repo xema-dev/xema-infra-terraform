@@ -61,8 +61,8 @@ locals {
   grant_deployer = var.grant_deployer_secrets_officer && length(var.secret_names) > 0
 
   required_role_assignments = concat(
-    local.grant_deployer ? [{ scope = azurerm_key_vault.this.id, role_definition_name = "Key Vault Secrets Officer", principal_id = data.azurerm_client_config.current.object_id }] : [],
-    [for i in azurerm_user_assigned_identity.reader : { scope = azurerm_key_vault.this.id, role_definition_name = "Key Vault Secrets User", principal_id = i.principal_id }],
+    local.grant_deployer ? [{ scope = azurerm_key_vault.this.id, role_definition_name = "Key Vault Secrets Officer", principal_id = data.azurerm_client_config.current.object_id, principal_type = null }] : [],
+    [for i in azurerm_user_assigned_identity.reader : { scope = azurerm_key_vault.this.id, role_definition_name = "Key Vault Secrets User", principal_id = i.principal_id, principal_type = "ServicePrincipal" }],
   )
 }
 

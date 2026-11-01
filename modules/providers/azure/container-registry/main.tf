@@ -38,6 +38,7 @@ locals {
     scope                = azurerm_container_registry.this.id
     role_definition_name = "AcrPull"
     principal_id         = var.pull_principal_ids[k]
+    principal_type       = null # the resource sets none (it skips the directory lookup instead)
   }]
 }
 

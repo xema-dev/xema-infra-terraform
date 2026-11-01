@@ -82,6 +82,11 @@ output "assigned_role_names" {
 }
 
 output "required_role_assignments" {
-  description = "Every role assignment this module creates when its own gate is on, whatever manage_role_assignments says: {scope, role_definition_name, principal_id}. Grant them elsewhere when manage_role_assignments = false."
+  description = "Every role assignment this module creates when its own gate is on, whatever manage_role_assignments says (principal_type is what the resource sets, null when it sets none): {scope, role_definition_name, principal_id, principal_type}. Grant them elsewhere when manage_role_assignments = false."
   value       = local.required_role_assignments
+}
+
+output "role_assignments_created" {
+  description = "How many azurerm_role_assignment resources this module plans: 0 when manage_role_assignments = false. Lets a caller prove the flag reached the module."
+  value       = length(azurerm_role_assignment.cluster_network) + length(azurerm_role_assignment.cluster_route_table)
 }

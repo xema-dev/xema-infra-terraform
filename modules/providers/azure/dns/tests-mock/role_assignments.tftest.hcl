@@ -56,7 +56,7 @@ run "external_plans_none_and_still_lists_it" {
   }
   assert {
     condition = output.required_role_assignments == [
-      { scope = azurerm_dns_zone.this.id, role_definition_name = "DNS Zone Contributor", principal_id = "00000000-0000-0000-0000-000000000002" },
+      { scope = azurerm_dns_zone.this.id, role_definition_name = "DNS Zone Contributor", principal_id = "00000000-0000-0000-0000-000000000002", principal_type = "ServicePrincipal" },
     ]
     error_message = "the required grant is the same tuple as when the module manages it."
   }

@@ -98,6 +98,10 @@ run "managed_lists_the_grants" {
     condition     = length(output.required_role_assignments) == 2
     error_message = "the operator vault's deployer grant and the boundary store grant are listed."
   }
+  assert {
+    condition     = module.secrets_backend[0].role_assignments_created == 1 && module.boundary_vault["app"].role_assignments_created == 0 && module.external_secrets[0].role_assignments_created == 1
+    error_message = "by default the operator vault's deployer grant and the boundary store grant are planned."
+  }
 }
 
 run "external_lists_the_same_grants" {
@@ -109,9 +113,13 @@ run "external_lists_the_same_grants" {
 
   assert {
     condition = output.required_role_assignments == [
-      { scope = module.secrets_backend[0].key_vault_id, role_definition_name = "Key Vault Secrets Officer", principal_id = "00000000-0000-0000-0000-000000000001" },
-      { scope = module.boundary_vault["app"].key_vault_id, role_definition_name = "Key Vault Secrets User", principal_id = "00000000-0000-0000-0000-000000000002" },
+      { scope = module.secrets_backend[0].key_vault_id, role_definition_name = "Key Vault Secrets Officer", principal_id = "00000000-0000-0000-0000-000000000001", principal_type = null },
+      { scope = module.boundary_vault["app"].key_vault_id, role_definition_name = "Key Vault Secrets User", principal_id = "00000000-0000-0000-0000-000000000002", principal_type = "ServicePrincipal" },
     ]
     error_message = "externally managed RBAC lists the same tuples the stack grants by default."
+  }
+  assert {
+    condition     = module.secrets_backend[0].role_assignments_created == 0 && module.boundary_vault["app"].role_assignments_created == 0 && module.external_secrets[0].role_assignments_created == 0
+    error_message = "every module in the plan received manage_role_assignments = false and plans no role assignment."
   }
 }

@@ -55,7 +55,7 @@ run "external_plans_none_and_still_lists_them" {
   }
   assert {
     condition = [for r in output.required_role_assignments : r.role_definition_name] == ["Key Vault Secrets User", "Key Vault Secrets User"] && alltrue([
-      for r in output.required_role_assignments : r.scope == var.secret_stores["app"].key_vault_id && r.principal_id == "00000000-0000-0000-0000-000000000002"
+      for r in output.required_role_assignments : r.scope == var.secret_stores["app"].key_vault_id && r.principal_type == "ServicePrincipal" && r.principal_id == "00000000-0000-0000-0000-000000000002"
     ])
     error_message = "the required grants are the same tuples as when the module manages them."
   }

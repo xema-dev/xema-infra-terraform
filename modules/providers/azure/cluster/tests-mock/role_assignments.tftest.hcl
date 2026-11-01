@@ -59,8 +59,8 @@ run "external_plans_none_and_still_lists_them" {
   }
   assert {
     condition = output.required_role_assignments == [
-      { scope = var.vnet_id, role_definition_name = "Network Contributor", principal_id = "00000000-0000-0000-0000-000000000002" },
-      { scope = var.route_table_id, role_definition_name = "Network Contributor", principal_id = "00000000-0000-0000-0000-000000000002" },
+      { scope = var.vnet_id, role_definition_name = "Network Contributor", principal_id = "00000000-0000-0000-0000-000000000002", principal_type = "ServicePrincipal" },
+      { scope = var.route_table_id, role_definition_name = "Network Contributor", principal_id = "00000000-0000-0000-0000-000000000002", principal_type = "ServicePrincipal" },
     ]
     error_message = "the required grants are the same tuples as when the module manages them."
   }

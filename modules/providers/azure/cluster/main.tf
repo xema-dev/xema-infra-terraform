@@ -44,8 +44,8 @@ resource "azurerm_user_assigned_identity" "cluster" {
 locals {
   # The grants below as data, so an external RBAC owner can apply them (manage_role_assignments = false).
   required_role_assignments = concat(
-    [{ scope = var.vnet_id, role_definition_name = "Network Contributor", principal_id = azurerm_user_assigned_identity.cluster.principal_id }],
-    var.route_table_id != "" ? [{ scope = var.route_table_id, role_definition_name = "Network Contributor", principal_id = azurerm_user_assigned_identity.cluster.principal_id }] : [],
+    [{ scope = var.vnet_id, role_definition_name = "Network Contributor", principal_id = azurerm_user_assigned_identity.cluster.principal_id, principal_type = "ServicePrincipal" }],
+    var.route_table_id != "" ? [{ scope = var.route_table_id, role_definition_name = "Network Contributor", principal_id = azurerm_user_assigned_identity.cluster.principal_id, principal_type = "ServicePrincipal" }] : [],
   )
 }
 
