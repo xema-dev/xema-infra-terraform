@@ -92,6 +92,10 @@ Each `secret_store_boundaries` entry gets its own Key Vault (RBAC, purge protect
 
 The operator vault holds break-glass and infrastructure secrets (`key_vault_secrets`, the created Postgres admin password). It is never projected into the cluster, has no identity or `SecretStore`, and only the principal running Terraform can write to it. Because every vault is private, run Terraform from inside the foundation's network.
 
+## Externally managed RBAC
+
+With `manage_role_assignments = false` the stack creates no role assignment. Its `required_role_assignments` output lists every grant it would make (`scope`, `role_definition_name`, `principal_id`), for an owner of RBAC to apply. The list is the same whatever the input; a `principal_id` of an identity the stack creates is known once that identity exists. The default `true` keeps today's behaviour.
+
 ## Consume mode
 
 With `enable_managed_postgres = false`, the stack ensures the databases and roles inside the existing server over SQL, as `existing_postgres_admin_login`. It reads the admin password from Key Vault (`existing_postgres_admin_password_key_vault_id`, secret `postgres_admin_password_secret_name`, default `postgres-admin-password`), which an instance that created the server wrote to its operator vault. Run it where `existing_postgres_host` resolves (an in-VNet runner linked to the server's private DNS zone); otherwise apply stops with `no such host`.

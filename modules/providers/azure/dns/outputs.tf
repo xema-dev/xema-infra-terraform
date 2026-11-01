@@ -42,3 +42,8 @@ output "assigned_role_names" {
   description = "Azure role definition names this module assigns. Static: the names this module can assign, whatever the inputs, so a bootstrap's ABAC condition on the role-assignment writer can be derived before any state exists (see modules/assigned-roles)."
   value       = ["DNS Zone Contributor"]
 }
+
+output "required_role_assignments" {
+  description = "Every role assignment this module creates when its own gate is on, whatever manage_role_assignments says: {scope, role_definition_name, principal_id}. Grant them elsewhere when manage_role_assignments = false."
+  value       = local.required_role_assignments
+}

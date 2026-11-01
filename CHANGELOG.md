@@ -4,6 +4,12 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.23.0 — externally managed RBAC mode
+
+Additive; nothing to change to adopt. A root that leaves the new input unset plans no change.
+**Stack `stacks/azure/xema-substrate`:** new `manage_role_assignments` (bool, default `true`). Set to `false`, the stack creates no `azurerm_role_assignment` at all: not the cluster identity's Network Contributor grants, the registry AcrPull, the DNS-01 DNS Zone Contributor, the vault deployer and reader grants, nor the External Secrets store grants. New output `required_role_assignments`: a list of `{ scope, role_definition_name, principal_id }`, every grant the enabled modules would make, whatever the input says. An owner of RBAC applies that list elsewhere. A `principal_id` of an identity the stack creates is known only after that identity exists, so grant in a second step. Existing gates (`grant_deployer_secrets_officer`, the empty seed list) still decide whether a grant is listed; the deployer-propagation wait is skipped when no grant is made.
+**Modules `providers/azure/cluster`, `providers/azure/container-registry`, `providers/azure/dns`, `providers/azure/secrets-backend`, `cluster-addons/external-secrets`:** the same `manage_role_assignments` input (default `true`) and `required_role_assignments` output. Tests: `tests-mock/role_assignments.tftest.hcl` in each and in the stack.
+
 ## v0.22.0 — optional extra cloud-init for the management runner
 
 Additive; nothing to change to adopt. A root that leaves the new input unset plans no change: `custom_data` stays byte-identical.

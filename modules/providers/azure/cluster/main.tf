@@ -41,7 +41,17 @@ resource "azurerm_user_assigned_identity" "cluster" {
   tags                = var.tags
 }
 
+locals {
+  # The grants below as data, so an external RBAC owner can apply them (manage_role_assignments = false).
+  required_role_assignments = concat(
+    [{ scope = var.vnet_id, role_definition_name = "Network Contributor", principal_id = azurerm_user_assigned_identity.cluster.principal_id }],
+    var.route_table_id != "" ? [{ scope = var.route_table_id, role_definition_name = "Network Contributor", principal_id = azurerm_user_assigned_identity.cluster.principal_id }] : [],
+  )
+}
+
 resource "azurerm_role_assignment" "cluster_network" {
+  count = var.manage_role_assignments ? 1 : 0
+
   scope                = var.vnet_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.cluster.principal_id
@@ -56,7 +66,7 @@ resource "azurerm_role_assignment" "cluster_network" {
 # neither creates nor edits the routes. The grant is a PERMISSION on a resource
 # this module does not own — the route table itself is never managed here.
 resource "azurerm_role_assignment" "cluster_route_table" {
-  count = var.route_table_id != "" ? 1 : 0
+  count = var.manage_role_assignments && var.route_table_id != "" ? 1 : 0
 
   scope                = var.route_table_id
   role_definition_name = "Network Contributor"

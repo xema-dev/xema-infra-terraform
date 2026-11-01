@@ -113,8 +113,16 @@ resource "azurerm_federated_identity_credential" "dns01" {
   subject                   = "system:serviceaccount:${var.dns01_workload_identity.service_account_namespace}:${var.dns01_workload_identity.service_account_name}"
 }
 
+locals {
+  required_role_assignments = [for i in azurerm_user_assigned_identity.dns01 : {
+    scope                = azurerm_dns_zone.this.id
+    role_definition_name = "DNS Zone Contributor"
+    principal_id         = i.principal_id
+  }]
+}
+
 resource "azurerm_role_assignment" "dns01" {
-  count = var.dns01_workload_identity.enabled ? 1 : 0
+  count = var.manage_role_assignments && var.dns01_workload_identity.enabled ? 1 : 0
 
   scope                = azurerm_dns_zone.this.id
   role_definition_name = "DNS Zone Contributor"

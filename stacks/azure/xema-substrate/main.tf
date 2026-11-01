@@ -55,6 +55,8 @@ module "cluster" {
   source = "../../../modules/providers/azure/cluster"
   count  = var.enable_cluster ? 1 : 0
 
+  manage_role_assignments = var.manage_role_assignments
+
   name                            = local.cluster_name
   region                          = var.region
   kubernetes_version              = var.kubernetes_version
@@ -202,6 +204,8 @@ module "dns" {
   source = "../../../modules/providers/azure/dns"
   count  = var.enable_dns ? 1 : 0
 
+  manage_role_assignments = var.manage_role_assignments
+
   domain = var.apex_domain
   region = var.region
 
@@ -249,6 +253,8 @@ module "secrets_backend" {
   source = "../../../modules/providers/azure/secrets-backend"
   count  = var.enable_secrets_backend ? 1 : 0
 
+  manage_role_assignments = var.manage_role_assignments
+
   name   = module.vault_names.operator
   region = var.region
 
@@ -279,6 +285,8 @@ module "secrets_backend" {
 module "boundary_vault" {
   source   = "../../../modules/providers/azure/secrets-backend"
   for_each = var.enable_secrets_backend ? var.secret_store_boundaries : {}
+
+  manage_role_assignments = var.manage_role_assignments
 
   name   = module.vault_names.boundaries[each.key]
   region = var.region
@@ -314,6 +322,8 @@ module "cache" {
 module "container_registry" {
   source = "../../../modules/providers/azure/container-registry"
   count  = var.enable_container_registry ? 1 : 0
+
+  manage_role_assignments = var.manage_role_assignments
 
   name                = local.registry_name
   region              = var.region
@@ -479,6 +489,8 @@ module "gateway_tls" {
 module "external_secrets" {
   source = "../../../modules/cluster-addons/external-secrets"
   count  = var.enable_secrets_backend ? 1 : 0
+
+  manage_role_assignments = var.manage_role_assignments
 
   # One vault per boundary. The operator vault is deliberately absent: nothing in it is readable
   # from the cluster.

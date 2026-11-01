@@ -33,8 +33,16 @@ resource "azurerm_container_registry" "this" {
 
 # AcrPull only. The principal that PUSHES images (a CI identity) is the
 # consumer's own: it grants AcrPush to that principal itself.
+locals {
+  required_role_assignments = [for k in sort(keys(var.pull_principal_ids)) : {
+    scope                = azurerm_container_registry.this.id
+    role_definition_name = "AcrPull"
+    principal_id         = var.pull_principal_ids[k]
+  }]
+}
+
 resource "azurerm_role_assignment" "pull" {
-  for_each = var.pull_principal_ids
+  for_each = var.manage_role_assignments ? var.pull_principal_ids : {}
 
   scope                = azurerm_container_registry.this.id
   role_definition_name = "AcrPull"

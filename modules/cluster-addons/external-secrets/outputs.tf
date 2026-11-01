@@ -21,3 +21,8 @@ output "secret_stores" {
     client_ids   = { for ns in b.namespaces : ns => azurerm_user_assigned_identity.store["${k}/${ns}"].client_id }
   } }
 }
+
+output "required_role_assignments" {
+  description = "Every role assignment this module creates when its own gate is on, whatever manage_role_assignments says: {scope, role_definition_name, principal_id}. Grant them elsewhere when manage_role_assignments = false."
+  value       = local.required_role_assignments
+}
