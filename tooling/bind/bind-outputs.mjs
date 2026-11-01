@@ -243,6 +243,7 @@ export const DISPOSITIONS = Object.freeze({
   operator_vault_uri: ign('duplicate of substrate.operator_vault_uri'),
   operator_vault_id: ign('an Azure resource id (a role-assignment scope for the consumer root\'s Terraform); nothing in the deployment root reads it'),
   assigned_role_names: ign('the Azure role names the stack assigns, for the consumer root\'s RBAC-Administrator ABAC condition in Terraform; not a deployment input'),
+  required_role_assignments: ign('Azure, manage_role_assignments = false: the role grants (scope, role, principal) the stack would make, applied by the separate privileged root in Terraform; not a deployment input'),
   redis_host: ign('duplicate of substrate.redis_host'),
   redis_port: ign('duplicate of substrate.redis_port'),
   redis_primary_key: x('redis-password', WhenNull.Omit, 'no managed cache on this cloud, or enable_cache = false'),
