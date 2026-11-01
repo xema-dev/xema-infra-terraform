@@ -68,8 +68,17 @@ resource "azurerm_federated_identity_credential" "store" {
   subject                   = "system:serviceaccount:${each.value.namespace}:${var.store_service_account_name}"
 }
 
+locals {
+  required_role_assignments = [for k in sort(keys(module.boundaries.stores)) : {
+    scope                = module.boundaries.stores[k].key_vault_id
+    role_definition_name = "Key Vault Secrets User"
+    principal_id         = azurerm_user_assigned_identity.store[k].principal_id
+    principal_type       = "ServicePrincipal"
+  }]
+}
+
 resource "azurerm_role_assignment" "store" {
-  for_each = module.boundaries.stores
+  for_each = var.manage_role_assignments ? module.boundaries.stores : {}
 
   scope                = each.value.key_vault_id
   role_definition_name = "Key Vault Secrets User"

@@ -260,6 +260,18 @@ output "substrate" {
 }
 
 output "assigned_role_names" {
-  description = "Sorted, de-duplicated Azure role definition names the enabled modules assign (modules/assigned-roles). Derive the RBAC-Administrator ABAC condition of the identity that applies this stack from it."
+  description = "Sorted, de-duplicated Azure role definition names the enabled modules assign (modules/assigned-roles). Derive the RBAC-Administrator ABAC condition of the identity that applies this stack from it. With manage_role_assignments = false the identity applying this stack needs NO RBAC Administrator role: these names are for the separate privileged root's condition only."
   value       = module.assigned_roles.assigned_role_names
+}
+
+output "required_role_assignments" {
+  description = "Every role assignment the enabled modules would create, as {scope, role_definition_name, principal_id, principal_type}, whatever manage_role_assignments says. With manage_role_assignments = false the stack creates none: grant these elsewhere. A principal_id of a resource this stack creates is known only after that resource exists."
+  value = concat(
+    flatten(module.cluster[*].required_role_assignments),
+    flatten(module.container_registry[*].required_role_assignments),
+    flatten(module.dns[*].required_role_assignments),
+    flatten(module.secrets_backend[*].required_role_assignments),
+    flatten([for m in module.boundary_vault : m.required_role_assignments]),
+    flatten(module.external_secrets[*].required_role_assignments),
+  )
 }

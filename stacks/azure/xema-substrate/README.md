@@ -29,6 +29,8 @@ terraform apply                       # in-cluster resources and roles
 terraform apply                       # again with enable_identity_realm = true, once Keycloak answers at keycloak_url
 ```
 
+With `manage_role_assignments = false` none of the phase commands below that target a role assignment or rely on the stack granting roles work: use [Externally managed RBAC](#externally-managed-rbac) instead.
+
 The External Secrets identities need no Kubernetes: `-target=module.external_secrets[0].azurerm_role_assignment.store` (the identities come with it) and `...azurerm_federated_identity_credential.store` can join the first phase.
 
 With the default `postgres_network_access = "private"`, apply from inside the VNet (the runner), or use `"public"` with `postgres_public_firewall_rules`. Consume mode and the import path ([`docs/import-runbook.md`](../../../docs/import-runbook.md)) skip the phases.
@@ -91,6 +93,26 @@ A consumer root must also declare `platform_databases` and `workload_namespaces`
 Each `secret_store_boundaries` entry gets its own Key Vault (RBAC, purge protection, public access off) with a private endpoint (or, with `key_vault_network_access = "service_endpoint"`, the service-endpoint ACL instead), and `cluster-addons/external-secrets` creates the per-namespace identities and `SecretStore`s. A namespace may belong to one boundary only.
 
 The operator vault holds break-glass and infrastructure secrets (`key_vault_secrets`, the created Postgres admin password). It is never projected into the cluster, has no identity or `SecretStore`, and only the principal running Terraform can write to it. Because every vault is private, run Terraform from inside the foundation's network.
+
+## Externally managed RBAC
+
+With `manage_role_assignments = false` the stack creates no role assignment. Its `required_role_assignments` output lists every grant it would make (`scope`, `role_definition_name`, `principal_id`, `principal_type`), for an owner of RBAC to apply. `principal_type` is what the resource sets (`"ServicePrincipal"` for identities the stack creates) and `null` where it sets none (the vault deployer and the registry pull grant). The list is the same whatever the input; a `principal_id` of an identity the stack creates is known once that identity exists. The default `true` keeps today's behaviour. The identity applying the stack needs no RBAC Administrator role in this mode; `assigned_role_names` is for the privileged root's condition only.
+
+Bring-up sequence:
+
+1. Apply only the identities and key vaults the grants point at (these addresses still exist in this mode; drop those of areas you disable):
+   ```sh
+   terraform apply -var manage_role_assignments=false \
+     -target=module.cluster[0].azurerm_user_assigned_identity.cluster \
+     -target=module.dns[0].azurerm_user_assigned_identity.dns01 \
+     -target=module.secrets_backend[0].azurerm_key_vault.this \
+     -target=module.secrets_backend[0].azurerm_user_assigned_identity.reader \
+     -target=module.boundary_vault \
+     -target=module.external_secrets[0].azurerm_user_assigned_identity.store
+   ```
+2. The separate privileged root grants every tuple of `terraform output required_role_assignments` (`scope`, `role_definition_name`, `principal_id`, `principal_type`). The registry's AcrPull grant targets the kubelet identity, which exists only after the cluster does: grant it after step 4.
+3. Wait for the grants to propagate. Azure RBAC can take minutes; nothing in the stack waits in this mode.
+4. Run the full `terraform apply` (with the in-cluster phases as above, minus the role-assignment target).
 
 ## Consume mode
 

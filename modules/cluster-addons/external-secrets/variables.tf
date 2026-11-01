@@ -125,3 +125,9 @@ variable "namespaces_ready" {
   type        = any
   default     = null
 }
+
+variable "manage_role_assignments" {
+  description = "Externally managed RBAC mode when false: no role assignment is created; grant the required_role_assignments output elsewhere."
+  type        = bool
+  default     = true
+}

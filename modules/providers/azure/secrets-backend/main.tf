@@ -57,10 +57,19 @@ resource "azurerm_key_vault" "this" {
 # that is a role, and a freshly-granted role is eventually consistent.
 # ---------------------------------------------------------------------------
 
+locals {
+  grant_deployer = var.grant_deployer_secrets_officer && length(var.secret_names) > 0
+
+  required_role_assignments = concat(
+    local.grant_deployer ? [{ scope = azurerm_key_vault.this.id, role_definition_name = "Key Vault Secrets Officer", principal_id = data.azurerm_client_config.current.object_id, principal_type = null }] : [],
+    [for i in azurerm_user_assigned_identity.reader : { scope = azurerm_key_vault.this.id, role_definition_name = "Key Vault Secrets User", principal_id = i.principal_id, principal_type = "ServicePrincipal" }],
+  )
+}
+
 resource "azurerm_role_assignment" "deployer" {
   # The grant exists so the principal running Terraform can write the SEEDED secrets; with none to
   # seed it would be a standing data-plane role with no purpose.
-  count = var.grant_deployer_secrets_officer && length(var.secret_names) > 0 ? 1 : 0
+  count = var.manage_role_assignments && local.grant_deployer ? 1 : 0
 
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
@@ -68,7 +77,7 @@ resource "azurerm_role_assignment" "deployer" {
 }
 
 resource "time_sleep" "rbac_propagation" {
-  count = var.grant_deployer_secrets_officer && length(var.secret_names) > 0 ? 1 : 0
+  count = var.manage_role_assignments && local.grant_deployer ? 1 : 0
 
   create_duration = var.rbac_propagation_wait
   depends_on      = [azurerm_role_assignment.deployer]
@@ -122,7 +131,7 @@ resource "azurerm_federated_identity_credential" "reader" {
 }
 
 resource "azurerm_role_assignment" "reader" {
-  count = var.workload_identity.enabled ? 1 : 0
+  count = var.manage_role_assignments && var.workload_identity.enabled ? 1 : 0
 
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets User"
