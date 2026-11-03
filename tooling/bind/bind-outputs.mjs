@@ -88,10 +88,10 @@
 // and is overwritten by the next reconcile. A hand-run ALTER ROLE leaves no
 // receipt, so a divergence from it surfaces as an authentication failure rather
 // than as a conflict — which is why it is removed rather than documented better.
-// Likewise the Azure blob account: the deployment root's
-// object-store surface is S3-shaped (`objectStore.endpoint`, a MinIO/S3
-// endpoint); an Azure Blob endpoint under that key would be consumed as an S3
-// endpoint, so `blob_*` are `ignore`, not `fragment`.
+// The Azure blob account binds to its own Azure keys (`objectStore.azureAccount`,
+// `objectStore.azureBlobEndpoint`, `objectStore.blobContainerPrefix`), never to
+// the S3-shaped `objectStore.endpoint`. The account KEY (`blob_primary_access_key`)
+// is operator-only and is not bound.
 //
 // USAGE
 //   terraform output -json | node tooling/bind/bind-outputs.mjs --secret-inputs F --externals X
@@ -189,9 +189,9 @@ export const DISPOSITIONS = Object.freeze({
   ),
   'substrate.postgres_provisioner_role': ign('the deployment root has no provisioner-role input; its pooler and app legs both use postgres.role'),
   'substrate.postgres_databases': ign('database NAMES are the deployment root\'s secret-inputs (postgres.*Database), derived from its own roster; the stack only ensured them'),
-  'substrate.blob_account': ign('the deployment root\'s object-store surface is S3-shaped (objectStore.endpoint); an Azure Blob account has no key there'),
-  'substrate.blob_endpoint': ign('the deployment root\'s object-store surface is S3-shaped (objectStore.endpoint); an Azure Blob endpoint is not an S3 endpoint'),
-  'substrate.blob_container_prefix': ign('objectStore.blobContainerPrefix is derived by the deployment root from infra.yaml#minio.bucket; the Azure blob account is not bound (see blob_endpoint)'),
+  'substrate.blob_account': f('objectStore.azureAccount', WhenNull.Omit, 'Azure only: DigitalOcean has no blob account (null)'),
+  'substrate.blob_endpoint': f('objectStore.azureBlobEndpoint', WhenNull.Omit, 'Azure only: DigitalOcean has no blob endpoint (null)'),
+  'substrate.blob_container_prefix': f('objectStore.blobContainerPrefix', WhenNull.Omit, 'Azure only: DigitalOcean has no blob container prefix (null)'),
   'substrate.operator_vault_name': ign('Operator vault: break-glass/infra secrets, never projected into the cluster; the per-boundary SecretStores the external-secrets addon installs read their own vaults, and the deployment root binds none'),
   'substrate.operator_vault_uri': ign('same as operator_vault_name'),
   'substrate.secret_store_name': ign('a manifest reference (ExternalSecret.secretStoreRef.name), not a secret input'),
@@ -238,7 +238,7 @@ export const DISPOSITIONS = Object.freeze({
   dns_record_ids: ign('provider record ids for imports'),
   blob_account: ign('duplicate of substrate.blob_account'),
   blob_endpoint: ign('duplicate of substrate.blob_endpoint'),
-  blob_primary_access_key: op('Azure: the blob account key. Not written: the deployment root\'s object-store surface is S3-shaped and its `object-store-secret-key` external pairs with an S3 access key (objectStore.accessKey), which an Azure account key is not. Bind it when that surface grows an Azure Blob shape'),
+  blob_primary_access_key: op('Azure: the blob account key. Never written by the binder: it is operator-only, supplied through the deploy\'s `azure-storage-account-key` external credential, so a stack output must not become a second source for it'),
   operator_vault_name: ign('duplicate of substrate.operator_vault_name'),
   operator_vault_uri: ign('duplicate of substrate.operator_vault_uri'),
   operator_vault_id: ign('an Azure resource id (a role-assignment scope for the consumer root\'s Terraform); nothing in the deployment root reads it'),
