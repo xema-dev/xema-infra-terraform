@@ -75,7 +75,16 @@ test('azure: the app role, the cache and the redis key bind; blob and role passw
   assert.ok(report.ignored.some((l) => l.startsWith('postgres_role_passwords:')));
   assert.ok(!report.operator.some((l) => l.startsWith('postgres_role_passwords:')));
   assert.ok(report.operator.some((l) => l.startsWith('blob_primary_access_key:')));
-  assert.ok(report.ignored.some((l) => l.startsWith('substrate.blob_endpoint:')));
+  assert.equal(fragment.objectStore.azureAccount, 'acmeprodblob');
+  assert.equal(fragment.objectStore.azureBlobEndpoint, 'https://acmeprodblob.blob.core.windows.net/');
+  assert.equal(fragment.objectStore.blobContainerPrefix, 'acme-prod');
+  assert.ok(!JSON.stringify(fragment).includes('FIXTURE-BLOB-KEY'));
+  assert.ok(!JSON.stringify(externals).includes('FIXTURE-BLOB-KEY'));
+});
+
+test('digitalocean: the null Azure blob outputs bind no objectStore keys', () => {
+  const { fragment } = bind(fixture('digitalocean'));
+  assert.equal(fragment.objectStore, undefined);
 });
 
 test('an unknown output is refused by name', () => {
@@ -223,8 +232,9 @@ test('merge: every existing byte survives; missing derived keys are added in the
   assert.equal(cursor, original.length, `an original line was lost or reordered:\n${text}`);
   // Added: the keys the file lacked, appended at the END of their sections.
   assert.match(text, /^  directParams: sslmode=require\n  directPort: "5432"\n/m, 'directPort was not appended at the end of postgres:');
-  assert.match(text, /^\nredis:\n  host: "acme-prod-redis\.redis\.cache\.windows\.net"\n  port: "6380"\n$/m, 'the redis section was not appended at the end of the file');
-  assert.deepEqual(report.added.sort(), ['postgres.directPort', 'redis.host', 'redis.port']);
+  assert.match(text, /^\nredis:\n  host: "acme-prod-redis\.redis\.cache\.windows\.net"\n  port: "6380"\n/m, 'the redis section was not appended after postgres:');
+  assert.match(text, /^objectStore:\n  azureAccount: "acmeprodblob"\n  azureBlobEndpoint: "https:\/\/acmeprodblob\.blob\.core\.windows\.net\/"\n  blobContainerPrefix: "acme-prod"\n$/m, 'the objectStore section was not appended at the end of the file');
+  assert.deepEqual(report.added.sort(), ['objectStore.azureAccount', 'objectStore.azureBlobEndpoint', 'objectStore.blobContainerPrefix', 'postgres.directPort', 'redis.host', 'redis.port']);
   // Kept: the owner's directHost differs from the stack's — the explicit key wins, loudly.
   assert.equal(report.kept.length, 1);
   assert.match(report.kept[0], /^postgres\.directHost: the file declares "pg\.acme\.internal", the stack says "acme-prod-pg\.postgres\.database\.azure\.com" — the explicit key wins/);
@@ -259,7 +269,7 @@ test('CLI: aimed at a committed secret-inputs.yaml, --secret-inputs MERGES (55 l
     const after = fs.readFileSync(committed, 'utf8');
     assert.ok(after.split('\n').length > before, `the file shrank: ${before} → ${after.split('\n').length}`);
     assert.ok(after.startsWith('# secret-inputs for acme-prod'), 'the owner\'s header was replaced');
-    assert.match(run.stderr, /merged into .*secret-inputs\.yaml: 3 key\(s\) added, 2 already equal, 1 kept as declared/);
+    assert.match(run.stderr, /merged into .*secret-inputs\.yaml: 6 key\(s\) added, 2 already equal, 1 kept as declared/);
     assert.match(run.stderr, /KEPT — the file declares a different value/);
 
     // A prior fragment of the script's own is regenerated whole, as before.
