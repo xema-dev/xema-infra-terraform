@@ -4,6 +4,12 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — optional standalone cert-manager (XEMA-5449)
+
+Additive; nothing to change to adopt. A root that leaves the new input unset plans no change, and an existing gateway TLS cert-manager keeps its release (a `moved` block carries state to the new module address; no re-install).
+**Stack `stacks/azure/xema-substrate`:** new `install_cert_manager` (bool, default `false`) installs cert-manager with no gateway TLS issuer behind it: CRDs installed, Gateway API support off, no `ClusterIssuer`, no `Gateway`. It lets a substrate with `customer_supplied` certificates, or with `enable_gateway_tls = false`, run a chart that creates cert-manager `Issuer` and `Certificate` objects (the Xema Temporal chart). Exactly one instance: with `enable_gateway_tls` the `gateway-tls` module owns it (installed for an issuer, or for this input) and the option changes nothing when an issuer exists; without it the stack installs it. New output `cert_manager_installed`. Tests: `tests-mock/cert_manager.tftest.hcl`.
+**Modules:** new `cluster-addons/cert-manager` holds the one cert-manager definition (chart, pin, values). `cluster-addons/gateway-tls` calls it (its `cert_manager_chart_*`, `cert_manager_namespace` and `cert_manager_service_account_name` now default to `null`, meaning the `cert-manager` module's defaults, same values as before), takes `install_cert_manager` and outputs `cert_manager_installed`. State address `module.gateway_tls[0].helm_release.cert_manager[0]` becomes `module.gateway_tls[0].module.cert_manager[0].helm_release.this`, moved automatically.
+
 ## v0.23.0 — externally managed RBAC mode
 
 Additive; nothing to change to adopt. A root that leaves the new input unset plans no change.

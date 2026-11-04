@@ -475,6 +475,7 @@ module "gateway_tls" {
   cert_manager_chart_repository = var.cert_manager_chart_repository
   cert_manager_chart_version    = var.cert_manager_chart_version
   cert_manager_images           = var.cert_manager_images
+  install_cert_manager          = var.install_cert_manager
 
   dns01_azure = local.dns01 && var.enable_dns ? {
     subscription_id     = module.dns[0].subscription_id
@@ -482,6 +483,24 @@ module "gateway_tls" {
     hosted_zone_names   = [module.dns[0].domain]
     client_id           = module.dns[0].dns01_client_id
   } : null
+}
+
+# Standalone cert-manager: only where gateway_tls is absent, because gateway_tls then owns the one
+# instance (it installs it for an issuer or for install_cert_manager). Exactly one in every case.
+module "cert_manager_images_plan" {
+  source = "../../../modules/cluster-addons/gateway-tls/images-plan"
+  count  = local.standalone_cert_manager ? 1 : 0
+
+  cert_manager_images = var.cert_manager_images
+}
+
+module "cert_manager" {
+  source = "../../../modules/cluster-addons/cert-manager"
+  count  = local.standalone_cert_manager ? 1 : 0
+
+  chart_repository = var.cert_manager_chart_repository
+  chart_version    = var.cert_manager_chart_version
+  images_values    = one(module.cert_manager_images_plan[*].cert_manager_values)
 }
 
 # The secret store is installed with the key vault, whatever serves inbound traffic: workloads
