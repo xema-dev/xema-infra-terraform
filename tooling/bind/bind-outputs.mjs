@@ -93,6 +93,17 @@
 // the S3-shaped `objectStore.endpoint`. The account KEY (`blob_primary_access_key`)
 // is operator-only and is not bound.
 //
+// The container PREFIX is a fact of ONE deployment: the stack derives it from
+// its own `deployment_name`, and a shared substrate (one stack, several
+// deployments) names only its own. So it binds only when the deployment being
+// bound (`--deployment`) is the stack's own `deployment_name`. For any other
+// deployment it is REFUSED, and `--consumed substrate.blob_container_prefix`
+// omits it loudly so the owner declares `objectStore.blobContainerPrefix`
+// themselves. Until v0.24.1 every deployment bound the shared stack's prefix,
+// so aura-dev and aura-prod would have read and written aura-shared's
+// containers. The account and endpoint stay shared: one account may hold
+// several deployments' containers.
+//
 // USAGE
 //   terraform output -json | node tooling/bind/bind-outputs.mjs --secret-inputs F --externals X
 //   node tooling/bind/bind-outputs.mjs --from outputs.json --secret-inputs F --externals X \
@@ -128,6 +139,10 @@ const f = (target, whenNull = WhenNull.Refuse, note = null) => ({ disposition: D
 // the deployment being bound (--deployment, else the stack's own
 // `deployment_name` output) is the value.
 const fd = (target, note = null) => ({ disposition: Disposition.Fragment, target, whenNull: WhenNull.Omit, note, perDeployment: true });
+// A fragment row whose value names the STACK's own deployment: bound only when
+// the deployment being bound is the stack's `deployment_name`, refused
+// otherwise unless declared --consumed (then omitted loudly).
+const fo = (target, whenNull = WhenNull.Refuse, note = null) => ({ disposition: Disposition.Fragment, target, whenNull, note, ownDeploymentOnly: true });
 const x = (name, whenNull = WhenNull.Refuse, note = null) => ({ disposition: Disposition.External, name, whenNull, note });
 const op = (reason) => ({ disposition: Disposition.Operator, reason });
 const ign = (reason) => ({ disposition: Disposition.Ignore, reason });
@@ -191,7 +206,7 @@ export const DISPOSITIONS = Object.freeze({
   'substrate.postgres_databases': ign('database NAMES are the deployment root\'s secret-inputs (postgres.*Database), derived from its own roster; the stack only ensured them'),
   'substrate.blob_account': f('objectStore.azureAccount', WhenNull.Omit, 'Azure only: DigitalOcean has no blob account (null)'),
   'substrate.blob_endpoint': f('objectStore.azureBlobEndpoint', WhenNull.Omit, 'Azure only: DigitalOcean has no blob endpoint (null)'),
-  'substrate.blob_container_prefix': f('objectStore.blobContainerPrefix', WhenNull.Omit, 'Azure only: DigitalOcean has no blob container prefix (null)'),
+  'substrate.blob_container_prefix': fo('objectStore.blobContainerPrefix', WhenNull.Omit, 'Azure only: DigitalOcean has no blob container prefix (null)'),
   'substrate.operator_vault_name': ign('Operator vault: break-glass/infra secrets, never projected into the cluster; the per-boundary SecretStores the external-secrets addon installs read their own vaults, and the deployment root binds none'),
   'substrate.operator_vault_uri': ign('same as operator_vault_name'),
   'substrate.secret_store_name': ign('a manifest reference (ExternalSecret.secretStoreRef.name), not a secret input'),
@@ -547,6 +562,16 @@ export function bind(doc, { identityClient: identityClientFlag = null, consumed 
           if (typeof picked !== 'string' || picked === '') throw new BindError(`output '${name}'['${key}'] is not a non-empty string`);
           setFragment(row.target, picked, `${name}[${key}]`);
           break;
+        }
+        if (row.ownDeploymentOnly && deployment !== null) {
+          const own = entries.get('substrate.deployment_name')?.value ?? entries.get('deployment_name')?.value;
+          if (deployment !== own) {
+            if (consumedSet.has(name)) {
+              report.omitted.push(`${row.target} ← ${name} names the stack's own deployment '${own}', not '${deployment}' (declared --consumed; declare ${row.target} for '${deployment}' yourself)`);
+              break;
+            }
+            throw new BindError(`stack output '${name}' is '${entry.value}', derived for the stack's own deployment '${own ?? '(unnamed)'}', but this bind is for '${deployment}'. A shared substrate's containers belong to one deployment; binding them here would make '${deployment}' read and write them. Declare ${row.target} for '${deployment}' in its secret-inputs.yaml and pass --consumed ${name}`);
+          }
         }
         if (row.target === 'keycloak.issuer') {
           joined[name] = String(entry.value);
