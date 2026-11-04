@@ -250,6 +250,7 @@ export const DISPOSITIONS = Object.freeze({
   storage_class_name: ign('duplicate of substrate.storage_class_name'),
   gateway_parent_refs: ign('duplicate of substrate.gateway.parent_refs'),
   cluster_issuer_name: ign('a manifest annotation value (cert-manager.io/cluster-issuer), not a secret input'),
+  cert_manager_installed: ign('whether the stack installed cert-manager (standalone or with gateway TLS), for a consumer root not to install a second one; not a secret input'),
   secret_store_name: ign('duplicate of substrate.secret_store_name'),
   secret_stores: ign('duplicate of substrate.secret_stores'),
   workload_namespaces: ign('duplicate of substrate.namespaces'),
