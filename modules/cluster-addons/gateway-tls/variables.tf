@@ -210,22 +210,15 @@ variable "data_plane_node_ports" {
 # ---------------------------------------------------------------------------
 
 variable "cert_manager_chart_version" {
-  description = "Pinned cert-manager chart version (https://charts.jetstack.io)."
+  description = "Pinned cert-manager chart version. Null keeps the cert-manager module's pin."
   type        = string
-  nullable    = false
-  default     = "v1.21.2"
+  default     = null
 }
 
 variable "cert_manager_chart_repository" {
-  description = "Helm repository of the cert-manager chart (chart cert-manager): an HTTPS repository or an oci:// registry path. Override to pull from a private mirror."
+  description = "Helm repository of the cert-manager chart (HTTPS or oci://). Null keeps the cert-manager module's default (https://charts.jetstack.io). Override to pull from a private mirror."
   type        = string
-  nullable    = false
-  default     = "https://charts.jetstack.io"
-
-  validation {
-    condition     = can(regex("^(https?|oci)://[^[:space:]]+$", var.cert_manager_chart_repository))
-    error_message = "cert_manager_chart_repository must be an https://, http:// or oci:// URL."
-  }
+  default     = null
 }
 
 variable "cert_manager_images" {
@@ -247,15 +240,22 @@ variable "cert_manager_images" {
 }
 
 variable "cert_manager_namespace" {
-  description = "Namespace cert-manager is installed into (created if absent)."
+  description = "Namespace cert-manager is installed into (created if absent). Null keeps the cert-manager module's default (cert-manager)."
   type        = string
-  default     = "cert-manager"
+  default     = null
 }
 
 variable "cert_manager_service_account_name" {
-  description = "cert-manager controller service account name — the subject a dns01-azure workload identity is federated to."
+  description = "cert-manager controller service account name — the subject a dns01-azure workload identity is federated to. Null keeps the cert-manager module's default (cert-manager)."
   type        = string
-  default     = "cert-manager"
+  default     = null
+}
+
+variable "install_cert_manager" {
+  description = "Install cert-manager even when no issuer needs it (every listener customer_supplied), for a workload that creates cert-manager Issuer and Certificate objects of its own. Gateway API support stays off then. With an issuer cert-manager is installed anyway, and this changes nothing: there is one instance."
+  type        = bool
+  nullable    = false
+  default     = false
 }
 
 variable "cert_manager_values" {

@@ -275,3 +275,8 @@ output "required_role_assignments" {
     flatten(module.external_secrets[*].required_role_assignments),
   )
 }
+
+output "cert_manager_installed" {
+  description = "Whether this stack installs cert-manager: through gateway TLS (an issuer is needed, or install_cert_manager is set) or standalone (install_cert_manager without gateway TLS). Never more than one instance."
+  value       = local.standalone_cert_manager || one(module.gateway_tls[*].cert_manager_installed) == true
+}

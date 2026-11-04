@@ -4,7 +4,7 @@ Installs a Gateway API edge with the `helm` provider: the Gateway API standard C
 
 ## When to use it
 
-Use it for inbound HTTPS on any cluster. A certificate is either `managed` (issued by the `ClusterIssuer`) or `customer_supplied` (a `kubernetes.io/tls` Secret the customer creates in `gateway_namespace`; nothing is issued). With `gateway_implementation = "customer-managed"` the module installs only cert-manager and the issuer.
+Use it for inbound HTTPS on any cluster. A certificate is either `managed` (issued by the `ClusterIssuer`) or `customer_supplied` (a `kubernetes.io/tls` Secret the customer creates in `gateway_namespace`; nothing is issued). With `gateway_implementation = "customer-managed"` the module installs only cert-manager and the issuer. cert-manager itself is the [`cert-manager`](../cert-manager) module, called once here; output `cert_manager_installed` says whether it was installed.
 
 ## Usage
 
@@ -62,11 +62,12 @@ Routes attach with `module.gateway_tls.gateway_parent_refs`, one parent ref per 
 | `data_plane_external_traffic_policy` | no | externalTrafficPolicy of the data-plane Service (Local preserves the client source IP). |
 | `data_plane_load_balancer_ip` | no | Pin the data-plane LoadBalancer to a pre-allocated static IP. |
 | `data_plane_node_ports` | no | Fixed NodePorts for the data-plane Service (service type NodePort): each maps a node port to a Gateway list... |
-| `cert_manager_chart_version` | no | Pinned cert-manager chart version (https://charts.jetstack.io). |
-| `cert_manager_chart_repository` | no | Helm repository of the cert-manager chart: HTTPS or `oci://` (default `https://charts.jetstack.io`). |
+| `cert_manager_chart_version` | no | Pinned cert-manager chart version; null keeps the [`cert-manager`](../cert-manager) module's pin. |
+| `cert_manager_chart_repository` | no | Helm repository of the cert-manager chart: HTTPS or `oci://` (null keeps the `cert-manager` module's default, `https://charts.jetstack.io`). |
 | `cert_manager_images` | no | Image overrides keyed `controller`, `webhook`, `cainjector`, `acmesolver`, `startupapicheck`, each `{ repository, tag, digest }`, digest required; rendered with the chart's own `digest` key. Default `{}`. |
-| `cert_manager_namespace` | no | Namespace cert-manager is installed into (created if absent). |
-| `cert_manager_service_account_name` | no | cert-manager controller service account name — the subject a dns01-azure workload identity is federated to. |
+| `cert_manager_namespace` | no | Namespace cert-manager is installed into (created if absent); null keeps `cert-manager`. |
+| `cert_manager_service_account_name` | no | cert-manager controller service account name — the subject a dns01-azure workload identity is federated to; null keeps `cert-manager`. |
+| `install_cert_manager` | no | Install cert-manager even with no issuer needed (every listener `customer_supplied`), for a workload with its own Issuers and Certificates; Gateway API support stays off then. With an issuer it changes nothing: one instance either way. Default `false`. |
 | `cert_manager_values` | no | Extra inline Helm values for cert-manager, merged AFTER the module's own. |
 | `cluster_issuer_name` | no | Name of the ACME ClusterIssuer (what the Gateway references in cert-manager.io/cluster-issuer). |
 | `acme_email` | no | Contact e-mail registered with the ACME account (expiry notices). |

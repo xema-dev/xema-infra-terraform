@@ -1233,6 +1233,12 @@ variable "cert_manager_images" {
   default = {}
 }
 
+variable "install_cert_manager" {
+  description = "Install cert-manager (CRDs included, Gateway API support off, no ClusterIssuer, no Gateway) even when no gateway TLS issuer needs it: for a workload that creates cert-manager Issuer and Certificate objects of its own, such as the Xema Temporal chart. A substrate with enable_gateway_tls and an issuer installs cert-manager anyway (Gateway API support on) and this changes nothing: there is always exactly one instance, never two. Needs a cluster to install into."
+  type        = bool
+  default     = false
+}
+
 variable "manage_role_assignments" {
   description = "Externally managed RBAC mode when false: no role assignment is created; grant the required_role_assignments output elsewhere."
   type        = bool

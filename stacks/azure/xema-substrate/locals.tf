@@ -67,13 +67,15 @@ locals {
 
   dns01 = var.tls_solver == "dns01-azure"
 
+  standalone_cert_manager = var.install_cert_manager && !var.enable_gateway_tls
+
   # Irreversible / cost-bearing safety knobs follow the environment.
   postgres_backup_retention = var.environment == "prod" ? 35 : 7
 
   # ---------------------------------------------------------------------------
   # Cluster facts: from the created cluster, else the existing one read by name.
   # ---------------------------------------------------------------------------
-  needs_kube          = var.enable_rwx_storage || var.enable_workload_namespaces || var.enable_gateway_tls || var.enable_deployer_identity || var.enable_secrets_backend
+  needs_kube          = var.enable_rwx_storage || var.enable_workload_namespaces || var.enable_gateway_tls || var.install_cert_manager || var.enable_deployer_identity || var.enable_secrets_backend
   needs_cluster_facts = local.needs_kube || var.enable_secrets_backend || var.enable_container_registry || (var.enable_dns && local.dns01)
 
   kube_host = var.enable_cluster ? one(module.cluster[*].endpoint) : try(one(data.azurerm_kubernetes_cluster.existing[*].kube_config[0].host), null)

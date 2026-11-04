@@ -50,7 +50,7 @@ locals {
 
   # The Gateway, its Certificates, NginxProxy and ClientSettingsPolicy live in the Gateway's
   # namespace; a customer-managed Gateway is not ours, so the issuer chart sits with cert-manager.
-  config_namespace = local.ngf ? var.gateway_namespace : var.cert_manager_namespace
+  config_namespace = local.ngf ? var.gateway_namespace : one(module.cert_manager[*].namespace)
 
   ngf_values = yamlencode({
     nginxGateway = {
@@ -58,30 +58,7 @@ locals {
     }
   })
 
-  ngf_images_values          = module.images_plan.ngf_values
-  cert_manager_images_values = module.images_plan.cert_manager_values
-
-  # enableGatewayAPI turns on cert-manager's HTTP-01 gatewayHTTPRoute solver. The Gateway carries no
-  # cert-manager.io/cluster-issuer annotation, so the gateway-shim issues nothing: each managed
-  # listener gets an explicit Certificate, and a customer_supplied listener none.
-  # With dns01-azure the controller pod must carry the workload-identity label so the Azure
-  # webhook injects the federated token cert-manager exchanges.
-  cert_manager_values = yamlencode(merge(
-    {
-      crds = { enabled = true, keep = true }
-      serviceAccount = {
-        name = var.cert_manager_service_account_name
-      }
-      config = {
-        apiVersion       = "controller.config.cert-manager.io/v1alpha1"
-        kind             = "ControllerConfiguration"
-        enableGatewayAPI = true
-      }
-    },
-    local.dns01 ? {
-      podLabels = { "azure.workload.identity/use" = "true" }
-    } : {},
-  ))
+  ngf_images_values = module.images_plan.ngf_values
 
   cluster_config_values = yamlencode({
     clusterIssuer = local.issuer ? {
@@ -161,22 +138,35 @@ resource "helm_release" "nginx_gateway_fabric" {
   depends_on = [helm_release.gateway_api_crds]
 }
 
-# cert-manager is installed only with an issuer: with every listener customer_supplied nothing in
-# this module (or anywhere else in this repository) creates a cert-manager resource.
-resource "helm_release" "cert_manager" {
-  count = local.issuer ? 1 : 0
+# cert-manager is installed with an issuer, or on request (install_cert_manager) for a workload's own
+# Issuers and Certificates. This module is the only place of a stack with gateway TLS that installs
+# it, whichever reason applies: one release, never two. With every listener customer_supplied and no
+# request, nothing here creates a cert-manager resource.
+# enableGatewayAPI turns on cert-manager's HTTP-01 gatewayHTTPRoute solver and is set only with an
+# issuer: the Gateway carries no cert-manager.io/cluster-issuer annotation, so the gateway-shim
+# issues nothing, each managed listener gets an explicit Certificate and a customer_supplied one
+# none. With dns01-azure the controller pod carries the workload-identity label so the Azure webhook
+# injects the federated token cert-manager exchanges.
+module "cert_manager" {
+  source = "../cert-manager"
+  count  = local.issuer || var.install_cert_manager ? 1 : 0
 
-  name             = "cert-manager"
-  repository       = var.cert_manager_chart_repository
-  chart            = "cert-manager"
-  version          = var.cert_manager_chart_version
-  namespace        = var.cert_manager_namespace
-  create_namespace = true
-
-  values = concat([local.cert_manager_values], local.cert_manager_images_values, var.cert_manager_values)
+  chart_repository     = var.cert_manager_chart_repository
+  chart_version        = var.cert_manager_chart_version
+  namespace            = var.cert_manager_namespace
+  service_account_name = var.cert_manager_service_account_name
+  gateway_api          = local.issuer
+  workload_identity    = local.issuer && local.dns01
+  images_values        = module.images_plan.cert_manager_values
+  values               = var.cert_manager_values
 
   # cert-manager's controller fails to start with enableGatewayAPI when the Gateway API CRDs are absent.
   depends_on = [helm_release.gateway_api_crds]
+}
+
+moved {
+  from = helm_release.cert_manager[0]
+  to   = module.cert_manager[0].helm_release.this
 }
 
 # The ClusterIssuer, Gateway, Certificates, NginxProxy and ClientSettingsPolicy are custom resources whose CRDs do
@@ -192,5 +182,5 @@ resource "helm_release" "cluster_config" {
 
   values = [local.cluster_config_values]
 
-  depends_on = [helm_release.cert_manager, helm_release.nginx_gateway_fabric]
+  depends_on = [module.cert_manager, helm_release.nginx_gateway_fabric]
 }

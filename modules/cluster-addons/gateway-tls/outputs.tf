@@ -16,3 +16,8 @@ output "cluster_issuer_name" {
 
   depends_on = [helm_release.cluster_config]
 }
+
+output "cert_manager_installed" {
+  description = "Whether this module installed cert-manager (an issuer is needed, or install_cert_manager is set)."
+  value       = length(module.cert_manager) == 1
+}
