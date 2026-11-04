@@ -4,6 +4,13 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.24.1 — BIND refuses a shared substrate's container prefix for another deployment (XEMA-5463)
+
+Fix. No stack, module or tfvars change; only `tooling/bind/bind-outputs.mjs`.
+**Bug:** BIND mapped `substrate.blob_container_prefix` to `objectStore.blobContainerPrefix` for every deployment it bound. The stack derives that prefix from its own `deployment_name`, so with one shared substrate (e.g. `aura-shared`) serving several deployments (`aura-dev`, `aura-prod`), each of them bound `aura-shared`'s containers and would have read and written the same data.
+**Now:** the prefix binds only when `--deployment` is unset or equals the stack's `deployment_name`. For another deployment, BIND refuses, naming both deployments. `--consumed substrate.blob_container_prefix` turns the refusal into a reported omission. `substrate.blob_account` and `blob_endpoint` still bind: sharing an account is fine.
+**What a consumer must change:** a single-deployment substrate changes nothing. When you bind a deployment of a shared substrate that is not the stack's own, declare `objectStore.blobContainerPrefix` for that deployment in its `deployments/<d>/secret-inputs.yaml`, and add `--consumed substrate.blob_container_prefix` to its BIND command. xema-deploy refuses an Azure object store with no prefix, so the platform never falls back to a default. A secret-inputs file already bound with the shared prefix keeps that value: the merge never overwrites an owner key. Check each such file and replace the shared prefix by hand. The data already under the shared containers stays there and is not moved.
+
 ## v0.24.0 — optional standalone cert-manager (XEMA-5449)
 
 Additive; nothing to change to adopt. A root that leaves the new input unset plans no change, and an existing gateway TLS cert-manager keeps its release (a `moved` block carries state to the new module address; no re-install).

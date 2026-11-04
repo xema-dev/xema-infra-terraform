@@ -82,6 +82,34 @@ test('azure: the app role, the cache and the redis key bind; blob and role passw
   assert.ok(!JSON.stringify(externals).includes('FIXTURE-BLOB-KEY'));
 });
 
+// ── a shared substrate: one stack, several deployments ──────────────────────
+// The stack derives blob_container_prefix from its own deployment_name. Bound
+// for another deployment it would hand that deployment the stack's containers.
+
+test('shared substrate: the container prefix of the stack\'s own deployment is refused for another deployment', () => {
+  const doc = fixture('azure');
+  assert.equal(doc.substrate.value.deployment_name, 'acme-prod');
+  assert.throws(() => bind(doc, { deployment: 'acme-dev' }), (e) => e instanceof BindError && /substrate\.blob_container_prefix/.test(e.message) && /'acme-prod'/.test(e.message) && /'acme-dev'/.test(e.message) && /--consumed substrate\.blob_container_prefix/.test(e.message));
+});
+
+test('shared substrate: declared --consumed, the prefix is omitted loudly; the account and endpoint still bind', () => {
+  const { fragment, report } = bind(fixture('azure'), { deployment: 'acme-dev', consumed: ['substrate.blob_container_prefix'] });
+  assert.equal(fragment.objectStore.blobContainerPrefix, undefined);
+  assert.equal(fragment.objectStore.azureAccount, 'acmeprodblob');
+  assert.equal(fragment.objectStore.azureBlobEndpoint, 'https://acmeprodblob.blob.core.windows.net/');
+  assert.ok(report.omitted.some((l) => l.startsWith('objectStore.blobContainerPrefix ← substrate.blob_container_prefix') && l.includes("'acme-dev'")));
+});
+
+test('shared substrate: --deployment naming the stack\'s own deployment binds the prefix', () => {
+  assert.equal(bind(fixture('azure'), { deployment: 'acme-prod' }).fragment.objectStore.blobContainerPrefix, 'acme-prod');
+});
+
+test('shared substrate: a stack with no deployment_name cannot prove the prefix is the bound deployment\'s', () => {
+  const doc = fixture('azure');
+  doc.substrate = { ...doc.substrate, value: { ...doc.substrate.value, deployment_name: null } };
+  assert.throws(() => bind(doc, { deployment: 'acme-prod' }), /blob_container_prefix/);
+});
+
 test('digitalocean: the null Azure blob outputs bind no objectStore keys', () => {
   const { fragment } = bind(fixture('digitalocean'));
   assert.equal(fragment.objectStore, undefined);
@@ -372,7 +400,7 @@ test('custody: the deployment_name entry of each map binds to credentialCustody;
 });
 
 test('custody: --deployment overrides; a non-map is refused', () => {
-  assert.equal(bind(withCustody(), { deployment: 'other' }).fragment.credentialCustody.brokerClientId, 'client-2');
+  assert.equal(bind(withCustody(), { deployment: 'other', consumed: ['substrate.blob_container_prefix'] }).fragment.credentialCustody.brokerClientId, 'client-2');
   assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: 'x' } })), /not a map/);
   const noName = withCustody();
   delete noName.deployment_name;
@@ -389,7 +417,7 @@ test('custody: absent or null maps are omitted loudly; a sensitive one is refuse
 });
 
 test('custody: a deployment absent from a per-deployment map is skipped with the omitted notice', () => {
-  const { fragment, report } = bind(withCustody(), { deployment: 'example-shared' });
+  const { fragment, report } = bind(withCustody(), { deployment: 'example-shared', consumed: ['substrate.blob_container_prefix'] });
   assert.equal(fragment.credentialCustody, undefined);
   assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl') && l.includes("no entry for deployment 'example-shared'")));
   assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId') && l.includes("no entry for deployment 'example-shared'")));
