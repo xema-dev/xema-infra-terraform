@@ -61,6 +61,7 @@ module "postgres" {
 | `database_owners` | no | The role that OWNS each database, as `database => role` (both must be in `databases` / `roles`). |
 | `roles` | no | Logical login roles to ensure exist on the server, created through the cyrilgdn/postgresql provider (module... |
 | `role_options` | no | Optional per-role settings keyed by role name: create_database (CREATEDB), connection_limit (-1 = unlimited). |
+| `parameters` | no | PostgreSQL server parameters, name to value. Empty (default) sets none. A static parameter such as `max_connections` restarts the server when it changes. `azure.extensions` is refused: `extensions` owns it. |
 | `extensions` | no | PostgreSQL extensions to allow-list on the server (the azure.extensions server parameter, which CREATE EXTE... |
 | `resource_group_name` | no | Existing resource group to create the server in. |
 | `tags` | no | Tags applied to every created resource. |

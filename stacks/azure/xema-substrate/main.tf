@@ -132,6 +132,7 @@ module "postgres" {
   administrator_password          = local.pg_admin_password
   backup_retention_days           = local.postgres_backup_retention
   extensions                      = var.postgres_extensions
+  parameters                      = var.postgres_parameters
 
   databases       = local.postgres_databases
   database_owners = local.postgres_database_owners

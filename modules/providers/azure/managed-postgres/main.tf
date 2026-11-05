@@ -115,6 +115,16 @@ resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   value     = join(",", sort(distinct(var.extensions)))
 }
 
+# Server parameters the consumer sets, one resource per name. Empty creates none
+# and keeps Azure's defaults. azure.extensions stays with var.extensions.
+resource "azurerm_postgresql_flexible_server_configuration" "parameters" {
+  for_each = var.parameters
+
+  name      = each.key
+  server_id = azurerm_postgresql_flexible_server.this.id
+  value     = each.value
+}
+
 resource "azurerm_postgresql_flexible_server_firewall_rule" "this" {
   for_each = var.network_access == "public" ? var.public_firewall_rules : {}
 
