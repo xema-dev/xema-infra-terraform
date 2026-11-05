@@ -4,6 +4,13 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.24.2 — a database owner can CREATE in `public` on Azure Flexible Server (XEMA-5612)
+
+Fix. Nothing to change to adopt; a root with `database_owners` plans one new grant per owned database, in place.
+**Bug:** Azure Flexible Server gives schema `public` to `azure_pg_admin`, so an owner role from `modules/postgres-tenancy` (and `providers/azure/managed-postgres`, which calls it) failed its first `CREATE TABLE` with 42501, although the apply was green.
+**Now:** every role in `database_owners` gets `CREATE, USAGE` on its database's `public`. `connecting_role` must be a member of the schema's owner, or the apply fails with 42501; the Azure admin is one of `azure_pg_admin`. On a server below PostgreSQL 15, or one where `public` was removed, this grant can fail the apply.
+**What a consumer must change:** nothing, unless a database's `public` is absent or its owner is a role `connecting_role` isn't a member of.
+
 ## v0.24.1 — BIND refuses a shared substrate's container prefix for another deployment (XEMA-5463)
 
 Fix. No stack, module or tfvars change; only `tooling/bind/bind-outputs.mjs`.

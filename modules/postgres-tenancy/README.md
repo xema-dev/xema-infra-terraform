@@ -32,6 +32,7 @@ module "tenancy" {
 Role passwords are generated. Read them with `terraform output -json role_passwords` and put them in your secret store.
 
 - A role in `connect_grants` for a database it owns gets `CONNECT, TEMPORARY, CREATE`; any other role gets `CONNECT`.
+- A role in `database_owners` gets `CREATE, USAGE` on that database's `public` schema, whoever owns the schema (`azure_pg_admin` on Azure Flexible Server). `connecting_role` must be a member of the schema's owner, or the apply fails with 42501.
 - On PostgreSQL 16 and later the module grants every managed role to `connecting_role`. A role that already exists and was created by a different role needs `GRANT <role> TO <connecting_role> WITH ADMIN OPTION;` from its creator before import. The provider floor is `>= 1.24`.
 - An extension the server refuses (not installed, or not allow-listed such as `azure.extensions`) fails the apply, naming it. Removing a name from `extensions` does not drop it.
 - Every object is importable. An import does not read back a role password, so the first apply after one rotates it.
