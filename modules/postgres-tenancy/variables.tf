@@ -81,7 +81,8 @@ variable "database_owners" {
     The role that OWNS each database, as `database => role`. A database absent
     from the map is left with whatever owner it has (the connecting admin, for
     one this module creates) — say who owns it when the application connects as
-    a role that must run migrations.
+    a role that must run migrations. An owner is granted CREATE and USAGE on the
+    database's `public` schema.
   EOT
   type        = map(string)
   default     = {}

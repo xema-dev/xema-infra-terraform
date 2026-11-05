@@ -149,7 +149,7 @@ variable "databases" {
 }
 
 variable "database_owners" {
-  description = "The role that OWNS each database, as `database => role` (both must be in `databases` / `roles`). The owner may CREATE in schema `public`, which on PostgreSQL 15+ no other role may — so the role an application migrates as must own its database. A database absent from the map is owned by the administrator."
+  description = "The role that OWNS each database, as `database => role` (both must be in `databases` / `roles`). The owner is granted CREATE in schema `public`, which no other role gets — so the role an application migrates as must own its database. A database absent from the map is owned by the administrator."
   type        = map(string)
   default     = {}
 }

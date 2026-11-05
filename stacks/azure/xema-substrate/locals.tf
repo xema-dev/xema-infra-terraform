@@ -59,7 +59,7 @@ locals {
   }
   # ONE ownership rule, for a created server and a consumed one alike: the app
   # role OWNS every database it is given, so a migration running as it can
-  # CREATE in schema `public` (on PostgreSQL 15+ only the owner can). The
+  # CREATE in schema `public` (postgres-tenancy grants the owner that). The
   # provisioner reaches them with CONNECT.
   postgres_database_owners = { for db in local.postgres_databases : db => local.postgres_app_role }
 
