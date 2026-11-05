@@ -4,6 +4,14 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — settable PostgreSQL server parameters (Azure, XEMA-5655)
+
+No consumer change: the new input defaults to the previous behaviour. `providers/azure/managed-postgres`
+gains `parameters` (`map(string)`, default `{}`), one server configuration per entry;
+`azure.extensions` is refused there. `stacks/azure/xema-substrate` threads it as
+`postgres_parameters`. A root that holds its own `azurerm_postgresql_flexible_server_configuration`
+for a name moves it to this map and imports or `moved`s the state entry, or the two fight over the value.
+
 ## v0.24.2 — a database owner can CREATE in `public` on Azure Flexible Server (XEMA-5612)
 
 Fix. Nothing to change to adopt; a root with `database_owners` plans one new grant per owned database, in place.

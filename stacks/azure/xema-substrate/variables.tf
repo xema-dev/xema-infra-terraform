@@ -630,6 +630,12 @@ variable "postgres_extensions" {
   }
 }
 
+variable "postgres_parameters" {
+  description = "PostgreSQL server parameters to set on the CREATED server, name to value (e.g. { max_connections = \"429\" }). Empty (default) sets none. A static parameter restarts the server when it changes. azure.extensions is refused: postgres_extensions owns it."
+  type        = map(string)
+  default     = {}
+}
+
 variable "postgres_zone" {
   description = "Availability zone for the managed PostgreSQL server; null keeps the regional placement. Set it before the first apply: changing it later replaces the server."
   type        = string

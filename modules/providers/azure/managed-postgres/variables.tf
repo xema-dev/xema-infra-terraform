@@ -180,6 +180,22 @@ variable "extensions" {
   }
 }
 
+variable "parameters" {
+  description = "PostgreSQL server parameters to set, name to value (e.g. { max_connections = \"429\" }). Empty (default) sets none and keeps Azure's defaults. A static parameter such as max_connections restarts the server when it changes. azure.extensions is refused here: var.extensions owns it."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for name in keys(var.parameters) : can(regex("^[a-z][a-z0-9_.]*$", name))])
+    error_message = "parameters names must be lowercase server parameter names matching ^[a-z][a-z0-9_.]*$."
+  }
+
+  validation {
+    condition     = !contains(keys(var.parameters), "azure.extensions")
+    error_message = "azure.extensions is set through extensions, not parameters."
+  }
+}
+
 variable "resource_group_name" {
   description = "Existing resource group to create the server in. Empty string creates a dedicated resource group named \"<name>-rg\"."
   type        = string
