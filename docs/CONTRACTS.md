@@ -363,8 +363,8 @@ Provisions a managed Postgres instance/cluster plus logical databases and roles.
   the VNet or over VPN/bastion). The databases are created over SQL too
   (through `postgres-tenancy`, the one in-server tenancy implementation), so
   the optional `database_owners` map can make a role their owner — the role an
-  application migrates as must own its database to CREATE in `public` on
-  PostgreSQL 15+. Every role gets `CONNECT` on every database (`CONNECT,
+  application migrates as, granted CREATE in `public` by `postgres-tenancy`.
+  Every role gets `CONNECT` on every database (`CONNECT,
   TEMPORARY, CREATE` on one it owns) and `CONNECT` is revoked from `PUBLIC`.
   Per-role `create_database` / `connection_limit` come from the optional
   `role_options` map.
