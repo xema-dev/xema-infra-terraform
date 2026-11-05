@@ -133,9 +133,10 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "this" {
 #
 # The databases are created over SQL rather than through Azure's control
 # plane, because the rule includes OWNERSHIP: `database_owners` names the role
-# that owns each database, so an application migrating as that role can CREATE
-# in schema `public` — on PostgreSQL 15+ only the database owner can — with
-# Terraform alone. A control-plane database cannot be given an owner by any
+# that owns each database, and the tenancy module grants that role CREATE in
+# schema `public`, so an application migrating as it needs Terraform alone
+# (Azure gives `public` to azure_pg_admin, so ownership of the database is not
+# enough on its own). A control-plane database cannot be given an owner by any
 # resource this repository uses. Every role in `roles` reaches every database
 # (`CONNECT`, or `CONNECT, TEMPORARY, CREATE` for its owner); PUBLIC loses it.
 # ---------------------------------------------------------------------------

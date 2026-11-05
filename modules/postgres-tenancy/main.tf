@@ -200,6 +200,28 @@ resource "postgresql_grant" "connect" {
   privileges  = each.value.privileges
 }
 
+# THE OWNER OF A DATABASE DOES NOT NECESSARILY OWN ITS `public` SCHEMA.
+#
+# On stock PostgreSQL 15+ `public` belongs to `pg_database_owner`, so the
+# database owner can CREATE in it with no grant. Azure Flexible Server gives it
+# to `azure_pg_admin` instead, leaving PUBLIC with USAGE alone, so the same
+# owner's first CREATE TABLE fails with 42501. This grant states the rule every
+# server should give: the owner migrates into `public`. The connecting role
+# issues it through its membership of the schema's owner: `azure_pg_admin` on
+# Azure, the database owner (hence `pg_database_owner`) elsewhere.
+resource "postgresql_grant" "owner_public_schema" {
+  for_each = var.database_owners
+
+  database    = postgresql_database.this[each.key].name
+  role        = postgresql_role.this[each.value].name
+  schema      = "public"
+  object_type = "schema"
+  privileges  = ["CREATE", "USAGE"]
+
+  # Destroyed before the CONNECT grant, for the reason on revoke_public above.
+  depends_on = [postgresql_grant.connect]
+}
+
 # The step that used to be a superuser and a shell. `vector` is not a trusted
 # extension, so a database owner cannot create it; this runs as the credential
 # the root configured the provider with.
