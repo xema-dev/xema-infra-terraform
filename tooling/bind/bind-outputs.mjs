@@ -135,10 +135,6 @@ export const WhenNull = Object.freeze({
 export const DEFAULT_IDENTITY_CLIENT = 'identity-api';
 
 const f = (target, whenNull = WhenNull.Refuse, note = null) => ({ disposition: Disposition.Fragment, target, whenNull, note });
-// A fragment row whose output is a MAP keyed by deployment name: the entry for
-// the deployment being bound (--deployment, else the stack's own
-// `deployment_name` output) is the value.
-const fd = (target, note = null) => ({ disposition: Disposition.Fragment, target, whenNull: WhenNull.Omit, note, perDeployment: true });
 // A fragment row whose value names the STACK's own deployment: bound only when
 // the deployment being bound is the stack's `deployment_name`, refused
 // otherwise unless declared --consumed (then omitted loudly).
@@ -222,13 +218,19 @@ export const DISPOSITIONS = Object.freeze({
 
   // ── per-deployment credential custody ────────────────────────────────────
   // Where a deployment's credential custody lives: the endpoint of the vault
-  // that holds its credentials, and the workload-identity client id (AKS
-  // workload identity, EKS IRSA, GKE) the credential broker runs as. Both are
-  // non-secret and keyed by deployment name. Null/absent map = custody not
-  // provisioned for the stack: omitted loudly.
-  custody_vault_urls: fd('credentialCustody.vaultUrl', 'credential custody is not provisioned by this stack'),
-  custody_broker_client_ids: fd('credentialCustody.brokerClientId', 'credential custody is not provisioned by this stack'),
-  deployment_name: ign('the name that keys the per-deployment maps (custody_*) and the default for --deployment; not itself a binding — the deployment root has its own deployment.yaml#name'),
+  // that holds its credentials, and the workload-identity client id the
+  // credential broker runs as. Both are non-secret and keyed by deployment
+  // name. The engine reads the broker's custody only from
+  // deployments/<d>/infra.yaml#hostCustody.credentialBroker (since XEMA-6008),
+  // a nested mapping in a commented file: operator steps, nothing is merged and
+  // nothing is written under credentialCustody.
+  custody_vault_urls: op(
+    'the vault endpoint of the credential broker\'s custody (a map keyed by deployment name), for deployments/<d>/infra.yaml#hostCustody.credentialBroker (vaultUrl, with clientId from custody_broker_client_ids). NOT merged: the engine reads the broker\'s custody only there since XEMA-6008, and it is a nested mapping in infra.yaml, not a secret-inputs scalar. Print the whole block for the deployment and paste it once: `terraform output -json | jq -r --arg d <deployment> \'"hostCustody:", "  credentialBroker:", "    clientId: \\(.custody_broker_client_ids.value[$d])", "    vaultUrl: \\(.custody_vault_urls.value[$d])"\'`',
+  ),
+  custody_broker_client_ids: op(
+    'the workload-identity client id the credential broker runs as (a map keyed by deployment name), for deployments/<d>/infra.yaml#hostCustody.credentialBroker.clientId. NOT merged, for the reason given under custody_vault_urls; its jq command prints the whole hostCustody.credentialBroker block (clientId and vaultUrl) in one go',
+  ),
+  deployment_name: ign('the name that keys the per-deployment custody maps (custody_*) and is the default for --deployment; not itself a binding — the deployment root has its own deployment.yaml#name'),
 
   // ── top-level outputs ────────────────────────────────────────────────────
   cluster_id: ign('a provider id for imports'),
@@ -533,10 +535,6 @@ export function bind(doc, { identityClient: identityClientFlag = null, consumed 
         break;
       }
       case Disposition.Fragment: {
-        if (!entry && row.perDeployment && row.whenNull === WhenNull.Omit) {
-          report.omitted.push(`${row.target} ← ${name} is absent from the document (${row.note})`);
-          break;
-        }
         if (!entry) {
           if (name.startsWith('substrate.')) throw new BindError(`the binding contract lacks '${name}' — this document was not produced by a stack of this module set (docs/CONTRACTS.md § Binding contract)`);
           throw new BindError(`required stack output '${name}' is absent from the document — add it to the consumer root's outputs`);
@@ -548,20 +546,6 @@ export function bind(doc, { identityClient: identityClientFlag = null, consumed 
             break;
           }
           throw new BindError(`stack output '${name}' is null, and secret-inputs ${row.target} needs it. Either the area is disabled/consumed elsewhere — then declare it with --consumed ${name} and supply ${row.target} yourself — or the apply has not happened yet`);
-        }
-        if (row.perDeployment) {
-          const key = deployment ?? entries.get('deployment_name')?.value ?? entries.get('substrate.deployment_name')?.value;
-          if (typeof entry.value !== 'object' || Array.isArray(entry.value)) throw new BindError(`output '${name}' is not a map keyed by deployment name`);
-          if (typeof key !== 'string' || key === '') throw new BindError(`output '${name}' is keyed by deployment; pass --deployment <name> (keys: [${Object.keys(entry.value).join(', ')}])`);
-          if (!Object.hasOwn(entry.value, key)) {
-            // A root that legitimately has no custody for this deployment (e.g. a shared root): skip the row, loudly.
-            report.omitted.push(`${row.target} ← ${name} has no entry for deployment '${key}' (keys: [${Object.keys(entry.value).join(', ')}]; ${row.note})`);
-            break;
-          }
-          const picked = entry.value[key];
-          if (typeof picked !== 'string' || picked === '') throw new BindError(`output '${name}'['${key}'] is not a non-empty string`);
-          setFragment(row.target, picked, `${name}[${key}]`);
-          break;
         }
         if (row.ownDeploymentOnly && deployment !== null) {
           const own = entries.get('substrate.deployment_name')?.value ?? entries.get('deployment_name')?.value;

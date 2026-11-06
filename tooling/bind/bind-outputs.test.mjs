@@ -393,47 +393,27 @@ const withCustody = (extra = {}) => ({
   ...extra,
 });
 
-test('custody: the deployment_name entry of each map binds to credentialCustody; deployment_name itself is ignored', () => {
+test('custody: the fragment has no credentialCustody; deployment_name is ignored', () => {
   const { fragment, report } = bind(withCustody());
-  assert.deepEqual(fragment.credentialCustody, { vaultUrl: 'https://vault.acme.example', brokerClientId: 'client-1' });
+  assert.equal(fragment.credentialCustody, undefined);
   assert.ok(report.ignored.some((l) => l.startsWith('deployment_name:')));
 });
 
-test('custody: --deployment overrides; a non-map is refused', () => {
-  assert.equal(bind(withCustody(), { deployment: 'other', consumed: ['substrate.blob_container_prefix'] }).fragment.credentialCustody.brokerClientId, 'client-2');
-  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: 'x' } })), /not a map/);
-  const noName = withCustody();
-  delete noName.deployment_name;
-  noName.substrate = { ...noName.substrate, value: { ...noName.substrate.value, deployment_name: null } };
-  assert.throws(() => bind(noName), /pass --deployment/);
+test('custody: both outputs are operator steps naming hostCustody.credentialBroker', () => {
+  const { report } = bind(withCustody());
+  for (const name of ['custody_vault_urls', 'custody_broker_client_ids']) {
+    const line = report.operator.find((l) => l.startsWith(`${name}:`));
+    assert.ok(line, `${name} is an operator step`);
+    assert.ok(line.includes('hostCustody.credentialBroker'));
+  }
+  assert.ok(report.operator.some((l) => l.startsWith('custody_vault_urls:') && l.includes('jq -r --arg d')));
 });
 
-test('custody: absent or null maps are omitted loudly; a sensitive one is refused', () => {
+test('custody: absent or null maps report nothing and write nothing', () => {
   const { fragment, report } = bind(withCustody({ custody_vault_urls: { sensitive: false, value: null } }));
-  assert.equal(fragment.credentialCustody.vaultUrl, undefined);
-  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl')));
-  assert.ok(bind(fixture('azure')).report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId')));
-  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: true, value: { 'acme-prod': 'u' } } })), /marked sensitive/);
-});
-
-test('custody: a deployment absent from a per-deployment map is skipped with the omitted notice', () => {
-  const { fragment, report } = bind(withCustody(), { deployment: 'example-shared', consumed: ['substrate.blob_container_prefix'] });
   assert.equal(fragment.credentialCustody, undefined);
-  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.vaultUrl') && l.includes("no entry for deployment 'example-shared'")));
-  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId') && l.includes("no entry for deployment 'example-shared'")));
-});
-
-test('custody: a present entry is emitted; one map may skip while the other emits', () => {
-  const doc = withCustody({ custody_broker_client_ids: { sensitive: false, type: ['map', 'string'], value: { other: 'client-2' } } });
-  const { fragment, report } = bind(doc);
-  assert.deepEqual(fragment.credentialCustody, { vaultUrl: 'https://vault.acme.example' });
-  assert.ok(report.omitted.some((l) => l.startsWith('credentialCustody.brokerClientId')));
-});
-
-test('custody: a present but malformed entry is still refused', () => {
-  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: { 'acme-prod': '' } } })), /not a non-empty string/);
-  assert.throws(() => bind(withCustody({ custody_vault_urls: { sensitive: false, value: { 'acme-prod': 7 } } })), /not a non-empty string/);
-  assert.throws(() => bind(withCustody({ custody_broker_client_ids: { sensitive: false, value: ['acme-prod'] } })), /not a map/);
+  assert.ok(!report.operator.some((l) => l.startsWith('custody_vault_urls:')));
+  assert.ok(!bind(fixture('azure')).report.operator.some((l) => l.startsWith('custody_broker_client_ids:')));
 });
 
 // ── deployment without an in-platform IdP realm (external OIDC IdP) ─────────
