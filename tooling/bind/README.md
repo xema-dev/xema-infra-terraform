@@ -32,7 +32,7 @@ Run the deployment root's generator afterwards with `--externals` pointing at th
 | `--secret-inputs <file>` | the `secret-inputs.yaml` to merge endpoints into |
 | `--externals <file>` | the operator externals file to write credentials into |
 | `--identity-client <key>` | the `realm_clients` key of the identity-api client (default `identity-api`) |
-| `--deployment <name>` | the deployment being bound: selects the entry of the per-deployment custody maps (default: the stack's `deployment_name`). Naming another deployment than the stack's own refuses `substrate.blob_container_prefix` (see below) |
+| `--deployment <name>` | the deployment being bound: the deployment whose own-deployment outputs bind (default: the stack's `deployment_name`). Naming another deployment than the stack's own refuses `substrate.blob_container_prefix` (see below) |
 | `--consumed <output>[,...]` | a null output is an area consumed elsewhere, so its key is omitted instead of refused; `substrate.blob_container_prefix` declared here is omitted for a deployment that is not the stack's own |
 
 The report on stderr lists what was written, omitted and ignored, and which credentials are operator steps.
@@ -47,7 +47,7 @@ The report on stderr lists what was written, omitted and ignored, and which cred
 | `substrate.redis_host`, `redis_port` | secret-inputs | `redis.host`, `redis.port` |
 | `realm_client_secrets[--identity-client]` | externals | `keycloak-identity-client-secret` |
 | `redis_primary_key` | externals | `redis-password` |
-| `custody_vault_urls`, `custody_broker_client_ids` | secret-inputs | `credentialCustody.vaultUrl`, `credentialCustody.brokerClientId` |
+| `custody_vault_urls`, `custody_broker_client_ids` | operator step | infra.yaml `hostCustody.credentialBroker.{vaultUrl,clientId}` (the report prints the `jq` block; nothing is written under `credentialCustody`) |
 | `substrate.blob_account`, `blob_endpoint` | secret-inputs | `objectStore.azureAccount`, `objectStore.azureBlobEndpoint` (one account may serve several deployments) |
 | `substrate.blob_container_prefix` | secret-inputs | `objectStore.blobContainerPrefix`, only when `--deployment` is the stack's own `deployment_name`. For another deployment of a shared substrate it is refused: declare that deployment's own prefix in its `secret-inputs.yaml` and pass `--consumed substrate.blob_container_prefix` |
 | `postgres_uri`, `kubeconfig_raw`, `blob_primary_access_key`, `substrate.gateway` | never written | operator steps |
