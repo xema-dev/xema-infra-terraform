@@ -14,3 +14,11 @@ variable "kube_ca_b64" {
   description = "Base64 cluster CA; only used with apply_via = in-vnet."
   default     = null
 }
+
+variable "cluster_token" {
+  type        = string
+  description = "Admin's Entra access token for the AKS server app; set via TF_VAR_cluster_token, never a tfvars file."
+  default     = null
+  sensitive   = true
+  ephemeral   = true
+}

@@ -30,6 +30,9 @@ data "archive_file" "chart" {
   type        = "zip"
   source_dir  = var.chart_path
   output_path = local.archive_path
+
+  # A symlink in the chart dir could pull files from outside it into the zip.
+  exclude_symlink_directories = true
 }
 
 # azapi_resource_action has no triggers_replace; replacing it on a chart change
@@ -51,6 +54,12 @@ resource "azapi_resource_action" "run_command" {
   body = {
     command = local.helm_command
     context = filebase64(data.archive_file.chart[0].output_path)
+  }
+
+  # The admin's Entra token for the AKS server app: with local accounts off, the
+  # run-command pod has no credential without it. Write-only: never in plan or state.
+  sensitive_body = {
+    clusterToken = var.cluster_token
   }
 
   response_export_values = ["properties.exitCode", "properties.logs"]

@@ -13,3 +13,10 @@ rights. CI never holds those rights; the customer's admin runs this root.
   first apply nobody hand-applies these objects again.
 - Edit `chart_path` in `main.tf` if the root repo keeps the chart elsewhere.
 - `release_namespace` must stay a namespace the deployer cannot write.
+- With `run-command`, export the admin's token first (environment only, never a tfvars file,
+  never committed):
+  `export TF_VAR_cluster_token=$(az account get-access-token --resource 6dae42f8-4368-4678-94ff-3960e28e3630 --query accessToken -o tsv)`.
+- State holds the run output and cluster details: keep it in a storage account/container the
+  deployer/CI identity cannot read or write.
+- A failed run stays in state; rerun with `tofu apply -replace=module.cluster_admin.azapi_resource_action.run_command[0]`.
+- Check the chart directory has no symlinks.

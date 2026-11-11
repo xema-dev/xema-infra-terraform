@@ -53,6 +53,24 @@ variable "aks_cluster_id" {
 
 variable "chart_archive_path" {
   type        = string
-  description = "Where run-command writes the zip of chart_path before sending it. Null uses a file inside this module's directory."
+  description = "Where run-command writes the zip of chart_path before sending it. Null uses a file inside this module's directory. Must not be inside chart_path."
   default     = null
+
+  validation {
+    condition     = var.chart_archive_path == null || !startswith(abspath(var.chart_archive_path), "${abspath(var.chart_path)}/")
+    error_message = "chart_archive_path must not be inside chart_path (the zip would include itself)."
+  }
+}
+
+variable "cluster_token" {
+  type        = string
+  description = "The admin's Entra access token for the AKS server app, sent as clusterToken so the run-command pod acts as the admin. Required when apply_via = run-command; not used in in-vnet mode. Set it from the environment, never a tfvars file."
+  default     = null
+  sensitive   = true
+  ephemeral   = true
+
+  validation {
+    condition     = var.apply_via != "run-command" || (var.cluster_token != null && var.cluster_token != "")
+    error_message = "cluster_token is required when apply_via = \"run-command\". Get it with: az account get-access-token --resource 6dae42f8-4368-4678-94ff-3960e28e3630 --query accessToken -o tsv, and export it as TF_VAR_cluster_token."
+  }
 }

@@ -4,6 +4,7 @@ module "cluster_admin" {
   chart_path     = "${path.root}/../../bootstrap/cluster-admin"
   apply_via      = "run-command"
   aks_cluster_id = var.aks_cluster_id
+  cluster_token  = var.cluster_token
 }
 
 output "chart_version" {

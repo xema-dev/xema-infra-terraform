@@ -7,6 +7,7 @@ mock_provider "archive" {}
 variables {
   chart_path         = "./tests-mock/fixtures/chart"
   chart_archive_path = "./tests-mock/fixtures/chart.zip"
+  cluster_token      = "tok-SECRET-123"
   aks_cluster_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/aks"
 }
 
@@ -100,5 +101,56 @@ run "run_command_nonzero_exit_fails_with_logs" {
     values = {
       output = { properties = { exitCode = 1, logs = "boom" } }
     }
+  }
+}
+
+run "run_command_token_is_in_no_plan_visible_body" {
+  command = plan
+  variables {
+    apply_via = "run-command"
+  }
+  override_resource {
+    target = azapi_resource_action.run_command
+    values = {
+      output = { properties = { exitCode = 0, logs = "ok" } }
+    }
+  }
+  assert {
+    condition     = length(azapi_resource_action.run_command) == 1
+    error_message = "the action is planned."
+  }
+  assert {
+    condition     = !strcontains(jsonencode(azapi_resource_action.run_command[0].body), "tok-SECRET-123") && !strcontains(jsonencode(azapi_resource_action.run_command[0].body), "clusterToken")
+    error_message = "the token is only in the write-only sensitive_body."
+  }
+}
+
+run "run_command_without_token_is_refused" {
+  command         = plan
+  expect_failures = [var.cluster_token]
+  variables {
+    apply_via     = "run-command"
+    cluster_token = null
+  }
+}
+
+run "in_vnet_without_token_is_fine" {
+  command = plan
+  variables {
+    apply_via     = "in-vnet"
+    cluster_token = null
+  }
+  assert {
+    condition     = length(helm_release.this) == 1
+    error_message = "in-vnet needs no token."
+  }
+}
+
+run "archive_inside_chart_is_refused" {
+  command         = plan
+  expect_failures = [var.chart_archive_path]
+  variables {
+    apply_via          = "in-vnet"
+    chart_archive_path = "./tests-mock/fixtures/chart/x.zip"
   }
 }
