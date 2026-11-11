@@ -11,7 +11,7 @@ terraform {
       version = ">= 3.1"
     }
     azapi = {
-      source  = "Azure/azapi"
+      source = "Azure/azapi"
       # >= 2.11: azapi_resource_action sensitive_body (write-only), first in 2.11.0.
       version = ">= 2.11"
     }
