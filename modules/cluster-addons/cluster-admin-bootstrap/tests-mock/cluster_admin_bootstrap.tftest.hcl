@@ -146,6 +146,18 @@ run "in_vnet_without_token_is_fine" {
   }
 }
 
+run "archive_path_unset_is_accepted" {
+  command = plan
+  variables {
+    apply_via          = "in-vnet"
+    chart_archive_path = null
+  }
+  assert {
+    condition     = length(helm_release.this) == 1
+    error_message = "the default (unset) chart_archive_path passes its validation."
+  }
+}
+
 run "archive_inside_chart_is_refused" {
   command         = plan
   expect_failures = [var.chart_archive_path]

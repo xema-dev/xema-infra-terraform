@@ -57,7 +57,8 @@ variable "chart_archive_path" {
   default     = null
 
   validation {
-    condition     = var.chart_archive_path == null || !startswith(abspath(var.chart_archive_path), "${abspath(var.chart_path)}/")
+    # A conditional, not ||: Terraform evaluates both operands of ||, and abspath(null) errors.
+    condition     = var.chart_archive_path == null ? true : !startswith(abspath(var.chart_archive_path), "${abspath(var.chart_path)}/")
     error_message = "chart_archive_path must not be inside chart_path (the zip would include itself)."
   }
 }
