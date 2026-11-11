@@ -4,6 +4,16 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — explicit `unowned` Postgres roles (XDO-7136)
+
+No consumer change: the new input defaults to the previous behaviour (minor, additive). `modules/postgres-tenancy` and
+`providers/azure/managed-postgres` gain `role_ownership`, and `stacks/azure/xema-substrate` gains `postgres_role_ownership`
+(closed set `"installation"` default | `"unowned"`). **Why:** a tenant that is not a Xema installation (a shared Temporal
+server's role) can have no ownership marker, and v0.25.0 refused to plan it. **Now:** `"unowned"` requires the marker to be
+null (refused if set), stamps no role, runs no `psql`, and `sql_connection` / `connecting_password` become optional in
+`postgres-tenancy` (required, by precondition, under `"installation"`); `role_ownership_markers` is empty. Unowned roles are
+never adopted by any installation: `xema installation import` always refuses them as foreign. It is an opt-out, not a fallback.
+
 ## Unreleased — every Postgres role carries its installation's ownership marker (XEMA-7136)
 
 **Consumer change.** `modules/postgres-tenancy` requires `ownership_marker`, `sql_connection` and `connecting_password`,

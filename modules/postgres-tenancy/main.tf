@@ -167,10 +167,32 @@ resource "postgresql_grant_role" "connecting_role" {
 # provisioner's environment: never on a command line, never in state (a
 # provisioner's environment is not recorded; `input` below holds no secret).
 #
+# role_ownership = "unowned" creates none of these and needs no psql: the roles
+# stay unmarked and no installation can ever adopt them.
+#
 # IDEMPOTENT: `COMMENT ON ROLE` overwrites. It re-runs when the role or the
 # marker changes, and whenever the role itself is replaced or updated.
+# The cross-variable contract of role_ownership (a precondition rather than a
+# validation: cross-variable validation needs Terraform 1.9 / OpenTofu 1.8 and
+# this module supports 1.6).
+resource "terraform_data" "ownership_contract" {
+  input = var.role_ownership
+
+  lifecycle {
+    precondition {
+      condition     = var.role_ownership != "installation" || (var.ownership_marker != null && var.sql_connection != null && var.connecting_password != null)
+      error_message = "role_ownership = \"installation\" requires ownership_marker, sql_connection and connecting_password: every role is stamped with the installation's marker. For a tenant that belongs to no installation, set role_ownership = \"unowned\" explicitly."
+    }
+    precondition {
+      condition     = var.role_ownership != "unowned" || var.ownership_marker == null
+      error_message = "role_ownership = \"unowned\" and ownership_marker are mutually exclusive: an unowned role is never stamped, so no installation can adopt it. Unset ownership_marker, or use role_ownership = \"installation\"."
+    }
+  }
+}
+
 resource "terraform_data" "role_marker" {
-  for_each = var.roles
+  # Only an installation's roles are stamped; "unowned" roles stay unmarked.
+  for_each = var.role_ownership == "installation" ? var.roles : toset([])
 
   input = {
     role    = postgresql_role.this[each.value].name
@@ -184,12 +206,12 @@ resource "terraform_data" "role_marker" {
   provisioner "local-exec" {
     command = "command -v psql >/dev/null 2>&1 || { echo 'postgres-tenancy: psql is not on PATH; it writes the ownership marker of every role' >&2; exit 127; }; psql -X -q -v ON_ERROR_STOP=1 -c \"$XEMA_ROLE_MARKER_SQL\""
     environment = {
-      PGHOST               = var.sql_connection.host
-      PGPORT               = tostring(var.sql_connection.port)
-      PGDATABASE           = var.sql_connection.database
-      PGSSLMODE            = var.sql_connection.sslmode
+      PGHOST               = try(var.sql_connection.host, "")
+      PGPORT               = tostring(try(var.sql_connection.port, 5432))
+      PGDATABASE           = try(var.sql_connection.database, "postgres")
+      PGSSLMODE            = try(var.sql_connection.sslmode, "require")
       PGUSER               = var.connecting_role
-      PGPASSWORD           = var.connecting_password
+      PGPASSWORD           = var.connecting_password == null ? "" : var.connecting_password
       XEMA_ROLE_MARKER_SQL = self.input.sql
     }
   }
@@ -198,7 +220,7 @@ resource "terraform_data" "role_marker" {
     replace_triggered_by = [postgresql_role.this[each.key]]
   }
 
-  depends_on = [postgresql_grant_role.connecting_role]
+  depends_on = [postgresql_grant_role.connecting_role, terraform_data.ownership_contract]
 }
 
 resource "postgresql_database" "this" {

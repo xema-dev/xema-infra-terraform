@@ -65,3 +65,54 @@ run "an_empty_marker_is_refused" {
 
   expect_failures = [var.ownership_marker]
 }
+
+run "unowned_roles_plan_with_no_marker_step" {
+  command = plan
+
+  variables {
+    role_ownership      = "unowned"
+    ownership_marker    = null
+    sql_connection      = null
+    connecting_password = null
+  }
+
+  assert {
+    condition     = length(terraform_data.role_marker) == 0 && length(output.role_ownership_markers) == 0
+    error_message = "unowned roles must get no marker step and report no marker."
+  }
+
+  assert {
+    condition     = toset(keys(postgresql_role.this)) == toset(["acme_dev", "acme_dev_provisioner"])
+    error_message = "unowned roles are still created."
+  }
+}
+
+run "unowned_with_a_marker_is_refused" {
+  command = plan
+
+  variables {
+    role_ownership = "unowned"
+  }
+
+  expect_failures = [terraform_data.ownership_contract]
+}
+
+run "an_unknown_role_ownership_is_refused" {
+  command = plan
+
+  variables {
+    role_ownership = "shared"
+  }
+
+  expect_failures = [var.role_ownership]
+}
+
+run "installation_without_a_marker_is_refused" {
+  command = plan
+
+  variables {
+    ownership_marker = null
+  }
+
+  expect_failures = [terraform_data.ownership_contract]
+}

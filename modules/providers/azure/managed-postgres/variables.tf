@@ -175,6 +175,17 @@ variable "ownership_marker" {
   default     = null
 }
 
+variable "role_ownership" {
+  description = "Whose roles var.roles are, passed to modules/postgres-tenancy. \"installation\" (default): the roles belong to one Xema installation and ownership_marker is required. \"unowned\": they belong to no installation (a shared server's non-Xema tenant); ownership_marker must be null, no role is stamped and no psql runs. Unowned roles are never adopted by any installation (`xema installation import` refuses them as foreign)."
+  type        = string
+  default     = "installation"
+
+  validation {
+    condition     = contains(["installation", "unowned"], var.role_ownership)
+    error_message = "role_ownership must be \"installation\" or \"unowned\"."
+  }
+}
+
 variable "sql_host" {
   description = "The host the postgresql provider of the root connects to, which modules/postgres-tenancy's psql step (the ownership marker) connects to as administrator_login. Empty means the server's FQDN."
   type        = string

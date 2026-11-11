@@ -131,10 +131,40 @@ variable "revoke_public_connect" {
   default     = true
 }
 
+variable "role_ownership" {
+  description = <<-EOT
+    Whose roles these are. A closed set:
+
+    - "installation" (default): the roles belong to one Xema installation.
+      `ownership_marker`, `sql_connection` and `connecting_password` are
+      required, and every role is stamped with the marker.
+    - "unowned": the roles belong to no installation (a shared server's tenant
+      that is not a Xema deployment, such as a shared Temporal server's role).
+      `ownership_marker` must be null (mutually exclusive), no role is stamped,
+      no `psql` is needed, and `sql_connection` / `connecting_password` are not
+      required. The roles stay unmarked, so UNOWNED ROLES ARE NEVER ADOPTED BY
+      ANY INSTALLATION: `xema installation import` always refuses them as
+      foreign. That is the intended safety, not a gap.
+
+    This is an explicit opt-out, never a fallback: a missing marker under
+    "installation" is refused, and no placeholder marker can stand in for it.
+  EOT
+  type        = string
+  default     = "installation"
+
+  validation {
+    condition     = contains(["installation", "unowned"], var.role_ownership)
+    error_message = "role_ownership must be \"installation\" or \"unowned\"."
+  }
+}
+
 variable "ownership_marker" {
   description = <<-EOT
     The text stamped on every role this module creates, as
-    `COMMENT ON ROLE <role> IS '<ownership_marker>'`. REQUIRED, no default.
+    `COMMENT ON ROLE <role> IS '<ownership_marker>'`. REQUIRED when
+    role_ownership = "installation" (no default; null is refused by the
+    precondition on terraform_data.ownership_contract), and MUST be null when
+    role_ownership = "unowned".
 
     It is the ownership marker of the Xema installation these roles belong to,
     `xema-deploy:managed deployment=<installation>`. An installer that later
@@ -144,9 +174,10 @@ variable "ownership_marker" {
     it in (the deployment engine emits it) and this module never builds it.
   EOT
   type        = string
+  default     = null
 
   validation {
-    condition     = can(regex("^xema-deploy:managed deployment=[a-z0-9]([a-z0-9-]*[a-z0-9])?$", var.ownership_marker))
+    condition     = var.ownership_marker == null ? true : can(regex("^xema-deploy:managed deployment=[a-z0-9]([a-z0-9-]*[a-z0-9])?$", var.ownership_marker))
     error_message = "ownership_marker must be `xema-deploy:managed deployment=<installation>` with a lowercase deployment id (letters, digits, hyphens) — the marker the deployment engine emits. It is required: a role created without it is refused as foreign by `xema installation import`."
   }
 }
@@ -155,7 +186,8 @@ variable "sql_connection" {
   description = <<-EOT
     Where the ownership marker is written from: the same server, as the same
     role, that the root's postgresql provider connects to. A NAME and an
-    address, not a credential. REQUIRED, no default.
+    address, not a credential. REQUIRED when role_ownership = "installation";
+    unused (may be null) when "unowned".
 
     The postgresql provider has no resource that comments on a role, so the
     marker is written by `psql` (which must be on the PATH of the host running
@@ -167,9 +199,10 @@ variable "sql_connection" {
     database = optional(string, "postgres")
     sslmode  = optional(string, "require")
   })
+  default = null
 
   validation {
-    condition     = length(trimspace(var.sql_connection.host)) > 0
+    condition     = var.sql_connection == null ? true : length(trimspace(var.sql_connection.host)) > 0
     error_message = "sql_connection.host must name the server the postgresql provider connects to."
   }
 }
@@ -179,8 +212,10 @@ variable "connecting_password" {
     The password of `connecting_role` — the one the root already configures its
     postgresql provider with. A credential: it reaches `psql` only through the
     PGPASSWORD environment variable of the marker step, never its command line,
-    and it is not kept in state. REQUIRED, no default.
+    and it is not kept in state. REQUIRED when role_ownership = "installation";
+    unused (may be null) when "unowned".
   EOT
   type        = string
   sensitive   = true
+  default     = null
 }

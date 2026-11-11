@@ -60,8 +60,12 @@ resource "terraform_data" "postgres_ownership_marker" {
 
   lifecycle {
     precondition {
-      condition     = var.postgres_ownership_marker != null || !(var.enable_managed_postgres || length(local.postgres_databases) > 0)
-      error_message = "This stack creates Postgres roles (enable_managed_postgres, or a non-empty platform_databases), so it requires postgres_ownership_marker: the installation's `xema-deploy:managed deployment=<installation>`, written as every role's comment so `xema installation import` recognises the roles. Take it from the deployment engine's roster (generate-postgres-database-bootstrap.mjs --terraform-roster); never type it."
+      condition     = var.postgres_role_ownership != "installation" || var.postgres_ownership_marker != null || !(var.enable_managed_postgres || length(local.postgres_databases) > 0)
+      error_message = "This stack creates Postgres roles (enable_managed_postgres, or a non-empty platform_databases), so it requires postgres_ownership_marker: the installation's `xema-deploy:managed deployment=<installation>`, written as every role's comment so `xema installation import` recognises the roles. Take it from the deployment engine's roster (generate-postgres-database-bootstrap.mjs --terraform-roster); never type it. A tenant that belongs to no installation is declared with postgres_role_ownership = \"unowned\" (and no marker), never with a made-up marker."
+    }
+    precondition {
+      condition     = var.postgres_role_ownership != "unowned" || var.postgres_ownership_marker == null
+      error_message = "postgres_role_ownership = \"unowned\" and postgres_ownership_marker are mutually exclusive: unowned roles are never stamped, so no installation can adopt them. Unset postgres_ownership_marker, or use postgres_role_ownership = \"installation\"."
     }
   }
 }
@@ -162,6 +166,7 @@ module "postgres" {
   # Every role carries the installation's marker; the psql step that writes it
   # connects where the stack's postgresql provider does (providers.tf).
   ownership_marker = terraform_data.postgres_ownership_marker.input
+  role_ownership   = var.postgres_role_ownership
   sql_host         = local.pg_host
 }
 
@@ -197,6 +202,7 @@ module "postgres_tenancy" {
   connecting_password = local.pg_admin_password
   sql_connection      = { host = local.pg_host, port = 5432, database = "postgres", sslmode = "require" }
   ownership_marker    = terraform_data.postgres_ownership_marker.input
+  role_ownership      = var.postgres_role_ownership
 
   databases    = local.postgres_databases
   roles        = toset(local.postgres_roles)

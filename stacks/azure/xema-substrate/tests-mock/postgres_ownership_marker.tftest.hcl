@@ -149,3 +149,48 @@ run "a_stack_that_creates_no_role_needs_no_marker" {
     error_message = "with no role created, no tenancy is instantiated and no marker is required."
   }
 }
+
+run "unowned_roles_plan_with_no_marker_and_no_stamp" {
+  command = plan
+
+  variables {
+    postgres_role_ownership   = "unowned"
+    postgres_ownership_marker = null
+  }
+
+  assert {
+    condition     = length(module.postgres[0].role_ownership_markers) == 0
+    error_message = "unowned roles must carry no marker."
+  }
+}
+
+run "unowned_with_a_marker_is_refused" {
+  command = plan
+
+  variables {
+    postgres_role_ownership = "unowned"
+  }
+
+  expect_failures = [terraform_data.postgres_ownership_marker]
+}
+
+run "an_unknown_role_ownership_is_refused" {
+  command = plan
+
+  variables {
+    postgres_role_ownership = "shared"
+  }
+
+  expect_failures = [var.postgres_role_ownership]
+}
+
+run "installation_without_a_marker_is_still_refused" {
+  command = plan
+
+  variables {
+    postgres_role_ownership   = "installation"
+    postgres_ownership_marker = null
+  }
+
+  expect_failures = [terraform_data.postgres_ownership_marker]
+}
