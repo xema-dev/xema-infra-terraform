@@ -694,12 +694,18 @@ variable "postgres_ownership_marker" {
     `xema installation import` recognises them as the installation's own.
     Emitted by the deployment engine in the roster it hands this stack
     (`generate-postgres-database-bootstrap.mjs --terraform-roster`); never
-    typed, never built here. Required whenever the stack creates a role
-    (enable_managed_postgres, or a non-empty platform_databases); the module
-    names it when it is missing.
+    typed, never built here. REQUIRED, no default: every instance of this
+    stack is one installation's, and a stack that creates a role without it
+    creates a role no installer can adopt. Checked HERE, before any module
+    sees it, because Terraform 1.6 validation cannot ask whether this
+    instance creates roles.
   EOT
   type        = string
-  default     = null
+
+  validation {
+    condition     = can(regex("^xema-deploy:managed deployment=[a-z0-9]([a-z0-9-]*[a-z0-9])?$", var.postgres_ownership_marker))
+    error_message = "postgres_ownership_marker must be `xema-deploy:managed deployment=<installation>` (a lowercase deployment id): the marker every Postgres role carries so `xema installation import` recognises it. Take it from the deployment engine's roster (generate-postgres-database-bootstrap.mjs --terraform-roster), never type it."
+  }
 }
 
 variable "postgres_provisioner_role" {

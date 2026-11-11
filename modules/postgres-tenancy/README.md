@@ -57,4 +57,4 @@ Role passwords are generated. Read them with `terraform output -json role_passwo
 | `connecting_password` | yes | `connecting_role`'s password (sensitive), for the `psql` marker step only. |
 | `revoke_public_connect` | no | Revoke CONNECT from PUBLIC on every managed database. |
 
-Outputs: `databases`, `roles`, `role_passwords`, `extensions`.
+Outputs: `databases`, `roles`, `role_passwords`, `role_ownership_markers`, `extensions`.

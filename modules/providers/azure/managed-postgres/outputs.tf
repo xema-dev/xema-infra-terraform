@@ -49,6 +49,11 @@ output "role_passwords" {
   sensitive   = true
 }
 
+output "role_ownership_markers" {
+  description = "The ownership marker each role carries as its comment, as `role => marker` (modules/postgres-tenancy)."
+  value       = length(module.tenancy) > 0 ? module.tenancy[0].role_ownership_markers : {}
+}
+
 output "databases" {
   description = "The databases ensured on the server (created over SQL by modules/postgres-tenancy)."
   value       = length(module.tenancy) > 0 ? module.tenancy[0].databases : toset([])

@@ -30,4 +30,4 @@ The state account must already exist; bootstrap it with [`providers/azure/state-
 - **Consume:** with `enable_cluster = false` the cluster is read by name and one `terraform apply` is enough. Run it where `existing_postgres_host` resolves.
 - **Existing infrastructure:** follow [`docs/import-runbook.md`](../../docs/import-runbook.md).
 
-`platform_databases` and `workload_namespaces` have no default; the tfvars examples show one answer. See the [stack README](../../stacks/azure/xema-substrate/README.md) for derived names and the names you can override.
+`platform_databases` and `workload_namespaces` have no default; the tfvars examples show one answer. `postgres_ownership_marker` has no default either: it is emitted with `platform_databases` by the deployment engine's `--terraform-roster`, never typed. See the [stack README](../../stacks/azure/xema-substrate/README.md) for derived names and the names you can override.

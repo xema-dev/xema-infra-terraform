@@ -292,6 +292,11 @@ variable "platform_databases" {
   type        = set(string)
 }
 
+variable "postgres_ownership_marker" {
+  description = "The installation's ownership marker, `xema-deploy:managed deployment=<installation>`, written as every Postgres role's comment so `xema installation import` recognises the roles. Emitted by the deployment engine's roster (generate-postgres-database-bootstrap.mjs --terraform-roster), never typed. Required."
+  type        = string
+}
+
 # --- workload namespaces ---
 
 variable "workload_namespaces" {

@@ -68,4 +68,4 @@ module "postgres" {
 | `resource_group_name` | no | Existing resource group to create the server in. |
 | `tags` | no | Tags applied to every created resource. |
 
-Outputs: `cluster_id`, `host`, `port`, `uri`, `ca_certificate`, `administrator_login`, `administrator_password`, `role_passwords`, `databases`, `resource_group_name`, `private_dns_zone_id`.
+Outputs: `cluster_id`, `host`, `port`, `uri`, `ca_certificate`, `administrator_login`, `administrator_password`, `role_passwords`, `role_ownership_markers`, `databases`, `resource_group_name`, `private_dns_zone_id`.
