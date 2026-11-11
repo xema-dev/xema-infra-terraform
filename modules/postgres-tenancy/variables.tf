@@ -130,3 +130,57 @@ variable "revoke_public_connect" {
   type        = bool
   default     = true
 }
+
+variable "ownership_marker" {
+  description = <<-EOT
+    The text stamped on every role this module creates, as
+    `COMMENT ON ROLE <role> IS '<ownership_marker>'`. REQUIRED, no default.
+
+    It is the ownership marker of the Xema installation these roles belong to,
+    `xema-deploy:managed deployment=<installation>`. An installer that later
+    takes custody of the roles (`xema installation import`) reads it to decide
+    that a role is its own rather than a neighbour's: a role without it is
+    refused as foreign. The text is the kernel's grammar, so the caller passes
+    it in (the deployment engine emits it) and this module never builds it.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^xema-deploy:managed deployment=[a-z0-9]([a-z0-9-]*[a-z0-9])?$", var.ownership_marker))
+    error_message = "ownership_marker must be `xema-deploy:managed deployment=<installation>` with a lowercase deployment id (letters, digits, hyphens) — the marker the deployment engine emits. It is required: a role created without it is refused as foreign by `xema installation import`."
+  }
+}
+
+variable "sql_connection" {
+  description = <<-EOT
+    Where the ownership marker is written from: the same server, as the same
+    role, that the root's postgresql provider connects to. A NAME and an
+    address, not a credential. REQUIRED, no default.
+
+    The postgresql provider has no resource that comments on a role, so the
+    marker is written by `psql` (which must be on the PATH of the host running
+    the apply), connecting as `connecting_role` with `connecting_password`.
+  EOT
+  type = object({
+    host     = string
+    port     = optional(number, 5432)
+    database = optional(string, "postgres")
+    sslmode  = optional(string, "require")
+  })
+
+  validation {
+    condition     = length(trimspace(var.sql_connection.host)) > 0
+    error_message = "sql_connection.host must name the server the postgresql provider connects to."
+  }
+}
+
+variable "connecting_password" {
+  description = <<-EOT
+    The password of `connecting_role` — the one the root already configures its
+    postgresql provider with. A credential: it reaches `psql` only through the
+    PGPASSWORD environment variable of the marker step, never its command line,
+    and it is not kept in state. REQUIRED, no default.
+  EOT
+  type        = string
+  sensitive   = true
+}

@@ -152,6 +152,55 @@ resource "postgresql_grant_role" "connecting_role" {
   }
 }
 
+# EVERY ROLE CARRIES ITS INSTALLATION'S OWNERSHIP MARKER, AS ITS COMMENT.
+#
+# `xema installation import` takes custody of an installation's roles only when
+# each carries `xema-deploy:managed deployment=<installation>` as its comment;
+# an unmarked role is a neighbour's, and it refuses it. So a role this module
+# creates without the marker is a role no installer can ever adopt.
+#
+# WHY local-exec AND NOT THE PROVIDER: cyrilgdn/postgresql (>= 1.24, through
+# 1.27) has no comment argument on `postgresql_role` and no resource that runs
+# SQL. So the statement is run by `psql` as `connecting_role` — the identity
+# that created the role, so it holds the ADMIN OPTION that PostgreSQL 16+ asks
+# of whoever comments on a role. The password reaches psql as PGPASSWORD in the
+# provisioner's environment: never on a command line, never in state (a
+# provisioner's environment is not recorded; `input` below holds no secret).
+#
+# IDEMPOTENT: `COMMENT ON ROLE` overwrites. It re-runs when the role or the
+# marker changes, and whenever the role itself is replaced or updated.
+resource "terraform_data" "role_marker" {
+  for_each = var.roles
+
+  input = {
+    role    = postgresql_role.this[each.value].name
+    comment = var.ownership_marker
+    # The statement, for a reader of the plan. Both parts are validated to a
+    # grammar with no quote character (variables.tf), so neither can end the
+    # literal or the identifier it sits in.
+    sql = "COMMENT ON ROLE \"${postgresql_role.this[each.value].name}\" IS '${var.ownership_marker}'"
+  }
+
+  provisioner "local-exec" {
+    command = "command -v psql >/dev/null 2>&1 || { echo 'postgres-tenancy: psql is not on PATH; it writes the ownership marker of every role' >&2; exit 127; }; psql -X -q -v ON_ERROR_STOP=1 -c \"$XEMA_ROLE_MARKER_SQL\""
+    environment = {
+      PGHOST               = var.sql_connection.host
+      PGPORT               = tostring(var.sql_connection.port)
+      PGDATABASE           = var.sql_connection.database
+      PGSSLMODE            = var.sql_connection.sslmode
+      PGUSER               = var.connecting_role
+      PGPASSWORD           = var.connecting_password
+      XEMA_ROLE_MARKER_SQL = self.input.sql
+    }
+  }
+
+  lifecycle {
+    replace_triggered_by = [postgresql_role.this[each.key]]
+  }
+
+  depends_on = [postgresql_grant_role.connecting_role]
+}
+
 resource "postgresql_database" "this" {
   for_each = var.databases
 

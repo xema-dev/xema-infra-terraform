@@ -47,6 +47,25 @@ resource "terraform_data" "input_guards" {
   }
 }
 
+# The ownership marker every Postgres role this stack creates carries as its
+# comment (modules/postgres-tenancy). Required only when a role is created, a
+# fact spanning three inputs, so it is a precondition here rather than a
+# validation (cross-variable validation needs Terraform 1.9 / OpenTofu 1.8;
+# this stack supports 1.6). Both tenancy calls read the marker THROUGH this
+# resource (`.input`, known at plan): when the precondition fails, OpenTofu
+# skips them, so the refusal is this one message, naming the input, and never
+# a module's validation of a null.
+resource "terraform_data" "postgres_ownership_marker" {
+  input = var.postgres_ownership_marker
+
+  lifecycle {
+    precondition {
+      condition     = var.postgres_ownership_marker != null || !(var.enable_managed_postgres || length(local.postgres_databases) > 0)
+      error_message = "This stack creates Postgres roles (enable_managed_postgres, or a non-empty platform_databases), so it requires postgres_ownership_marker: the installation's `xema-deploy:managed deployment=<installation>`, written as every role's comment so `xema installation import` recognises the roles. Take it from the deployment engine's roster (generate-postgres-database-bootstrap.mjs --terraform-roster); never type it."
+    }
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Cloud infra (optional — usually owned by a separate "cloud substrate" tf)
 # ---------------------------------------------------------------------------
@@ -139,6 +158,11 @@ module "postgres" {
   roles           = local.postgres_roles
   role_options    = local.postgres_role_options
   tags            = local.tags
+
+  # Every role carries the installation's marker; the psql step that writes it
+  # connects where the stack's postgresql provider does (providers.tf).
+  ownership_marker = terraform_data.postgres_ownership_marker.input
+  sql_host         = local.pg_host
 }
 
 # CONSUME MODE: the server already exists — another environment's, another
@@ -168,6 +192,11 @@ module "postgres_tenancy" {
   # it every managed role, without which the ownership and grants below cannot
   # be applied by a non-superuser admin (modules/postgres-tenancy/README.md).
   connecting_role = local.pg_admin_login
+
+  # The marker step (psql) connects exactly as the provider does (providers.tf).
+  connecting_password = local.pg_admin_password
+  sql_connection      = { host = local.pg_host, port = 5432, database = "postgres", sslmode = "require" }
+  ownership_marker    = terraform_data.postgres_ownership_marker.input
 
   databases    = local.postgres_databases
   roles        = toset(local.postgres_roles)

@@ -169,6 +169,18 @@ variable "role_options" {
   default = {}
 }
 
+variable "ownership_marker" {
+  description = "The ownership marker every role in var.roles carries as its comment (`xema-deploy:managed deployment=<installation>`), passed to modules/postgres-tenancy, which requires it whenever roles or databases are set. Emitted by the deployment engine; never built here."
+  type        = string
+  default     = null
+}
+
+variable "sql_host" {
+  description = "The host the postgresql provider of the root connects to, which modules/postgres-tenancy's psql step (the ownership marker) connects to as administrator_login. Empty means the server's FQDN."
+  type        = string
+  default     = ""
+}
+
 variable "extensions" {
   description = "PostgreSQL extensions to allow-list on the server (the azure.extensions server parameter, which CREATE EXTENSION is refused without). Lowercase identifiers; the parameter is written as the sorted, distinct, comma-joined list. Empty (default) writes no parameter and leaves Azure's own default untouched."
   type        = list(string)

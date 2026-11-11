@@ -155,12 +155,15 @@ module "tenancy" {
   source = "../../../postgres-tenancy"
   count  = length(var.roles) > 0 || length(var.databases) > 0 ? 1 : 0
 
-  connecting_role = var.administrator_login
-  databases       = var.databases
-  database_owners = var.database_owners
-  roles           = var.roles
-  role_options    = var.role_options
-  connect_grants  = { for role in var.roles : role => var.databases }
+  connecting_role     = var.administrator_login
+  connecting_password = local.administrator_password
+  sql_connection      = { host = var.sql_host != "" ? var.sql_host : azurerm_postgresql_flexible_server.this.fqdn }
+  ownership_marker    = var.ownership_marker
+  databases           = var.databases
+  database_owners     = var.database_owners
+  roles               = var.roles
+  role_options        = var.role_options
+  connect_grants      = { for role in var.roles : role => var.databases }
 
   depends_on = [
     azurerm_postgresql_flexible_server.this,

@@ -28,3 +28,8 @@ output "extensions" {
     if length(try(var.extensions[database], [])) > 0
   }
 }
+
+output "role_ownership_markers" {
+  description = "The ownership marker each managed role carries as its comment, as `role => marker` (`xema installation import` reads it)."
+  value       = { for role, marker in terraform_data.role_marker : role => marker.input.comment }
+}

@@ -75,6 +75,9 @@ module "substrate" {
   # The database roster is YOURS: derive it from what you deploy. The stack has
   # no default and refuses to plan without it.
   platform_databases = var.platform_databases
+  # The installation's ownership marker, every Postgres role's comment. From
+  # the deployment engine's roster, like platform_databases; never typed.
+  postgres_ownership_marker = var.postgres_ownership_marker
 
   # --- workload namespaces ---
   # The namespace roster is YOURS too — full names, nothing derived.

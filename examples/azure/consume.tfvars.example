@@ -81,6 +81,12 @@ platform_databases = [ # unprefixed; the stack prefixes "acme_dev_"
   "temporal",
   "temporal_visibility",
 ]
+
+# The installation's ownership marker, written as every Postgres role's comment
+# so `xema installation import` recognises the roles as the installation's own.
+# Emitted with platform_databases by the deployment engine's --terraform-roster
+# (into acme-dev.auto.tfvars.json); never typed. The value is the shape.
+postgres_ownership_marker = "xema-deploy:managed deployment=acme-dev"
 workload_namespaces = [ # full names; nothing derived
   "acme-dev",
   "acme-dev-shared",
