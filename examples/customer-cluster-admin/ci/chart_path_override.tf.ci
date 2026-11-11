@@ -1,0 +1,9 @@
+# CI ONLY. main.tf points chart_path at bootstrap/cluster-admin/, the chart the
+# customer's root generates and commits; this repository does not carry it, so
+# validate would refuse the module's chart_path rule. CI copies this file to
+# examples/customer-cluster-admin/chart_path_override.tf (git-ignored via
+# *_override.tf) before validate, pointing it at the module's fixture chart.
+# A customer root never carries this file.
+module "cluster_admin" {
+  chart_path = "${path.root}/../../modules/cluster-addons/cluster-admin-bootstrap/tests-mock/fixtures/chart"
+}

@@ -60,7 +60,9 @@ jobs:
         if: matrix.engine == 'terraform'
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.6.2"
+          # The highest required_version floor any leaf declares (cluster-admin-bootstrap:
+          # >= 1.11, write-only arguments and ephemeral variables), so every portable leaf validates.
+          terraform_version: "1.11.4"
           terraform_wrapper: false
 
       - name: fmt (check, recursive)
@@ -96,6 +98,10 @@ jobs:
           # fetch offline; the CI-only override resolves it from this checkout
           # (examples/customer/README.md § Validating this example offline).
           cp examples/customer/ci/source_override.tf.ci examples/customer/source_override.tf
+          # examples/customer-cluster-admin applies a chart the customer's root generates
+          # (bootstrap/cluster-admin/), which this repository does not carry; the CI-only
+          # override points it at the module's fixture chart.
+          cp examples/customer-cluster-admin/ci/chart_path_override.tf.ci examples/customer-cluster-admin/chart_path_override.tf
           # The terraform leg skips leaves declared opentofu-native; the tofu
           # leg validates everything.
           native="$(node tooling/check-engine-profile.mjs --list native)"
@@ -110,8 +116,12 @@ jobs:
                   continue
                 fi
                 echo "::group::validate $dir"
-                ${{ matrix.bin }} -chdir="$dir" init -backend=false -input=false -no-color >/dev/null
-                ${{ matrix.bin }} -chdir="$dir" validate -no-color
+                if ! ${{ matrix.bin }} -chdir="$dir" init -backend=false -input=false -no-color >/dev/null \
+                  || ! ${{ matrix.bin }} -chdir="$dir" validate -no-color; then
+                  echo "::endgroup::"
+                  echo "::error title=${{ matrix.engine }} validate::$dir failed; its output is in the group above"
+                  exit 1
+                fi
                 echo "::endgroup::"
               done
 
