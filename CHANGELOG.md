@@ -10,7 +10,7 @@ was committed, but what a `main.tf` + tfvars have to say differently.
 and writes `COMMENT ON ROLE <role> IS '<ownership_marker>'` on every role it manages, with `psql` (the provider cannot set a
 comment), so `psql` must be on the PATH of the host running the apply. `providers/azure/managed-postgres` gains
 `ownership_marker` (required with `roles` or `databases`) and `sql_host`; `stacks/azure/xema-substrate` gains
-`postgres_ownership_marker` (required, no default; validated in the stack), which the deployment engine's roster now emits.
+`postgres_ownership_marker` (default null; the plan fails by name when the stack creates a role without it), which the deployment engine's roster now emits.
 **Why:** `xema installation import` refuses a role without the marker as foreign, so roles this stack created could never be
 taken into custody. **Adopt:** pass the marker the deployment engine emits; the first apply plans one `terraform_data.role_marker`
 per role and changes nothing else.

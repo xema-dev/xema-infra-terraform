@@ -66,12 +66,11 @@ variables {
   enable_gateway_tls         = false
   enable_identity_realm      = false
 
-  enable_managed_postgres   = false
-  postgres_ownership_marker = "xema-deploy:managed deployment=acme-dev"
-  postgres_network_access   = "private_endpoint"
-  enable_object_storage     = false
-  enable_secrets_backend    = false
-  enable_cache              = false
+  enable_managed_postgres = false
+  postgres_network_access = "private_endpoint"
+  enable_object_storage   = false
+  enable_secrets_backend  = false
+  enable_cache            = false
 
   network = {
     resource_group_name        = "net-rg"

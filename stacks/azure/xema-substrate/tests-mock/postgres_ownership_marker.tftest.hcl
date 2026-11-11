@@ -1,10 +1,10 @@
 # Needs mock_provider (OpenTofu 1.8+, Terraform 1.7+): run as
 #   tofu test -test-directory=tests-mock
 #
-# The stack refuses to plan without the installation's
+# A stack that creates Postgres roles refuses to plan without the installation's
 # ownership marker (`xema installation import` refuses an unmarked role as
-# foreign), and with it every role it creates carries the marker as its comment
-# — on a created server and on a consumed one alike.
+# foreign); one that creates no role needs none. With it, every role carries
+# the marker as its comment, on a created server and on a consumed one alike.
 
 mock_provider "azurerm" {
   mock_data "azurerm_client_config" {
@@ -125,12 +125,27 @@ run "consumed_postgres_marks_every_role" {
   }
 }
 
-run "a_stack_without_the_marker_is_refused" {
+run "a_stack_that_creates_roles_refuses_no_marker" {
   command = plan
 
   variables {
     postgres_ownership_marker = null
   }
 
-  expect_failures = [var.postgres_ownership_marker]
+  expect_failures = [terraform_data.postgres_ownership_marker]
+}
+
+run "a_stack_that_creates_no_role_needs_no_marker" {
+  command = plan
+
+  variables {
+    enable_managed_postgres   = false
+    platform_databases        = []
+    postgres_ownership_marker = null
+  }
+
+  assert {
+    condition     = length(module.postgres) == 0 && length(module.postgres_tenancy) == 0
+    error_message = "with no role created, no tenancy is instantiated and no marker is required."
+  }
 }
