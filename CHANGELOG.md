@@ -4,6 +4,17 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## Unreleased — every Postgres role carries its installation's ownership marker (XEMA-7136)
+
+**Consumer change.** `modules/postgres-tenancy` requires `ownership_marker`, `sql_connection` and `connecting_password`,
+and writes `COMMENT ON ROLE <role> IS '<ownership_marker>'` on every role it manages, with `psql` (the provider cannot set a
+comment), so `psql` must be on the PATH of the host running the apply. `providers/azure/managed-postgres` gains
+`ownership_marker` (required with `roles` or `databases`) and `sql_host`; `stacks/azure/xema-substrate` gains
+`postgres_ownership_marker` (required whenever it creates a role), which the deployment engine's roster now emits.
+**Why:** `xema installation import` refuses a role without the marker as foreign, so roles this stack created could never be
+taken into custody. **Adopt:** pass the marker the deployment engine emits; the first apply plans one `terraform_data.role_marker`
+per role and changes nothing else.
+
 ## Unreleased — settable PostgreSQL server parameters (Azure, XEMA-5655)
 
 No consumer change: the new input defaults to the previous behaviour. `providers/azure/managed-postgres`

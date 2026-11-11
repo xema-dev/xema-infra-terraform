@@ -686,6 +686,22 @@ variable "platform_databases" {
   }
 }
 
+variable "postgres_ownership_marker" {
+  description = <<-EOT
+    The ownership marker of the Xema installation this stack's Postgres roles
+    belong to, `xema-deploy:managed deployment=<installation>`, written as the
+    comment of every role the stack creates (modules/postgres-tenancy) so that
+    `xema installation import` recognises them as the installation's own.
+    Emitted by the deployment engine in the roster it hands this stack
+    (`generate-postgres-database-bootstrap.mjs --terraform-roster`); never
+    typed, never built here. Required whenever the stack creates a role
+    (enable_managed_postgres, or a non-empty platform_databases); the module
+    names it when it is missing.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "postgres_provisioner_role" {
   description = "Whether to create the second Postgres role, `<deployment>_provisioner`, with CREATEDB (for a consumer that provisions databases at runtime). \"enabled\" (default, the historical behaviour) creates it; \"disabled\" creates only the app role, and the `postgres_provisioner_role` entry of the `substrate` output is null and the role is absent from `postgres_roles` and `postgres_role_passwords`."
   type        = string

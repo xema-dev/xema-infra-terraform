@@ -68,11 +68,12 @@ variables {
   enable_gateway_tls         = false
   enable_identity_realm      = false
 
-  enable_managed_postgres = true
-  postgres_network_access = "private_endpoint"
-  enable_object_storage   = true
-  enable_secrets_backend  = true
-  enable_cache            = true
+  enable_managed_postgres   = true
+  postgres_ownership_marker = "xema-deploy:managed deployment=acme-dev"
+  postgres_network_access   = "private_endpoint"
+  enable_object_storage     = true
+  enable_secrets_backend    = true
+  enable_cache              = true
   secret_store_boundaries = {
     app = { namespaces = ["app"], vault_name = "acme-dev-app" }
   }

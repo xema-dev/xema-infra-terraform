@@ -20,8 +20,11 @@ provider "postgresql" {
 module "tenancy" {
   source = "github.com/xema-dev/xema-infra-terraform//modules/postgres-tenancy?ref=v1.0.0"
 
-  connecting_role = var.pg_admin_user
-  databases       = ["acme_app"]
+  connecting_role     = var.pg_admin_user
+  connecting_password = var.pg_admin_password
+  sql_connection      = { host = "db.internal.example" }
+  ownership_marker    = var.ownership_marker # "xema-deploy:managed deployment=acme-prod", from the deployment engine
+  databases           = ["acme_app"]
   roles           = ["acme_app"]
   database_owners = { acme_app = "acme_app" }
   connect_grants  = { acme_app = ["acme_app"] }
@@ -35,6 +38,7 @@ Role passwords are generated. Read them with `terraform output -json role_passwo
 - A role in `database_owners` gets `CREATE, USAGE` on that database's `public` schema, whoever owns the schema (`azure_pg_admin` on Azure Flexible Server). `connecting_role` must be a member of the schema's owner, or the apply fails with 42501.
 - On PostgreSQL 16 and later the module grants every managed role to `connecting_role`. A role that already exists and was created by a different role needs `GRANT <role> TO <connecting_role> WITH ADMIN OPTION;` from its creator before import. The provider floor is `>= 1.24`.
 - An extension the server refuses (not installed, or not allow-listed such as `azure.extensions`) fails the apply, naming it. Removing a name from `extensions` does not drop it.
+- Every role gets `COMMENT ON ROLE <role> IS '<ownership_marker>'`, so `xema installation import` recognises it as the installation's own; an unmarked role is refused as foreign. The provider cannot set a comment, so `psql` writes it: `psql` must be on the PATH of the host running the apply, and it connects to `sql_connection` as `connecting_role`, with `connecting_password` passed as `PGPASSWORD` (never on a command line, never in state). The step re-runs when the role or the marker changes; a comment changed by hand afterwards is not detected.
 - Every object is importable. An import does not read back a role password, so the first apply after one rotates it.
 
 ## Configuration
@@ -48,6 +52,9 @@ Role passwords are generated. Read them with `terraform output -json role_passwo
 | `connect_grants` | no | Which roles may reach which databases, as `role => set(database)`. |
 | `database_owners` | no | The role that OWNS each database, as `database => role`. |
 | `extensions` | no | The PostgreSQL extensions each database must carry, as `database => set(extension)`. |
+| `ownership_marker` | yes | `xema-deploy:managed deployment=<installation>`, written as every role's comment. Supplied by the deployment engine, never built here. |
+| `sql_connection` | yes | `{ host, port = 5432, database = "postgres", sslmode = "require" }`: where `psql` writes the marker — the server the provider connects to. |
+| `connecting_password` | yes | `connecting_role`'s password (sensitive), for the `psql` marker step only. |
 | `revoke_public_connect` | no | Revoke CONNECT from PUBLIC on every managed database. |
 
 Outputs: `databases`, `roles`, `role_passwords`, `extensions`.

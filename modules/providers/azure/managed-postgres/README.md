@@ -60,6 +60,8 @@ module "postgres" {
 | `databases` | no | Logical databases to ensure exist on the server. |
 | `database_owners` | no | The role that OWNS each database, as `database => role` (both must be in `databases` / `roles`). |
 | `roles` | no | Logical login roles to ensure exist on the server, created through the cyrilgdn/postgresql provider (module... |
+| `ownership_marker` | with `roles` or `databases` | `xema-deploy:managed deployment=<installation>`, every role's comment ([`postgres-tenancy`](../../../postgres-tenancy)). `psql` must be on the PATH of the host running the apply. |
+| `sql_host` | no | The host the root's postgresql provider connects to, for the `psql` marker step. Empty means the server's FQDN. |
 | `role_options` | no | Optional per-role settings keyed by role name: create_database (CREATEDB), connection_limit (-1 = unlimited). |
 | `parameters` | no | PostgreSQL server parameters, name to value. Empty (default) sets none. A static parameter such as `max_connections` restarts the server when it changes. `azure.extensions` is refused: `extensions` owns it. |
 | `extensions` | no | PostgreSQL extensions to allow-list on the server (the azure.extensions server parameter, which CREATE EXTE... |
