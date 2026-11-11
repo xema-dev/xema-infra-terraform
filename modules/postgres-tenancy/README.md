@@ -39,6 +39,7 @@ Role passwords are generated. Read them with `terraform output -json role_passwo
 - On PostgreSQL 16 and later the module grants every managed role to `connecting_role`. A role that already exists and was created by a different role needs `GRANT <role> TO <connecting_role> WITH ADMIN OPTION;` from its creator before import. The provider floor is `>= 1.24`.
 - An extension the server refuses (not installed, or not allow-listed such as `azure.extensions`) fails the apply, naming it. Removing a name from `extensions` does not drop it.
 - Every role gets `COMMENT ON ROLE <role> IS '<ownership_marker>'`, so `xema installation import` recognises it as the installation's own; an unmarked role is refused as foreign. The provider cannot set a comment, so `psql` writes it: `psql` must be on the PATH of the host running the apply, and it connects to `sql_connection` as `connecting_role`, with `connecting_password` passed as `PGPASSWORD` (never on a command line, never in state). The step re-runs when the role or the marker changes; a comment changed by hand afterwards is not detected.
+- `role_ownership = "unowned"` (closed set: `"installation"` default, `"unowned"`) is the explicit opt-out for a tenant that belongs to no Xema installation: `ownership_marker` must be null (refused if set), no role is stamped, no `psql` is needed, and `sql_connection` / `connecting_password` may be null. Unowned roles are never adopted by any installation: `xema installation import` always refuses them as foreign. Under `"installation"` the marker, `sql_connection` and `connecting_password` are required (a precondition names them).
 - Every object is importable. An import does not read back a role password, so the first apply after one rotates it.
 
 ## Configuration
@@ -52,9 +53,10 @@ Role passwords are generated. Read them with `terraform output -json role_passwo
 | `connect_grants` | no | Which roles may reach which databases, as `role => set(database)`. |
 | `database_owners` | no | The role that OWNS each database, as `database => role`. |
 | `extensions` | no | The PostgreSQL extensions each database must carry, as `database => set(extension)`. |
-| `ownership_marker` | yes | `xema-deploy:managed deployment=<installation>`, written as every role's comment. Supplied by the deployment engine, never built here. |
-| `sql_connection` | yes | `{ host, port = 5432, database = "postgres", sslmode = "require" }`: where `psql` writes the marker — the server the provider connects to. |
-| `connecting_password` | yes | `connecting_role`'s password (sensitive), for the `psql` marker step only. |
+| `role_ownership` | no | `"installation"` (default) or `"unowned"`; see above. |
+| `ownership_marker` | with `"installation"` | `xema-deploy:managed deployment=<installation>`, written as every role's comment. Supplied by the deployment engine, never built here. |
+| `sql_connection` | with `"installation"` | `{ host, port = 5432, database = "postgres", sslmode = "require" }`: where `psql` writes the marker — the server the provider connects to. |
+| `connecting_password` | with `"installation"` | `connecting_role`'s password (sensitive), for the `psql` marker step only. |
 | `revoke_public_connect` | no | Revoke CONNECT from PUBLIC on every managed database. |
 
 Outputs: `databases`, `roles`, `role_passwords`, `role_ownership_markers`, `extensions`.

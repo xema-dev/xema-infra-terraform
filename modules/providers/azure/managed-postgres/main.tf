@@ -159,6 +159,7 @@ module "tenancy" {
   connecting_password = local.administrator_password
   sql_connection      = { host = var.sql_host != "" ? var.sql_host : azurerm_postgresql_flexible_server.this.fqdn }
   ownership_marker    = var.ownership_marker
+  role_ownership      = var.role_ownership
   databases           = var.databases
   database_owners     = var.database_owners
   roles               = var.roles

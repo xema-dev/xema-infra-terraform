@@ -708,6 +708,17 @@ variable "postgres_ownership_marker" {
   }
 }
 
+variable "postgres_role_ownership" {
+  description = "Whose Postgres roles this stack creates. \"installation\" (default, the v0.25.0 behaviour): they belong to one Xema installation and postgres_ownership_marker is required when a role is created. \"unowned\": they belong to no installation (a shared server's non-Xema tenant, e.g. a shared Temporal server's role); postgres_ownership_marker must be null, no role is stamped, no psql runs, and `role_ownership_markers` is empty. Unowned roles are never adopted by any installation: `xema installation import` always refuses them as foreign."
+  type        = string
+  default     = "installation"
+
+  validation {
+    condition     = contains(["installation", "unowned"], var.postgres_role_ownership)
+    error_message = "postgres_role_ownership must be \"installation\" or \"unowned\"."
+  }
+}
+
 variable "postgres_provisioner_role" {
   description = "Whether to create the second Postgres role, `<deployment>_provisioner`, with CREATEDB (for a consumer that provisions databases at runtime). \"enabled\" (default, the historical behaviour) creates it; \"disabled\" creates only the app role, and the `postgres_provisioner_role` entry of the `substrate` output is null and the role is absent from `postgres_roles` and `postgres_role_passwords`."
   type        = string
