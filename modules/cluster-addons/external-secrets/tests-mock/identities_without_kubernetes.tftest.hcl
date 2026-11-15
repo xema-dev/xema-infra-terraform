@@ -10,6 +10,8 @@ mock_provider "azurerm" {
   mock_resource "azurerm_user_assigned_identity" {
     defaults = {
       id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id"
+      # azurerm_role_assignment validates principal_id as a UUID; the mock's random string is refused.
+      principal_id = "00000000-0000-0000-0000-000000000001"
     }
   }
 }
