@@ -16,6 +16,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # XEMA-8139: main keeps one group per commit, never cancelled (each promoted
+  # commit gets its verdict). develop groups by workflow and ref, never
+  # cancelled: a running run finishes and a newer push replaces the one pending
+  # run. Any other ref cancels superseded runs.
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ (github.ref == 'refs/heads/main' && github.sha) || 'shared' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
+
 jobs:
   # PORTABILITY, PROVEN ON BOTH ENGINES. `terraform-portable` is every
   # module's zero-configuration default, recorded nowhere; the exception is a
