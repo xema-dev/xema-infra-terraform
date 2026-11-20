@@ -95,3 +95,53 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cors_rules" {
+  description = <<-EOT
+    Browser CORS rules, so presigned PUT/GET work straight from a web origin.
+    Default [] sets none (today's behaviour). Each rule: allowed_origins ("*" or
+    scheme://host[:port], no path), allowed_methods (upper-case, one of DELETE GET HEAD MERGE POST OPTIONS PUT PATCH),
+    allowed_headers, exposed_headers and max_age (preflight cache, whole seconds).
+    Azure: at most 5 rules, and allowed_headers and exposed_headers must each be
+    non-empty (the azurerm provider requires at least one item; no placeholder is
+    invented).
+  EOT
+  type = list(object({
+    allowed_origins = list(string)
+    allowed_methods = list(string)
+    allowed_headers = optional(list(string), [])
+    exposed_headers = optional(list(string), [])
+    max_age         = optional(number, 0)
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for r in var.cors_rules : length(r.allowed_origins) > 0 && length(r.allowed_methods) > 0])
+    error_message = "Each cors_rules entry needs at least one allowed_origins and one allowed_methods."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.cors_rules : alltrue([for o in r.allowed_origins : o == "*" || can(regex("^https?://[^/]+$", o))])])
+    error_message = "Each cors_rules allowed_origins entry must be \"*\" or a scheme://host[:port] origin without a path (e.g. \"https://app.example.com\")."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.cors_rules : alltrue([for m in r.allowed_methods : contains(["DELETE", "GET", "HEAD", "MERGE", "POST", "OPTIONS", "PUT", "PATCH"], m)])])
+    error_message = "Each cors_rules allowed_methods entry must be upper-case and one of DELETE GET HEAD MERGE POST OPTIONS PUT PATCH."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.cors_rules : r.max_age >= 0 && r.max_age == floor(r.max_age)])
+    error_message = "cors_rules max_age must be a whole number of seconds >= 0."
+  }
+
+  validation {
+    condition     = length(var.cors_rules) <= 5
+    error_message = "Azure allows at most 5 CORS rules per storage service; cors_rules has more."
+  }
+
+  validation {
+    condition     = alltrue([for r in var.cors_rules : length(r.allowed_headers) > 0 && length(r.exposed_headers) > 0])
+    error_message = "On Azure each cors_rules entry needs a non-empty allowed_headers and exposed_headers: the azurerm provider requires at least one item in each (e.g. [\"*\"])."
+  }
+}

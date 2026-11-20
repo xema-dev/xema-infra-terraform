@@ -48,6 +48,18 @@ resource "azurerm_storage_account" "this" {
 
   blob_properties {
     versioning_enabled = var.versioning
+
+    # Opt-in only: no rules by default. Managed here, so an apply keeps them.
+    dynamic "cors_rule" {
+      for_each = var.cors_rules
+      content {
+        allowed_origins    = cors_rule.value.allowed_origins
+        allowed_methods    = cors_rule.value.allowed_methods
+        allowed_headers    = cors_rule.value.allowed_headers
+        exposed_headers    = cors_rule.value.exposed_headers
+        max_age_in_seconds = cors_rule.value.max_age
+      }
+    }
   }
 }
 

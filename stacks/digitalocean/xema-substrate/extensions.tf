@@ -17,6 +17,7 @@ module "extension_bucket" {
   region     = var.region
   acl        = each.value.acl
   versioning = each.value.versioning
+  cors_rules = each.value.cors_rules
 }
 
 # One dedicated logical database per managed_databases claim, on the resolved

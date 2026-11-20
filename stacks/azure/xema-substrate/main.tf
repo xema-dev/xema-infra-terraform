@@ -266,6 +266,7 @@ module "blob" {
   region      = var.region
   acl         = "private"
   versioning  = var.blob_versioning
+  cors_rules  = var.blob_cors_rules
   replication = var.azure_sizing.blob_replication
   containers  = local.blob_containers
 

@@ -4,6 +4,20 @@ Consumers pin this module set by `?ref=vX.Y.Z`. Every entry below names what a
 consumer root on the PREVIOUS tag must change to adopt the release — not what
 was committed, but what a `main.tf` + tfvars have to say differently.
 
+## v0.27.0 — CORS rules on object-bucket (HAM-286)
+
+No consumer change: unset is the previous behaviour (minor, additive). `providers/azure/object-bucket` and
+`providers/digitalocean/object-bucket` gain `cors_rules` (default `[]`: no rules), so a browser can upload and download through
+presigned PUT/GET straight to object storage. Each rule is `{ allowed_origins, allowed_methods, allowed_headers?, exposed_headers?, max_age? }`;
+plan fails for an origin that is not `"*"` or a `scheme://host[:port]` without a path, a lower-case or unsupported method, or a negative or
+fractional `max_age`. The rules live in the module's configuration, so an apply keeps them. `stacks/azure/xema-substrate` gains
+`blob_cors_rules` (platform account); both substrate stacks' extension `object_buckets` claims gain an optional `cors_rules`.
+**Azure:** rendered as `cors_rule` blocks in `blob_properties` of the storage account; at most 5 rules; methods DELETE GET HEAD MERGE POST OPTIONS
+PUT PATCH. The azurerm provider requires at least one item in each rule's `allowed_headers` and `exposed_headers`, so the module requires them
+non-empty (e.g. `["*"]`, `["ETag"]`) rather than inventing a placeholder. **DigitalOcean:** the separate
+`digitalocean_spaces_bucket_cors_configuration` resource (absent when no rules); methods GET PUT DELETE POST HEAD; `max_age = 0` leaves the
+preflight cache unset. The resource exists since provider 2.30, so the `>= 2.34` floor is unchanged.
+
 ## Unreleased — explicit `unowned` Postgres roles (XDO-7136)
 
 No consumer change: the new input defaults to the previous behaviour (minor, additive). `modules/postgres-tenancy` and
