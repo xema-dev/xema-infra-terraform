@@ -464,6 +464,13 @@ variable "extensions" {
       name       = string
       acl        = optional(string, "private")
       versioning = optional(bool, false)
+      cors_rules = optional(list(object({
+        allowed_origins = list(string)
+        allowed_methods = list(string)
+        allowed_headers = optional(list(string), [])
+        exposed_headers = optional(list(string), [])
+        max_age         = optional(number, 0)
+      })), [])
     })), {})
     managed_databases = optional(map(object({
       database = string

@@ -418,6 +418,7 @@ A single object-storage bucket (for application/extension use, not Terraform sta
 | `region` | `string` | Bucket region. |
 | `acl` | `optional(string, "private")` | One of `private` \| `public-read` (validated). |
 | `versioning` | `optional(bool, false)` | Enable object versioning. |
+| `cors_rules` | `optional(list(object({ allowed_origins, allowed_methods, allowed_headers?, exposed_headers?, max_age? })), [])` | Browser CORS rules for presigned PUT/GET; `[]` sets none. Origins `"*"` or `scheme://host[:port]`; upper-case methods within the provider's set (validated). Azure: at most 5 rules, and non-empty `allowed_headers`/`exposed_headers` per rule. |
 
 **Required outputs**
 

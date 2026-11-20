@@ -33,6 +33,7 @@ module "bucket" {
 | `containers` | no | Blob containers to pre-create. |
 | `replication` | no | Storage redundancy: one of "LRS", "ZRS", "GRS", "GZRS". |
 | `network_rules` | no | Opt-in VNet service-endpoint access, `{ virtual_network_subnet_ids }`; null (default) sets no rules. When set: `default_action = Deny`, `bypass = ["None"]`, only those subnets. Needs `public_network_access_enabled = true` and the `Microsoft.Storage` service endpoint on each subnet (not managed here). |
+| `cors_rules` | no | Browser CORS rules for presigned PUT/GET, a list of `{ allowed_origins, allowed_methods, allowed_headers, exposed_headers, max_age }` rendered as `cors_rule` blocks in `blob_properties`; `[]` (default) sets none. Origins are `"*"` or `scheme://host[:port]` (no path); methods are upper-case, one of DELETE GET HEAD MERGE POST OPTIONS PUT PATCH; at most 5 rules. **`allowed_headers` and `exposed_headers` must be non-empty** (the azurerm provider requires at least one item in each; use e.g. `["*"]`), and the module refuses empty lists at plan. |
 | `public_network_access_enabled` | no | Whether the account's endpoints accept traffic from the public internet (authenticated; anonymous access is... |
 | `shared_access_key_enabled` | no | Allow account-key (shared key) authentication — what the platform's blob-storage adapter uses today. |
 | `resource_group_name` | no | Existing resource group to create the account in. |

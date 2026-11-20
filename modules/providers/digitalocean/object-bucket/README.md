@@ -24,5 +24,6 @@ module "bucket" {
 | `region` | yes | DO Spaces region slug. |
 | `acl` | no | Canned ACL: one of "private" or "public-read". |
 | `versioning` | no | Enable object versioning on the bucket. |
+| `cors_rules` | no | Browser CORS rules for presigned PUT/GET, a list of `{ allowed_origins, allowed_methods, allowed_headers, exposed_headers, max_age }`; `[]` (default) creates no `digitalocean_spaces_bucket_cors_configuration`. Origins are `"*"` or `scheme://host[:port]` (no path); methods are upper-case, one of GET PUT DELETE POST HEAD. `max_age` 0 leaves the preflight cache unset. |
 
 Outputs: `bucket`, `endpoint`.

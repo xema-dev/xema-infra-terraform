@@ -408,7 +408,7 @@ variable "extensions" {
     need a cloud resource of their own — keyed by a stable extension id the
     consumer chooses. Each value carries any subset of a CLOSED set of three
     claim kinds:
-      - object_buckets   : map(stable id => { name, acl?, versioning? })
+      - object_buckets   : map(stable id => { name, acl?, versioning?, cors_rules? })
       - managed_databases: map(stable id => { database, owner? })  (on the resolved cluster)
       - dns_records      : map(stable id => { name, type?, value, ttl? })  (requires enable_dns)
     Declare an extension here only when it needs a DEDICATED out-of-cluster
@@ -421,6 +421,13 @@ variable "extensions" {
       name       = string
       acl        = optional(string, "private")
       versioning = optional(bool, false)
+      cors_rules = optional(list(object({
+        allowed_origins = list(string)
+        allowed_methods = list(string)
+        allowed_headers = optional(list(string), [])
+        exposed_headers = optional(list(string), [])
+        max_age         = optional(number, 0)
+      })), [])
     })), {})
     managed_databases = optional(map(object({
       database = string
