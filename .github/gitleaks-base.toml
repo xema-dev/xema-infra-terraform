@@ -1,0 +1,79 @@
+# GENERATED from .gitleaks.toml
+# source-sha256: 9af25e08f2bb64252a1e0c16993077426bce76e5cc068ac6f8bfb9c8b25550a0
+# Secret scan: `gitleaks git --pre-commit --staged` locally (lefthook) and
+# `gitleaks git` in .github/workflows/check-no-tokens.yaml. Replaces the
+# hand-written token scanner; the rules below are
+# its Xema-specific patterns and allowlist, on top of gitleaks' maintained
+# default rules (GitHub, npm, AWS, Slack, PEM private keys, ...).
+#
+# Add a path or regex to the allowlist only after a human review; never to
+# silence the scanner. The real secrets live in the secrets repo
+# (~/develop/neuralchowder/devops-do-k8s/secrets/<namespace>/), never here.
+title = "xema-monorepo"
+
+[extend]
+useDefault = true
+
+# Docker config.json `auths` entry holding a literal base64 credential.
+[[rules]]
+id = "xema-docker-auths-literal"
+description = "Docker config.json `auth` with a literal base64 credential"
+regex = '''"auth"\s*:\s*"[A-Za-z0-9+/=]{20,}"'''
+keywords = ["auth"]
+
+# `.env`-style assignment with a long high-entropy right-hand side.
+# `.env.example` and friends are the canonical placeholder files and are
+# excluded by path; dev/local/test-prefixed values are placeholders.
+[[rules]]
+id = "xema-env-high-entropy-value"
+description = ".env-style high-entropy value (likely secret)"
+path = '''(^|/)\.env(\.[A-Za-z0-9_-]+)?$'''
+regex = '''(?m)^[A-Z][A-Z0-9_]*=['"]?([A-Za-z0-9+/=_-]{32,})['"]?\s*$'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["="]
+  [[rules.allowlists]]
+  description = "placeholder sentinels and dev/local/test values"
+  regexTarget = "match"
+  regexes = [
+    '''=['"]?(dev|local|test|fake|stub|sample|fixture|nonce)[-_]''',
+    '''=['"]?(REPLACE_ME|CHANGE_ME|TODO)''',
+  ]
+  [[rules.allowlists]]
+  description = ".env.example / .env.sample / .env.template are placeholder files"
+  paths = ['''\.env\.(example|sample|template)$''']
+
+[allowlist]
+description = "generated, vendored and fixture content"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)\.next/''',
+  '''(^|/)\.turbo/''',
+  '''(^|/)coverage/''',
+  '''(^|/)submodules/''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)yarn\.lock$''',
+  '''(^|/)\.pnp\.cjs$''',
+  # Example token-shaped strings in prose.
+  '''^test-suite/dev-stack/integration/tenant-isolation/README\.md$''',
+  # Reviewed 2026-10-17: committed LOCAL-ONLY dev-stack encryption keys (the
+  # same value repeated across services), never a deployed value.
+  '''^test-suite/dev-stack/docker-compose[A-Za-z.-]*\.yaml$''',
+  # Reviewed 2026-10-17: redaction-test fixtures asserting a bearer is redacted.
+  '''^tooling/agent-skills/second-opinion/secrets\.test\.mjs$''',
+  '''^tooling/agent-skills/take-role/live-prompt\.test\.mjs$''',
+  # Reviewed 2026-10-17: prose that quotes an image reference / a sentence.
+  '''^\.claude/plans/CLOSURE-LEDGER\.md$''',
+  '''^\.claude/plans/xema-convergence-program/00a-decisions\.md$''',
+]
+# Placeholder-style values that mark a token as fake (the old scanner's
+# PLACEHOLDER_HINTS), and lines that say so in prose.
+regexes = [
+  '''xxxxxxxx''',
+  '''AAAABBBBCCCC''',
+  '''AKIAABCDEFGHI''',
+  '''ghp_abcdef0123456789''',
+]

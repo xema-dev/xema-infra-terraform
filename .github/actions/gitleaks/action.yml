@@ -1,0 +1,54 @@
+# GENERATED from tooling/ci/ci-steps/gitleaks.action.yml
+# source-sha256: 206d55d2febea41d53887b6eacb4a54b7490e5523589ab287e3f3d8b64d25a7a
+name: gitleaks
+description: >-
+  Scan the tracked tree at HEAD for tokens and private keys with a pinned, checksum-verified gitleaks (no gitleaks-action: it needs a
+  licence). Works on a depth-1 checkout: `git archive HEAD` exports the tracked files and `gitleaks dir` grades them. The config is the
+  repository's own .gitleaks.toml when it has one (it may `[extend] path = ".github/gitleaks-base.toml"`), else the stamped
+  .github/gitleaks-base.toml (a repo config must extend it or set useDefault = true). The runner needs curl, tar and sha256sum (Linux x64 or arm64).
+runs:
+  using: composite
+  steps:
+    - name: Install gitleaks (pinned, checksum-verified)
+      shell: bash
+      env:
+        GITLEAKS_VERSION: 8.30.1
+        # From the release's gitleaks_8.30.1_checksums.txt; to upgrade, change the version and both sums together.
+        GITLEAKS_SHA256_X64: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        GITLEAKS_SHA256_ARM64: e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+      run: |
+        set -euo pipefail
+        case "$(uname -m)" in
+          x86_64)  arch=x64;   want="${GITLEAKS_SHA256_X64}" ;;
+          aarch64) arch=arm64; want="${GITLEAKS_SHA256_ARM64}" ;;
+          *) echo "::error::unsupported runner architecture $(uname -m)"; exit 1 ;;
+        esac
+        tarball="gitleaks_${GITLEAKS_VERSION}_linux_${arch}.tar.gz"
+        # The runner image bakes this tarball into XEMA_RELEASE_CACHE (XEMA-6565). The cached file is COPIED and the copy hashed: only
+        # bytes equal to the pin are used; anything else falls through to the download, which is checked against the same pin.
+        rm -f "${RUNNER_TEMP}/${tarball}"
+        cached="${XEMA_RELEASE_CACHE:-}/${tarball}"
+        if [ -n "${XEMA_RELEASE_CACHE:-}" ] && cp "${cached}" "${RUNNER_TEMP}/${tarball}" 2>/dev/null \
+          && [ "$(sha256sum "${RUNNER_TEMP}/${tarball}" | cut -d' ' -f1)" = "${want}" ]; then
+          echo "gitleaks: copied ${tarball} from the runner release cache"
+        else
+          rm -f "${RUNNER_TEMP}/${tarball}"
+          curl -fsSL -o "${RUNNER_TEMP}/${tarball}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+        fi
+        echo "${want}  ${RUNNER_TEMP}/${tarball}" | sha256sum -c -
+        mkdir -p "${RUNNER_TEMP}/gitleaks"
+        tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}/gitleaks" gitleaks
+        echo "${RUNNER_TEMP}/gitleaks" >> "${GITHUB_PATH}"
+    - name: Scan the tracked tree for tokens and keys
+      shell: bash
+      run: |
+        set -euo pipefail
+        # The tracked files at the checked-out commit, never untracked or ignored leftovers on a self-hosted runner, and never fewer
+        # than `git ls-files` lists (see the script). Scan from inside the export so finding paths stay repo-relative (the allowlist
+        # paths and an `[extend] path` are anchored at the root).
+        scan_dir="${RUNNER_TEMP}/tracked-tree"
+        rm -rf "${scan_dir}"
+        config="$(bash "${GITHUB_ACTION_PATH}/scan-tree.sh" "${scan_dir}")"
+        cd "${scan_dir}"
+        gitleaks dir -v --redact --no-banner --config "${config}" .
