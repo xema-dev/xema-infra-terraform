@@ -1,2 +1,6 @@
 [extend]
 path = ".github/gitleaks-base.toml"
+
+[allowlist]
+# Mock-provider fixtures, never real values.
+paths = ['''(^|/)tests-mock/''']
