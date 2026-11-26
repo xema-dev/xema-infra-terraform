@@ -44,7 +44,7 @@ jobs:
   # rather than a green step that planned nothing.
   validate:
     name: ${{ matrix.engine }} — fmt / validate
-    runs-on: ubuntu-latest
+    runs-on: [general, x64]
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -138,7 +138,7 @@ jobs:
 
   checks:
     name: profile / tflint / leak-scan / bind tests
-    runs-on: ubuntu-latest
+    runs-on: [general, x64]
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -191,7 +191,7 @@ jobs:
     name: ci/required
     needs: [validate, checks]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: [general, x64]
     timeout-minutes: 2
     steps:
       - run: test "${{ needs.validate.result }}" = success && test "${{ needs.checks.result }}" = success
